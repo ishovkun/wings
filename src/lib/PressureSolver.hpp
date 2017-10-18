@@ -59,6 +59,9 @@
 // #include <deal.II/fe/fe_system.h>
 // #include <deal.II/lac/sparsity_tools.h>
 
+// Custom modules
+#include <DataBase.hpp>
+
 
 namespace FluidSolvers
 {
@@ -69,19 +72,40 @@ namespace FluidSolvers
   class PressureSolver
   {
   public:
-    PressureSolver(Triangulation<dim> &triangulation);
+    PressureSolver(const Triangulation<dim>  &triangulation,
+                   const Data::DataBase<dim> &data_);
     ~PressureSolver();
 
     void setup_system();
-    void assemble_system();
+    void assemble_system(const double time_step);
     void solve();
     void print_system_matrix();
 
-    Vector<double>       solution;
 
   private:
-    DoFHandler<dim>      dof_handler;
-    FE_DGQ<dim>          fe;
+    double get_transmissibility(const Tensor<1,dim> &perm,
+                                const double        visc,
+                                const double        volume_factor,
+                                const Tensor<1,dim> &normal_vector,
+                                const Tensor<1,dim> &dx,
+                                const double        dS) const;
+
+    double get_cell_mass_matrix(const double cell_volume,
+                                const double volume_factor,
+                                const double porosity,
+                                const double compressibility) const;
+
+    void harmonic_mean(const Tensor<1,dim> &perm_1,
+                       const Tensor<1,dim> &perm_2,
+                       Tensor<1,dim>       &out) const;
+
+    double arithmetic_mean(const double x1,
+                           const double x2) const;
+
+  private:
+    DoFHandler<dim>            dof_handler;
+    FE_DGQ<dim>                fe;
+    const Data::DataBase<dim>  &data;
 
     // Matrices and vectors
     SparsityPattern      sparsity_pattern;
@@ -91,14 +115,21 @@ namespace FluidSolvers
     // SparsityPattern
     // typedef MeshWorker::DoFInfo<dim> DoFInfo;
     // typedef MeshWorker::IntegrationInfo<dim> CellInfo;
+
+  public:
+    Vector<double>                solution, solution_old, rhs_vector;
+    // std::vector< Vector<double> > permeability;
+    // Vector<double>       perm;
   };
 
 
   template <int dim>
-  PressureSolver<dim>::PressureSolver(Triangulation<dim> &triangulation)
+  PressureSolver<dim>::PressureSolver(const Triangulation<dim>  &triangulation,
+                                      const Data::DataBase<dim> &data_)
     :
     dof_handler(triangulation),
-    fe(0)  // since we want finite volumes
+    fe(0),                          // since we want finite volumes
+    data(data_)
   {}  // eom
 
 
@@ -121,13 +152,70 @@ namespace FluidSolvers
 
     system_matrix.reinit(sparsity_pattern);
     solution.reinit(dof_handler.n_dofs());
-    // solution_old.reinit(dof_handler.n_dofs());
-    // right_hand_side.reinit (dof_handler.n_dofs());
+    solution_old.reinit(dof_handler.n_dofs());
+    rhs_vector.reinit(dof_handler.n_dofs());
   } // eom
 
 
   template <int dim>
-  void PressureSolver<dim>::assemble_system()
+  double PressureSolver<dim>::get_cell_mass_matrix(const double cell_volume,
+                                                   const double volume_factor,
+                                                   const double porosity,
+                                                   const double compressibility) const
+  {
+    double B_ii = cell_volume/volume_factor*(porosity*compressibility);
+    return B_ii;
+  }  // eom
+
+
+  template <int dim>
+  double PressureSolver<dim>::get_transmissibility(const Tensor<1,dim> &perm,
+                                                   const double        visc,
+                                                   const double        volume_factor,
+                                                   const Tensor<1,dim> &normal_vector,
+                                                   const Tensor<1,dim> &dx,
+                                                   const double        dS) const
+  {
+    double distance = dx.norm(); // to normalize
+    if (distance == 0)
+      return 0.0;
+
+    double T = 0;
+    for (int d=0; d<dim; ++d)
+    {
+      if (abs(dx[d]/distance) > 1e-10)
+      {
+        T += 1./visc/volume_factor*(perm[d]*normal_vector[d]/dx[d])*dS;
+      }
+    }
+
+    return T;
+  }  // eom
+
+  template <int dim>
+  void PressureSolver<dim>::harmonic_mean(const Tensor<1,dim> &perm_1,
+                                          const Tensor<1,dim> &perm_2,
+                                          Tensor<1,dim>       &out) const
+  {
+    for (int d=0; d<dim; ++d){
+      if (perm_1[d] == 0 || perm_2[d] == 0)
+        out[d] = 0;
+      else
+        out[d] = 2/(1./perm_1[d] + 1./perm_2[d]);
+    }
+  }  // eom
+
+
+  template <int dim>
+  double PressureSolver<dim>::arithmetic_mean(const double x1,
+                                              const double x2) const
+  {
+    return 0.5*(x1+x2);
+  }  // eom
+
+
+  template <int dim>
+  void PressureSolver<dim>::assemble_system(const double time_step)
   {
     // Only one integration point in FVM
     QGauss<dim>       quadrature_formula(1);
@@ -137,11 +225,8 @@ namespace FluidSolvers
     FEFaceValues<dim> fe_face_values(fe, face_quadrature_formula,
                                  update_normal_vectors);
 
-    Tensor<1, dim>    dx_j, normal;
-    Tensor<1, dim>    perm;
-    perm[0] = 1;
-    perm[1] = 1;
-    double visc = 1;
+    Tensor<1, dim>    dx_ij, normal;
+    Tensor<1, dim>    perm_i, perm_j, perm_ij;
     // Tensor <1,dim> normal_vector;
 
     typename DoFHandler<dim>::active_cell_iterator
@@ -149,51 +234,77 @@ namespace FluidSolvers
 		  endc = dof_handler.end();
 
     system_matrix = 0;
+    rhs_vector = 0;
 
 	  for (; cell!=endc; ++cell)
     {
-      unsigned int cell_index = cell->active_cell_index();
-      double p_i = solution[cell_index];
-      // std::cout << "cell: " << cell_index << "\t";
+      unsigned int i = cell->active_cell_index();
+      // std::cout << "cell: " << i << std::endl;
+      const double dV = cell->measure();
+      // double p_i = solution[i];
+      double p_old = solution_old[i];
+
+      // Cell properties
+      data.permeability(i, perm_i);
+      const double mu_i = data.viscosity(i);
+      const double volume_factor_i = data.volume_factor(i);
+      const double poro_i = data.porosity(i);
+      const double fcomp_i = data.fluid_compressibility(i);
+
+      // Cell mass matrix
+      double B_ii = get_cell_mass_matrix(dV, volume_factor_i, poro_i, fcomp_i);
+
       // std::cout << "cell pressure: " << solution[cell_index] << std::endl;
-      double matrix_ii = 0;
+
+      double matrix_ii = B_ii/time_step;
+      double rhs_i = B_ii/time_step*p_old;
+
       for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
       {
-        unsigned int neighbor_index = cell->neighbor_index(f);
+        unsigned int j = cell->neighbor_index(f);
         unsigned int no_neighbor_index = -1;
 
-        if(neighbor_index != no_neighbor_index) // if this neighbor exists
+        if(j != no_neighbor_index) // if this neighbor exists
         {
           // CHECK IF NEIGHBOR IS NOT REFINED, OTHERWISE WRITE CODE!!!!!
           // if neighbor is not at the maximum refinement level
           fe_face_values.reinit(cell, f);
-          double face_measure = cell->face(f)->measure();
-          double p_j = solution[neighbor_index];
-          normal = fe_face_values.normal_vector(0); // 0 is gauss point
-          dx_j = cell->neighbor(f)->center() - cell->center();
-          double mult = 0;
-          // std::cout << "dx: " << dx_j[0] << "\t" << dx_j[1] << std::endl;
-          for (int d=0; d<dim; d++)
-          {
-            if (!numbers::is_finite(dx_j[d]))
-              mult = -1./visc*(perm[d]*normal[d]/dx_j[d])*face_measure;
-          }
-          matrix_ii += mult*p_i;
-          double matrix_ij = mult*p_j;
-          // std::cout << "neighbor: " << neighbor_index << std::endl;
-          // std::cout << solution[neighbor_index] << std::endl;
-          // std::cout << "measure " << face_measure << std::endl;
-          // std::cout << "normals: "
-          //           << fe_face_values.normal_vector(0)[0] << "\t"
-          //           << fe_face_values.normal_vector(0)[1]
-          //           << std::endl;
-          system_matrix.add(cell_index, neighbor_index, matrix_ij);
-        } // end face loop
-        // system_matrix[cell_index, cell_index] += matrix_ii;
-        system_matrix.add(cell_index, cell_index, matrix_ii);
-      }  // end face loop
 
-      // std::cout << "\n";
+          // geometry props
+          double dS = cell->face(f)->measure();  // face area
+          normal = fe_face_values.normal_vector(0); // 0 is gauss point
+          dx_ij = cell->neighbor(f)->center() - cell->center();
+
+          // neighbor cell data
+          data.permeability(j, perm_j);
+          const double poro_j = data.porosity(j);
+          const double mu_j = data.viscosity(j);
+          const double volume_factor_j = data.volume_factor(j);
+          // get relative permeability!!!!!!!!!!!!!!1
+
+          // Face properties
+          harmonic_mean(perm_i, perm_j, perm_ij);
+          const double mu_ij = arithmetic_mean(mu_i, mu_j);
+          const double poro_ij = arithmetic_mean(poro_i, poro_j);
+          const double volume_factor_ij = arithmetic_mean(volume_factor_i,
+                                                          volume_factor_j);
+          // upwind relative permeability!!!!!!!!!!!!!!
+
+          // Face transmissibility
+          double T_ij = get_transmissibility(perm_ij, mu_ij, volume_factor_ij,
+                                             normal, dx_ij, dS);
+
+          matrix_ii += T_ij;
+          system_matrix.add(i, j, -T_ij);
+        } // end face loop
+        else  // if the neighbor doesn't exist
+          continue;
+
+      }  // end face loop
+      system_matrix.add(i, i, matrix_ii);
+      rhs_vector[i] += rhs_i;
+
+      // std::cout << "------------------------------\n";
     } // end cell loop
 
   } // eom
@@ -202,11 +313,20 @@ namespace FluidSolvers
   template <int dim>
   void PressureSolver<dim>::print_system_matrix()
   {
-    for (unsigned int i=0; i<dof_handler.n_dofs(); i++) {
-      for (unsigned int j=0; j<dof_handler.n_dofs(); j++) {
-        std::cout << system_matrix(i, j) << "\t";
-      }
-      std::cout << std::endl;
-    }
+    // for (unsigned int i=0; i<dof_handler.n_dofs(); i++) {
+    //   for (unsigned int j=0; j<dof_handler.n_dofs(); j++) {
+    //     try {
+    //       std::cout << system_matrix(i, j) << "\t";
+    //     }
+    //     catch (...)
+    //     {
+    //       std::cout << 0 << "\t";
+    //     }
+    //   }
+    //   std::cout << std::endl;
+    // }
+
+    // out, precision, scientific
+    system_matrix.print_formatted(std::cout, 1, false);
   } // eom
 }  // end of namespace

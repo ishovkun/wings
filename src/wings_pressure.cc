@@ -25,13 +25,14 @@ namespace Wings
 
     Triangulation<dim>                triangulation;
     FluidSolvers::PressureSolver<dim> pressure_solver;
+    Data::DataBase<dim>               data;
   };
 
 
   template <int dim>
   WingsPressure<dim>::WingsPressure()
     :
-    pressure_solver(triangulation)
+    pressure_solver(triangulation, data)
   {}
 
 
@@ -43,8 +44,8 @@ namespace Wings
   template <int dim>
   void WingsPressure<dim>::make_mesh()
   {
-    GridGenerator::hyper_cube(triangulation, 0, 1);
-    triangulation.refine_global(1);
+    GridGenerator::hyper_cube(triangulation, -1, 1);
+    triangulation.refine_global(2);
   } // eom
 
 
@@ -54,11 +55,14 @@ namespace Wings
     make_mesh();
     pressure_solver.setup_system();
 
+    double time_step = 1;
+
     pressure_solver.solution[0] = 1;
     pressure_solver.solution[1] = 0;
     pressure_solver.solution[2] = 0;
     pressure_solver.solution[3] = 1;
-    pressure_solver.assemble_system();
+    pressure_solver.solution_old = pressure_solver.solution;
+    pressure_solver.assemble_system(time_step);
     pressure_solver.print_system_matrix();
   } // eom
 
