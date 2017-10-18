@@ -75,6 +75,7 @@ namespace FluidSolvers
     void setup_system();
     void assemble_system();
     void solve();
+    void print_system_matrix();
 
     Vector<double>       solution;
 
@@ -195,7 +196,17 @@ namespace FluidSolvers
       // std::cout << "\n";
     } // end cell loop
 
-
   } // eom
 
+
+  template <int dim>
+  void PressureSolver<dim>::print_system_matrix()
+  {
+    for (unsigned int i=0; i<dof_handler.n_dofs(); i++) {
+      for (unsigned int j=0; j<dof_handler.n_dofs(); j++) {
+        std::cout << system_matrix(i, j) << "\t";
+      }
+      std::cout << std::endl;
+    }
+  } // eom
 }  // end of namespace

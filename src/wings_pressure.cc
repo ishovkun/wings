@@ -59,6 +59,7 @@ namespace Wings
     pressure_solver.solution[2] = 0;
     pressure_solver.solution[3] = 1;
     pressure_solver.assemble_system();
+    pressure_solver.print_system_matrix();
   } // eom
 
 } // end of namespace
