@@ -231,6 +231,7 @@ namespace FluidSolvers
 
     typename DoFHandler<dim>::active_cell_iterator
 		  cell = dof_handler.begin_active(),
+      neighbor_cell = dof_handler.begin_active(),
 		  endc = dof_handler.end();
 
     system_matrix = 0;
@@ -245,11 +246,13 @@ namespace FluidSolvers
       double p_old = solution_old[i];
 
       // Cell properties
-      data.permeability(i, perm_i);
-      const double mu_i = data.viscosity(i);
-      const double volume_factor_i = data.volume_factor(i);
-      const double poro_i = data.porosity(i);
-      const double fcomp_i = data.fluid_compressibility(i);
+      // data.get_permeability(i, perm_i);
+      for (int d=0; d<dim; d++)
+        perm_i[d] = data.get_permeability->value(cell->center(), d);
+      const double mu_i = data.get_viscosity();
+      const double volume_factor_i = data.get_volume_factor();
+      const double poro_i = data.get_porosity->value(cell->center());
+      const double fcomp_i = data.get_compressibility();
 
       // Cell mass matrix
       double B_ii = get_cell_mass_matrix(dV, volume_factor_i, poro_i, fcomp_i);
@@ -272,20 +275,26 @@ namespace FluidSolvers
 
           // geometry props
           double dS = cell->face(f)->measure();  // face area
+          neighbor_cell = cell->neighbor(f);
           normal = fe_face_values.normal_vector(0); // 0 is gauss point
-          dx_ij = cell->neighbor(f)->center() - cell->center();
+          dx_ij = neighbor_cell->center() - cell->center();
 
           // neighbor cell data
-          data.permeability(j, perm_j);
-          const double poro_j = data.porosity(j);
-          const double mu_j = data.viscosity(j);
-          const double volume_factor_j = data.volume_factor(j);
-          // get relative permeability!!!!!!!!!!!!!!1
+          // const double poro_j = data.get_porosity->value(neighbor_cell->center());
+          const double mu_j = data.get_viscosity();
+          const double volume_factor_j = data.get_volume_factor();
+
+          // get absolute perm
+          for (int d=0; d<dim; d++)
+            perm_j[d] = data.get_permeability->value(neighbor_cell->center(), d);
+          // std::cout << perm_j[0] << "\t" << perm_j[1]<< "\t" << std::endl;
+
+          // get relative permeability!!!!!!!!!!!!!!
 
           // Face properties
           harmonic_mean(perm_i, perm_j, perm_ij);
           const double mu_ij = arithmetic_mean(mu_i, mu_j);
-          const double poro_ij = arithmetic_mean(poro_i, poro_j);
+          // const double poro_ij = arithmetic_mean(poro_i, poro_j);
           const double volume_factor_ij = arithmetic_mean(volume_factor_i,
                                                           volume_factor_j);
           // upwind relative permeability!!!!!!!!!!!!!!
@@ -293,6 +302,7 @@ namespace FluidSolvers
           // Face transmissibility
           double T_ij = get_transmissibility(perm_ij, mu_ij, volume_factor_ij,
                                              normal, dx_ij, dS);
+          // std::cout << "trans: " << T_ij << std::endl;
 
           matrix_ii += T_ij;
           system_matrix.add(i, j, -T_ij);
