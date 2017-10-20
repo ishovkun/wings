@@ -42,7 +42,8 @@ ADD_EXECUTABLE(wings-pressure ${CMAKE_SOURCE_DIR}/src/wings_pressure.cc)
 DEAL_II_SETUP_TARGET(wings-pressure)
 
 # linking
-# TARGET_LINK_LIBRARIES(wings-pressure lib boost_filesystem)
-TARGET_LINK_LIBRARIES(wings-pressure lib)
+TARGET_LINK_LIBRARIES(wings-pressure lib boost_filesystem)
+# TARGET_LINK_LIBRARIES(wings-pressure lib boost_filesystem boost_algorithms)
+# TARGET_LINK_LIBRARIES(wings-pressure lib)
 
 # DEAL_II_INVOKE_AUTOPILOT()

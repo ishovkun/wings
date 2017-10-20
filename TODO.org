@@ -1,0 +1,7 @@
+* General
+** Handle units
+** Adaptive mesh refinement
+   Make PressureSolver work with refined mesh, see
+   https://www.dealii.org/8.4.1/doxygen/deal.II/classCellAccessor.html#acec7a480d2bcdd506a3350dd9ec3cfeb
+** Write code for treating bitmap input
+** Parallelize

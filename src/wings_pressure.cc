@@ -6,6 +6,7 @@
 #include <deal.II/grid/grid_generator.h>
 // Custom modules
 #include <PressureSolver.hpp>
+#include <Parsers.hpp>
 
 namespace Wings
 {
@@ -16,7 +17,7 @@ namespace Wings
   class WingsPressure
   {
   public:
-    WingsPressure();
+    WingsPressure(std::string);
     // ~WingsPressure();
     void run();
 
@@ -26,13 +27,15 @@ namespace Wings
     Triangulation<dim>                triangulation;
     FluidSolvers::PressureSolver<dim> pressure_solver;
     Data::DataBase<dim>               data;
+    std::string                       input_file;
   };
 
 
   template <int dim>
-  WingsPressure<dim>::WingsPressure()
+  WingsPressure<dim>::WingsPressure(std::string input_file_name_)
     :
-    pressure_solver(triangulation, data)
+    pressure_solver(triangulation, data),
+    input_file(input_file_name_)
   {}
 
 
@@ -52,33 +55,32 @@ namespace Wings
   template <int dim>
   void WingsPressure<dim>::run()
   {
+    data.read_input(input_file);
     make_mesh();
-    pressure_solver.setup_system();
+    // pressure_solver.setup_system();
 
-    double time_step = 1;
+    // double time_step = 1;
 
-    pressure_solver.solution[0] = 1;
-    pressure_solver.solution[1] = 0;
-    pressure_solver.solution[2] = 0;
-    pressure_solver.solution[3] = 1;
-    pressure_solver.solution_old = pressure_solver.solution;
-    pressure_solver.assemble_system(time_step);
-    pressure_solver.print_system_matrix();
+    // pressure_solver.solution[0] = 1;
+    // pressure_solver.solution[1] = 0;
+    // pressure_solver.solution[2] = 0;
+    // pressure_solver.solution[3] = 1;
+    // pressure_solver.solution_old = pressure_solver.solution;
+    // pressure_solver.assemble_system(time_step);
+    // pressure_solver.print_system_matrix();
   } // eom
 
 } // end of namespace
 
-// int main(int argc, char *argv[])
-int main()
+int main(int argc, char *argv[])
 {
   try
   {
     using namespace dealii;
-
     dealii::deallog.depth_console (0);
     // Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
-    // std::string input_file_name = parse_command_line(argc, argv);
-    Wings::WingsPressure<2> problem;
+    std::string input_file_name = Parsers::parse_command_line(argc, argv);
+    Wings::WingsPressure<2> problem(input_file_name);
     problem.run();
     return 0;
   }
