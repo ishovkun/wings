@@ -4,9 +4,11 @@
 #include <deal.II/base/tensor.h>
 #include <deal.II/base/function.h>
 #include <deal.II/base/parameter_handler.h>
+#include <boost/filesystem.hpp>
 
 // Custom modules
 #include <Parsers.hpp>
+#include <BitMap.hpp>
 
 
 namespace Data
@@ -19,7 +21,7 @@ namespace Data
   public:
     DataBase();
     // ~DataBase();
-    void read_input(std::string);
+    void read_input(const std::string&);
 
     // Functions of a coordinate
     Function<dim> *get_young_modulus,
@@ -39,15 +41,17 @@ namespace Data
     void assign_parameters();
     void compute_runtime_parameters();
     void check_input();
+    void assign_permeability_param();
 
     // ATTRIBUTES
   public:
     int initial_refinement_level, n_prerefinement_steps, n_adaptive_steps;
     std::vector<std::pair<double,double>> local_prerefinement_region;
   private:
-    double volume_factor, viscosity, porosity, fluid_compressibility,
+    std::string mesh_file_name, input_file_name;
+    double volume_factor_w, viscosity_w, porosity, compressibility_w,
            young_modulus, poisson_ratio;
-    std::vector<double> permeability;
+    // std::vector<double> permeability;
     ParameterHandler    prm;
 
 
@@ -57,29 +61,15 @@ namespace Data
   template <int dim>
   DataBase<dim>::DataBase()
   {
-    for (int d=0; d<dim; d++)
-      this->permeability.push_back(1);
-
-    this->porosity = 0.3;
-    this->volume_factor = 1;
-    this->viscosity = 1e-3;
-    this->young_modulus = 1;
-    this->poisson_ratio = 0.3;
-    this->fluid_compressibility = 1e-8;
-
-    this->get_young_modulus = new ConstantFunction<dim>(young_modulus);
-    this->get_poisson_ratio = new ConstantFunction<dim>(poisson_ratio);
-    this->get_porosity = new ConstantFunction<dim>(porosity);
-    this->get_permeability = new ConstantFunction<dim>(permeability);
-
     declare_parameters();
   }  // eom
 
 
   template <int dim>
-  void DataBase<dim>::read_input(std::string file_name)
+  void DataBase<dim>::read_input(const std::string& file_name)
   {
     std::cout << "Reading " << file_name << std::endl;
+    input_file_name = file_name;
     prm.read_input(file_name);
     prm.print_parameters(std::cout, ParameterHandler::Text);
     assign_parameters();
@@ -148,6 +138,33 @@ namespace Data
 
 
   template <int dim>
+  void DataBase<dim>::assign_permeability_param()
+  {
+    const std::string perm_entry = prm.get("Permeability");
+    if (Parsers::is_number(perm_entry))
+      {
+        std::vector<double> perm_tensor;
+        for (int d=0; d<dim; d++)
+          perm_tensor.push_back(boost::lexical_cast<double>(perm_entry));
+        this->get_permeability = new ConstantFunction<dim>(perm_tensor);
+      }
+    else
+      {
+        std::cout << "Searching " << perm_entry << std::endl;
+        boost::filesystem::path input_file_path(input_file_name);
+        boost::filesystem::path perm_file =
+          input_file_path.parent_path() / perm_entry;
+        std::cout << "Reading " << perm_file << std::endl;
+        this->get_permeability =
+          new BitMap::BitMapFunction<dim>(perm_file.string());
+        // just test what it gives
+        // Point<dim> p(1, 1);
+        // std::cout << this->get_permeability->value(p, 0) << std::endl;
+      }
+  }  // eom
+
+
+  template <int dim>
   void DataBase<dim>::assign_parameters()
   {
     { // Mesh
@@ -165,6 +182,74 @@ namespace Data
       local_prerefinement_region[1].first = tmp[2];
       local_prerefinement_region[1].second = tmp[3];
       prm.leave_subsection();
+    }
+    {  // Equation data
+      prm.enter_subsection("Equation data");
+
+      this->poisson_ratio = prm.get_double("Poisson ratio");
+      this->young_modulus = prm.get_double("Young modulus");
+      this->volume_factor_w = prm.get_double("Volume factor water");
+      this->viscosity_w = prm.get_double("Viscosity water");
+      this->compressibility_w = prm.get_double("Compressibility water");
+
+      // coefficients that are either constant or mapped
+      assign_permeability_param();
+      Point<dim> p(1, 1);
+      std::cout << this->get_permeability->value(p, 1) << std::endl;
+      // const std::string perm_entry = prm.get("Permeability");
+      // if (Parsers::is_number(perm_entry))
+      // {
+      //   std::vector<double> perm_tensor;
+      //   for (int d=0; d<dim; d++)
+      //     perm_tensor.push_back(boost::lexical_cast<double>(perm_entry));
+      //   this->get_permeability = new ConstantFunction<dim>(perm_tensor);
+      // }
+      // else
+      // {
+      //   std::cout << "Searching " << perm_entry << std::endl;
+      //   boost::filesystem::path input_file_path(input_file_name);
+      //   boost::filesystem::path perm_file =
+      //     input_file_path.parent_path() / perm_entry;
+      //   std::cout << "Reading " << perm_file << std::endl;
+      //   this->get_permeability =
+      //     new BitMap::BitMapFunction<dim>(perm_file.string());
+      //   // just test what it gives
+      //   // Point<dim> p(1, 1);
+      //   // std::cout << this->get_permeability->value(p, 0) << std::endl;
+      // }
+
+      // if (this->uniform_young_modulus)
+      //   this->young_modulus = prm.get_double("Young modulus");
+      // else
+      //   {
+      //     std::vector<double> tmp;
+      //     tmp.resize(2);
+      //     tmp = Parsers::parse_string_list<double>(prm.get("Young modulus range"));
+      //     this->young_modulus_limits.first = tmp[0];
+      //     this->young_modulus_limits.second = tmp[1];
+      //   }
+
+      // this->regularization_parameter_kappa = prm.get_double("Regularization kappa");
+      // this->penalty_parameter = prm.get_double("Penalization c");
+      // std::vector<double> tmp =
+      //   Parsers::parse_string_list<double>(prm.get("Regularization epsilon"));
+      // regularization_epsilon_coefficients.first = tmp[0];
+      // regularization_epsilon_coefficients.second = tmp[1];
+      // // Ranges
+      // // tmp.clear();
+      // // Bitmap file
+      // bitmap_file_name = prm.get("Bitmap file");
+      // std::vector<double> tmp1 =
+      //   Parsers::parse_string_list<double>(prm.get("Bitmap range"));
+      // bitmap_range.resize(dim);
+      // // std::cout << tmp1.size() << std::endl;
+      // if (tmp1.size() > 0)
+      //   for (int i=0; i<dim; ++i)
+      //     {
+      //       bitmap_range[i].first = tmp1[2*i];
+      //       bitmap_range[i].second = tmp1[2*i + 1];
+      //     }
+      // prm.leave_subsection();
     }
   }  // eom
 }  // end of namespace
