@@ -1,0 +1,23 @@
+subsection Mesh
+  set Initial global refinement steps = 4
+  set Local refinement region         = 16, 24, 17.5, 22.5
+  set Adaptive steps                  = 4
+  set Mesh file                       = 3x3.msh
+end
+
+subsection Equation data
+  set Young modulus              = 1e8
+  set Poisson ratio              = 0.3
+  set Volume factor water        = 1
+  set Viscosity water            = 1e-3
+  set Compressibility water      = 1e-8
+  set Permeability               = perm3x3_homog.dat
+end
+
+subsection Solver
+  set Time stepping       = (0, 0.01);# (1, 1); (4.5, 0.001); #(15, 5e-3)
+  set Minimum time step   = 1e-5
+  set T max               = 100
+  set FSS tolerance       = 1e-8
+  set Max FSS steps       = 30
+end
