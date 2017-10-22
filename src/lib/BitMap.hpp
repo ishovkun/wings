@@ -91,11 +91,13 @@ namespace BitMap {
       case 2:
         ny = n_pixels[1];
         hy = 1.0 / (ny - 1);
+        break;
       case 3:
         ny = n_pixels[1];
         nz = n_pixels[2];
         hy = 1.0 / (ny - 1);
         hz = 1.0 / (nz - 1);
+        break;
     }
   }  // eom
 

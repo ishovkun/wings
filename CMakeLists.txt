@@ -1,7 +1,8 @@
 
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8.8)
 
-FIND_PACKAGE(deal.II 8.4 QUIET
+# FIND_PACKAGE(deal.II 8.4 QUIET
+FIND_PACKAGE(deal.II 8.4
   HINTS ${deal.II_DIR} ${DEAL_II_DIR} ../ ../../ $ENV{DEAL_II_DIR}
   )
 IF(NOT ${deal.II_FOUND})
@@ -29,7 +30,20 @@ DEAL_II_INITIALIZE_CACHED_VARIABLES()
 #SET(CLEAN_UP_FILES *.log *.gmv *.gnuplot *.gpl *.eps *.pov *.vtk *.ucd *.d2 *.vtu *.pvtu)
 PROJECT(wings)
 
+set(Boost_USE_STATIC_LIBS OFF)
+set(Boost_USE_MULTITHREADED ON)
+set(Boost_USE_STATIC_RUNTIME OFF)
+find_package(Boost 1.65.1 COMPONENTS filesystem iostreams)
+
+# if(Boost_FOUND)
+    # MESSAGE("\nboost found!")
+    # include_directories(${Boost_INCLUDE_DIRS})
+    # add_executable(progname file1.cxx file2.cxx)
+    # target_link_libraries(progname ${Boost_LIBRARIES})
+# endif()
+
 # lib
+include_directories(${Boost_INCLUDE_DIRS})
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/src/lib)
 ADD_SUBDIRECTORY(src/lib)
 SET_TARGET_PROPERTIES (
@@ -42,7 +56,7 @@ ADD_EXECUTABLE(wings-pressure ${CMAKE_SOURCE_DIR}/src/wings_pressure.cc)
 DEAL_II_SETUP_TARGET(wings-pressure)
 
 # linking
-TARGET_LINK_LIBRARIES(wings-pressure lib boost_filesystem)
+TARGET_LINK_LIBRARIES(wings-pressure lib ${Boost_LIBRARIES})
 # TARGET_LINK_LIBRARIES(wings-pressure lib boost_filesystem boost_algorithms)
 # TARGET_LINK_LIBRARIES(wings-pressure lib)
 

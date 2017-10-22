@@ -16,7 +16,7 @@
 // to print sparsity pattern, remove later
 #include <fstream>
 
-// #include <deal.II/base/quadrature_lib.h>
+#include <deal.II/base/quadrature_lib.h>
 // #include <deal.II/base/function.h>
 // #include <deal.II/lac/dynamic_sparsity_pattern.h>
 // #include <deal.II/grid/grid_generator.h>
@@ -34,7 +34,6 @@
 // #include <deal.II/meshworker/loop.h>
 
 // #include <deal.II/base/utilities.h>
-// #include <deal.II/base/quadrature_lib.h>
 // #include <deal.II/base/timer.h>
 // #include <deal.II/base/function.h>
 // #include <deal.II/base/tensor.h>

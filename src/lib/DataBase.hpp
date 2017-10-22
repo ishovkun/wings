@@ -70,7 +70,7 @@ namespace Data
   {
     std::cout << "Reading " << file_name << std::endl;
     input_file_name = file_name;
-    prm.read_input(file_name);
+    prm.parse_input(file_name);
     prm.print_parameters(std::cout, ParameterHandler::Text);
     assign_parameters();
     // compute_runtime_parameters();
