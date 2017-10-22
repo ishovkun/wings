@@ -139,27 +139,71 @@ namespace BitMap {
   class BitMapFunction : public Function<dim>
   {
   public:
-    BitMapFunction(const std::string &filename)
-      :
-      Function<dim>(1),
-      f(filename)
-    {}
+    BitMapFunction(const std::string &filename);
+    BitMapFunction(const std::string   &filename,
+                   const Tensor<1,dim> &anisotropy_);
 
-    virtual
-    double value (const Point<dim> &p,
-                  const unsigned int /*component*/) const
-    {
-      Assert(dim==2, ExcNotImplemented());
-      // double x = (p(0)-x1)/(x2-x1);
-      // double y = (p(1)-y1)/(y2-y1);
-      // return minvalue + f.get_value(x,y)*(maxvalue-minvalue);
-      return f.get_value(p(0),p(1));
-    }
-
+    double value(const Point<dim> &p,
+                 const unsigned int /*component*/ c) const;
+    void vector_value(const Point<dim> &p,
+                      Tensor<1,dim>    &v) const;
+    void vector_value(const Point<dim> &p,
+                      Vector<double>   &v) const;
   private:
     BitMapFile<dim> f;
-    // double x1,x2,y1,y2;
-    // double minvalue, maxvalue;
+    Tensor<1,dim> anisotropy;
   };
+
+
+  template<int dim>
+  BitMapFunction<dim>::BitMapFunction(const std::string &filename)
+    :
+    Function<dim>(1),
+    f(filename)
+  {
+    for (int d=0; d<dim; d++)
+      anisotropy[d] = 1;
+  }  // eom
+
+
+  template<int dim>
+  BitMapFunction<dim>::BitMapFunction(const std::string   &filename,
+                                      const Tensor<1,dim> &anisotropy_)
+    :
+    Function<dim>(1),
+    f(filename),
+    anisotropy(anisotropy_)
+  {}  // eom
+
+
+  template<int dim>
+  void
+  BitMapFunction<dim>::vector_value(const Point<dim> &p,
+                                    Tensor<1,dim>    &v) const
+  {
+    AssertThrow(v.size() < dim, ExcMessage("Wrong dimensions"));
+    for (int c=0; c<dim; c++)
+      v[c] = value(p, c);
+  }  // eom
+
+
+  template<int dim>
+  void
+  BitMapFunction<dim>::vector_value(const Point<dim> &p,
+                                    Vector<double>   &v) const
+  {
+    for (int c=0; c<dim; c++)
+      v[c] = value(p, c);
+  }  // eom
+
+
+  template<>
+  double
+  BitMapFunction<2>::value(const Point<2> &p,
+                           const unsigned int /*component*/ c) const
+  {
+    Assert(c<2, ExcNotImplemented());
+    return f.get_value(p(0),p(1))*anisotropy[c];
+  }  // eom
 
 }  // end of namespace

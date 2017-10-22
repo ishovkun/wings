@@ -9,6 +9,7 @@
 // Custom modules
 #include <Parsers.hpp>
 #include <BitMap.hpp>
+#include <Units.cc>
 
 
 namespace Data
@@ -42,16 +43,18 @@ namespace Data
     void compute_runtime_parameters();
     void check_input();
     void assign_permeability_param();
+    Function<dim> * assign_hetorogeneous_param(const std::string&   par_name,
+                                               const Tensor<1,dim>& anisotropy);
 
     // ATTRIBUTES
   public:
     int initial_refinement_level, n_prerefinement_steps, n_adaptive_steps;
     std::vector<std::pair<double,double>> local_prerefinement_region;
+    Units::Units units;
   private:
     std::string mesh_file_name, input_file_name;
     double volume_factor_w, viscosity_w, porosity, compressibility_w,
            young_modulus, poisson_ratio;
-    // std::vector<double> permeability;
     ParameterHandler    prm;
 
 
@@ -138,31 +141,28 @@ namespace Data
 
 
   template <int dim>
-  void DataBase<dim>::assign_permeability_param()
+  Function<dim> * DataBase<dim>::assign_hetorogeneous_param(const std::string&   par_name,
+                                                            const Tensor<1,dim>& anisotropy)
   {
-    const std::string perm_entry = prm.get("Permeability");
-    if (Parsers::is_number(perm_entry))
+    const std::string entry = prm.get(par_name);
+    if (Parsers::is_number(entry))
       {
-        std::vector<double> perm_tensor;
-        for (int d=0; d<dim; d++)
-          perm_tensor.push_back(boost::lexical_cast<double>(perm_entry));
-        this->get_permeability = new ConstantFunction<dim>(perm_tensor);
+        std::vector<double> quantity;
+        for (int c=0; c<dim; c++)
+          quantity.push_back(boost::lexical_cast<double>(entry)*anisotropy[c]);
+        return new ConstantFunction<dim>(quantity);
       }
     else
-      {
-        std::cout << "Searching " << perm_entry << std::endl;
-        boost::filesystem::path input_file_path(input_file_name);
-        boost::filesystem::path perm_file =
-          input_file_path.parent_path() / perm_entry;
-        std::cout << "Reading " << perm_file << std::endl;
-        this->get_permeability =
-          new BitMap::BitMapFunction<dim>(perm_file.string());
-        // just test what it gives
-        // Point<dim> p(1, 1);
-        // std::cout << this->get_permeability->value(p, 0) << std::endl;
-      }
+    {
+      std::cout << "Searching " << par_name << std::endl;
+      boost::filesystem::path input_file_path(input_file_name);
+      boost::filesystem::path data_file =
+        input_file_path.parent_path() / entry;
+      std::cout << "Reading " << data_file << std::endl;
+      return new BitMap::BitMapFunction<dim>(data_file.string(),
+                                             anisotropy);
+    }
   }  // eom
-
 
   template <int dim>
   void DataBase<dim>::assign_parameters()
@@ -183,7 +183,7 @@ namespace Data
       local_prerefinement_region[1].second = tmp[3];
       prm.leave_subsection();
     }
-    {  // Equation data
+    { // Equation data
       prm.enter_subsection("Equation data");
 
       this->poisson_ratio = prm.get_double("Poisson ratio");
@@ -191,65 +191,25 @@ namespace Data
       this->volume_factor_w = prm.get_double("Volume factor water");
       this->viscosity_w = prm.get_double("Viscosity water");
       this->compressibility_w = prm.get_double("Compressibility water");
-
       // coefficients that are either constant or mapped
-      assign_permeability_param();
-      Point<dim> p(1, 1);
-      std::cout << this->get_permeability->value(p, 1) << std::endl;
-      // const std::string perm_entry = prm.get("Permeability");
-      // if (Parsers::is_number(perm_entry))
-      // {
-      //   std::vector<double> perm_tensor;
-      //   for (int d=0; d<dim; d++)
-      //     perm_tensor.push_back(boost::lexical_cast<double>(perm_entry));
-      //   this->get_permeability = new ConstantFunction<dim>(perm_tensor);
-      // }
-      // else
-      // {
-      //   std::cout << "Searching " << perm_entry << std::endl;
-      //   boost::filesystem::path input_file_path(input_file_name);
-      //   boost::filesystem::path perm_file =
-      //     input_file_path.parent_path() / perm_entry;
-      //   std::cout << "Reading " << perm_file << std::endl;
-      //   this->get_permeability =
-      //     new BitMap::BitMapFunction<dim>(perm_file.string());
-      //   // just test what it gives
-      //   // Point<dim> p(1, 1);
-      //   // std::cout << this->get_permeability->value(p, 0) << std::endl;
-      // }
+      // assign_permeability_param();
 
-      // if (this->uniform_young_modulus)
-      //   this->young_modulus = prm.get_double("Young modulus");
-      // else
-      //   {
-      //     std::vector<double> tmp;
-      //     tmp.resize(2);
-      //     tmp = Parsers::parse_string_list<double>(prm.get("Young modulus range"));
-      //     this->young_modulus_limits.first = tmp[0];
-      //     this->young_modulus_limits.second = tmp[1];
-      //   }
+      Tensor<1,dim> anisotropy;
+      for (int c=0; c<dim; c++)
+        anisotropy[c] = 1;
+      std::string perm_string = "Permeability";
+      this->get_permeability =
+        assign_hetorogeneous_param(perm_string, anisotropy);
 
-      // this->regularization_parameter_kappa = prm.get_double("Regularization kappa");
-      // this->penalty_parameter = prm.get_double("Penalization c");
-      // std::vector<double> tmp =
-      //   Parsers::parse_string_list<double>(prm.get("Regularization epsilon"));
-      // regularization_epsilon_coefficients.first = tmp[0];
-      // regularization_epsilon_coefficients.second = tmp[1];
-      // // Ranges
-      // // tmp.clear();
-      // // Bitmap file
-      // bitmap_file_name = prm.get("Bitmap file");
-      // std::vector<double> tmp1 =
-      //   Parsers::parse_string_list<double>(prm.get("Bitmap range"));
-      // bitmap_range.resize(dim);
-      // // std::cout << tmp1.size() << std::endl;
-      // if (tmp1.size() > 0)
-      //   for (int i=0; i<dim; ++i)
-      //     {
-      //       bitmap_range[i].first = tmp1[2*i];
-      //       bitmap_range[i].second = tmp1[2*i + 1];
-      //     }
-      // prm.leave_subsection();
+      // test output
+      std::cout
+        << this->get_permeability->value(Point<dim>(1,1), 1)
+        << std::endl;
+      prm.leave_subsection();
+    }
+    { // Solver
+      prm.enter_subsection("Equation data");
+      prm.leave_subsection();
     }
   }  // eom
 }  // end of namespace
