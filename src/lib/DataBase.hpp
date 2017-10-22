@@ -1,4 +1,4 @@
-# pragma once
+#pragma once
 
 // #include <deal.II/base/function.h>
 #include <deal.II/base/tensor.h>
@@ -11,6 +11,7 @@
 #include <BitMap.hpp>
 #include <Units.cc>
 #include <Tensors.hpp>
+#include <Keywords.cpp>
 
 
 namespace Data
@@ -44,21 +45,31 @@ namespace Data
     void compute_runtime_parameters();
     void check_input();
     void assign_permeability_param();
-    Function<dim> * assign_hetorogeneous_param(const std::string&   par_name,
-                                               const Tensor<1,dim>& anisotropy);
+    Function<dim>*
+    assign_hetorogeneous_param(const std::string&   par_name,
+                               const Tensor<1,dim>& anisotropy);
 
     // ATTRIBUTES
   public:
-    int initial_refinement_level, n_prerefinement_steps, n_adaptive_steps;
+    int                                   initial_refinement_level,
+                                          n_prerefinement_steps,
+                                          n_adaptive_steps;
     std::vector<std::pair<double,double>> local_prerefinement_region;
-    Units::Units units;
+    Units::Units                          units;
+    Keywords::Keywords                    keywords;
   private:
-    std::string mesh_file_name, input_file_name;
-    double volume_factor_w, viscosity_w, porosity, compressibility_w,
-           young_modulus, poisson_ratio;
-    ParameterHandler    prm;
-
-
+    std::string                           mesh_file_name, input_file_name;
+    double                                volume_factor_w,
+                                          viscosity_w,
+                                          porosity,
+                                          compressibility_w,
+                                          young_modulus,
+                                          poisson_ratio;
+    double                                fss_tolerance,
+                                          min_time_step,
+                                          t_max;
+    int                                   max_fss_steps;
+    ParameterHandler                      prm;
   };  // eom
 
 
@@ -107,33 +118,47 @@ namespace Data
   void DataBase<dim>::declare_parameters()
   {
     { // Mesh
-      prm.enter_subsection("Mesh");
-      prm.declare_entry("Mesh file", "", Patterns::Anything());
-      prm.declare_entry("Initial global refinement steps", "0", Patterns::Integer(0, 100));
-      prm.declare_entry("Adaptive steps", "0", Patterns::Integer(0, 100));
-      prm.declare_entry("Local refinement region", "",
-                        Patterns::List(Patterns::Double()));
+      prm.enter_subsection(keywords.section_mesh);
+      prm.declare_entry(keywords.mesh_file,
+                        "", Patterns::Anything());
+      prm.declare_entry(keywords.global_refinement_steps,
+                        "0", Patterns::Integer(0, 100));
+      prm.declare_entry(keywords.adaptive_refinement_steps,
+                        "0", Patterns::Integer(0, 100));
+      prm.declare_entry(keywords.local_refinement_regions,
+                        "", Patterns::List(Patterns::Double()));
       prm.leave_subsection();
     }
 
     { // equation data
-      prm.enter_subsection("Equation data");
+      prm.enter_subsection(keywords.section_equation_data);
       // Constant parameters
-      prm.declare_entry("Young modulus", "1e9", Patterns::Anything());
-      prm.declare_entry("Poisson ratio", "0.3", Patterns::Double(0, 0.5));
-      prm.declare_entry("Volume factor water", "1", Patterns::Anything());
-      prm.declare_entry("Viscosity water", "1e-3", Patterns::Double());
-      prm.declare_entry("Compressibility water", "1e-8", Patterns::Double());
-      prm.declare_entry("Permeability", "1e-12", Patterns::Anything());
+      prm.declare_entry(keywords.young_modulus,
+                        "1e9", Patterns::Anything());
+      prm.declare_entry(keywords.poisson_ratio,
+                        "0.3", Patterns::Double(0, 0.5));
+      prm.declare_entry(keywords.volume_factor_water,
+                        "1", Patterns::Anything());
+      prm.declare_entry(keywords.viscosity_water,
+                        "1e-3", Patterns::Double());
+      prm.declare_entry(keywords.compressibility_water,
+                        "1e-8", Patterns::Double());
+      prm.declare_entry(keywords.permeability,
+                        "1e-12", Patterns::Anything());
       prm.leave_subsection();
     }
     { // Solver
-      prm.enter_subsection("Solver");
-      prm.declare_entry("T max", "1", Patterns::Double());
-      prm.declare_entry("Time stepping", "(0, 1e-3)", Patterns::Anything());
-      prm.declare_entry("Minimum time step", "1e-9", Patterns::Double());
-      prm.declare_entry("FSS tolerance", "1e-9", Patterns::Double());
-      prm.declare_entry("Max FSS steps", "30", Patterns::Integer());
+      prm.enter_subsection(keywords.section_solver);
+      prm.declare_entry(keywords.t_max,
+                        "1", Patterns::Double());
+      prm.declare_entry(keywords.time_stepping,
+                        "(0, 1e-3)", Patterns::Anything());
+      prm.declare_entry(keywords.minimum_time_step,
+                        "1e-9", Patterns::Double());
+      prm.declare_entry(keywords.fss_tolerance,
+                        "1e-9", Patterns::Double());
+      prm.declare_entry(keywords.max_fss_steps,
+                        "30", Patterns::Integer());
       // prm.declare_entry("Newton tolerance", "1e-9", Patterns::Double());
       // prm.declare_entry("Max Newton steps", "20", Patterns::Integer());
       prm.leave_subsection();
@@ -169,15 +194,18 @@ namespace Data
   void DataBase<dim>::assign_parameters()
   {
     { // Mesh
-      prm.enter_subsection("Mesh");
-      mesh_file_name = prm.get("Mesh file");
-      initial_refinement_level = prm.get_integer("Initial global refinement steps");
-      n_adaptive_steps = prm.get_integer("Adaptive steps");
-      std::vector<double> tmp =
-        Parsers::parse_string_list<double>(prm.get("Local refinement region"));
+      prm.enter_subsection(keywords.section_mesh);
+      mesh_file_name = prm.get(keywords.mesh_file);
+      initial_refinement_level =
+        prm.get_integer(keywords.global_refinement_steps);
+      n_adaptive_steps = prm.get_integer(keywords.adaptive_refinement_steps);
+
+      std::vector<double> tmp = Parsers:: parse_string_list<double>
+        (prm.get(keywords.local_refinement_regions));
       local_prerefinement_region.resize(dim);
       AssertThrow(tmp.size() == 2*dim,
-                  ExcMessage("Wrong entry in Local refinement region"));
+                  ExcMessage("Wrong entry in" +
+                             keywords.local_refinement_regions));
       local_prerefinement_region[0].first = tmp[0];
       local_prerefinement_region[0].second = tmp[1];
       local_prerefinement_region[1].first = tmp[2];
@@ -185,34 +213,36 @@ namespace Data
       prm.leave_subsection();
     }
     { // Equation data
-      prm.enter_subsection("Equation data");
+      prm.enter_subsection(keywords.section_equation_data);
 
-      this->poisson_ratio = prm.get_double("Poisson ratio");
-      this->volume_factor_w = prm.get_double("Volume factor water");
-      this->viscosity_w = prm.get_double("Viscosity water");
-      this->compressibility_w = prm.get_double("Compressibility water");
+      this->poisson_ratio = prm.get_double(keywords.poisson_ratio);
+      this->volume_factor_w = prm.get_double(keywords.volume_factor_water);
+      this->viscosity_w = prm.get_double(keywords.viscosity_water);
+      this->compressibility_w = prm.get_double(keywords.compressibility_water);
+
       // coefficients that are either constant or mapped
-      // assign_permeability_param();
-
-      std::string perm_string = "Permeability";
       Tensor<1,dim> perm_anisotropy = Tensors::get_unit_vector<dim>();
       this->get_permeability =
-        assign_hetorogeneous_param(perm_string, perm_anisotropy);
+        assign_hetorogeneous_param(keywords.permeability,
+                                   perm_anisotropy);
 
-      std::string young_modulus_string = "Young modulus";
       Tensor<1,dim> stiffness_anisotropy = Tensors::get_unit_vector<dim>();
       this->get_young_modulus =
-        assign_hetorogeneous_param(young_modulus_string,
+        assign_hetorogeneous_param(keywords.young_modulus,
                                    stiffness_anisotropy);
 
       // test output
-      std::cout
-        << this->get_permeability->value(Point<dim>(1,1), 1)
-        << std::endl;
+      // std::cout
+      //   << this->get_permeability->value(Point<dim>(1,1), 1)
+      //   << std::endl;
       prm.leave_subsection();
     }
     { // Solver
-      prm.enter_subsection("Equation data");
+      prm.enter_subsection(keywords.section_solver);
+      this->t_max = prm.get_double(keywords.t_max);
+      this->min_time_step = prm.get_double(keywords.minimum_time_step);
+      this->fss_tolerance = prm.get_double(keywords.fss_tolerance);
+      this->max_fss_steps = prm.get_integer(keywords.max_fss_steps);
       prm.leave_subsection();
     }
   }  // eom
