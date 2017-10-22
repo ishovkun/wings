@@ -6,6 +6,7 @@ ADD_LIBRARY(lib
   BitMap.hpp
   Parsers.hpp
   Units.cc
+  Tensors.hpp
 )
 
 DEAL_II_SETUP_TARGET(lib)

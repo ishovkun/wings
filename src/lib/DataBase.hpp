@@ -10,6 +10,7 @@
 #include <Parsers.hpp>
 #include <BitMap.hpp>
 #include <Units.cc>
+#include <Tensors.hpp>
 
 
 namespace Data
@@ -187,19 +188,22 @@ namespace Data
       prm.enter_subsection("Equation data");
 
       this->poisson_ratio = prm.get_double("Poisson ratio");
-      this->young_modulus = prm.get_double("Young modulus");
       this->volume_factor_w = prm.get_double("Volume factor water");
       this->viscosity_w = prm.get_double("Viscosity water");
       this->compressibility_w = prm.get_double("Compressibility water");
       // coefficients that are either constant or mapped
       // assign_permeability_param();
 
-      Tensor<1,dim> anisotropy;
-      for (int c=0; c<dim; c++)
-        anisotropy[c] = 1;
       std::string perm_string = "Permeability";
+      Tensor<1,dim> perm_anisotropy = Tensors::get_unit_vector<dim>();
       this->get_permeability =
-        assign_hetorogeneous_param(perm_string, anisotropy);
+        assign_hetorogeneous_param(perm_string, perm_anisotropy);
+
+      std::string young_modulus_string = "Young modulus";
+      Tensor<1,dim> stiffness_anisotropy = Tensors::get_unit_vector<dim>();
+      this->get_young_modulus =
+        assign_hetorogeneous_param(young_modulus_string,
+                                   stiffness_anisotropy);
 
       // test output
       std::cout
