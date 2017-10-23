@@ -44,10 +44,9 @@ namespace Data
     void assign_parameters();
     void compute_runtime_parameters();
     void check_input();
-    void assign_permeability_param();
     Function<dim>*
-    assign_hetorogeneous_param(const std::string&   par_name,
-                               const Tensor<1,dim>& anisotropy);
+    get_hetorogeneous_function_from_parameter(const std::string&   par_name,
+                                              const Tensor<1,dim>& anisotropy);
 
     // ATTRIBUTES
   public:
@@ -167,8 +166,10 @@ namespace Data
 
 
   template <int dim>
-  Function<dim> * DataBase<dim>::assign_hetorogeneous_param(const std::string&   par_name,
-                                                            const Tensor<1,dim>& anisotropy)
+  Function<dim> *
+  DataBase<dim>::
+  get_hetorogeneous_function_from_parameter(const std::string&   par_name,
+                                            const Tensor<1,dim>& anisotropy)
   {
     const std::string entry = prm.get(par_name);
     if (Parsers::is_number(entry))
@@ -223,13 +224,13 @@ namespace Data
       // coefficients that are either constant or mapped
       Tensor<1,dim> perm_anisotropy = Tensors::get_unit_vector<dim>();
       this->get_permeability =
-        assign_hetorogeneous_param(keywords.permeability,
-                                   perm_anisotropy);
+        get_hetorogeneous_function_from_parameter(keywords.permeability,
+                                                  perm_anisotropy);
 
       Tensor<1,dim> stiffness_anisotropy = Tensors::get_unit_vector<dim>();
       this->get_young_modulus =
-        assign_hetorogeneous_param(keywords.young_modulus,
-                                   stiffness_anisotropy);
+        get_hetorogeneous_function_from_parameter(keywords.young_modulus,
+                                                  stiffness_anisotropy);
 
       // test output
       // std::cout
