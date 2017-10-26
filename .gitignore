@@ -1,0 +1,10 @@
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+src/lib/CMakeFiles/
+src/lib/Makefile
+src/lib/cmake_install.cmake
+src/lib/liblib.a
+wings-pressure
+
