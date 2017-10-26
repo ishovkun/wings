@@ -19,6 +19,7 @@ namespace Wings
   public:
     WingsPressure(std::string);
     // ~WingsPressure();
+    void read_mesh();
     void run();
 
   private:
@@ -43,6 +44,21 @@ namespace Wings
   // WingsPressure<dim>::~WingsPressure()
   // {}
 
+  template <int dim>
+  void WingsPressure<dim>::read_mesh()
+  {
+    GridIn<dim> gridin;
+	  gridin.attach_triangulation(triangulation);
+    std::cout << "Reading mesh file "
+              << data.mesh_file.string()
+              << std::endl;
+	  std::ifstream f(data.mesh_file.string());
+
+    // typename GridIn<dim>::Format format = GridIn<dim>::ucd;
+    // gridin.read(f, format);
+	  gridin.read_msh(f);
+  }  // eom
+
 
   template <int dim>
   void WingsPressure<dim>::make_mesh()
@@ -56,8 +72,12 @@ namespace Wings
   void WingsPressure<dim>::run()
   {
     data.read_input(input_file);
-    make_mesh();
+    read_mesh();
     // pressure_solver.setup_system();
+    // test heterogeouns function output
+    std::cout
+      << data.get_permeability->value(Point<dim>(1,1), 1)
+      << std::endl;
 
     // double time_step = 1;
 
@@ -66,8 +86,8 @@ namespace Wings
     // pressure_solver.solution[2] = 0;
     // pressure_solver.solution[3] = 1;
     // pressure_solver.solution_old = pressure_solver.solution;
-    // pressure_solver.assemble_system(time_step);
-    // pressure_solver.print_system_matrix();
+    pressure_solver.assemble_system(data.time_step);
+    pressure_solver.print_system_matrix();
   } // eom
 
 } // end of namespace

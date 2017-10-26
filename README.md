@@ -39,6 +39,19 @@ make
 make install
 ~~~~
 
+### Building boost (may be optional)
+The default boost libraries from the Ubuntu 16.04 repositories were too old,
+so that cmake preferred to used the boost version bundled with deal.ii.
+In order to overcome this, I had to build boost as well
+The latest sources are available at
+http://www.boost.org/users/download/
+I used boost-1.65.
+To build boost I used the following commands:
+~~~~
+./bootstrap.sh --prefix=$HOME/share
+./b2 --prefix=$HOME/share/boost-1.65 install
+~~~~
+
 ### Building deal.ii
 ~~~~
 git clone https://github.com/dealii/dealii
@@ -64,4 +77,9 @@ cd wings
 cmake -DDEAL_II_DIR=$HOME/share/dealii .
 make
 ./wings-pressure test/input/test-3x3-homog.prm
+~~~~
+In case if you had to build boost as well, you need to specify the BOOST_ROOT
+as well:
+~~~~
+cmake -DDEAL_II_DIR=$HOME/share/dealii -DBOOST_ROOT=$HOME/share/boost-1.65.
 ~~~~

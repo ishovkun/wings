@@ -22,8 +22,8 @@ Error! The deal.II library found at ${DEAL_II_PATH} was not configured with
 or
     DEAL_II_WITH_TRILINOS = ON
     DEAL_II_WITH_P4EST = ON
-One or both of these combinations are OFF in your installation but at least one is required for this tutorial step."
-    )
+One or both of these combinations are OFF in your installation but at least one is required for this tutorial step.
+")
 ENDIF()
 
 DEAL_II_INITIALIZE_CACHED_VARIABLES()
@@ -32,15 +32,17 @@ PROJECT(wings)
 
 set(Boost_USE_STATIC_LIBS OFF)
 set(Boost_USE_MULTITHREADED ON)
-set(Boost_USE_STATIC_RUNTIME OFF)
-find_package(Boost 1.65.1 COMPONENTS filesystem iostreams)
+set(Boost_USE_STATIC_RUNTIME ON)
+set(Boost_NO_SYSTEM_PATHS OFF)
+find_package(Boost 1.65.1
+  COMPONENTS filesystem iostreams)
+# find_package(Boost REQUIRED COMPONENTS filesystem iostreams)
 
-# if(Boost_FOUND)
-    # MESSAGE("\nboost found!")
-    # include_directories(${Boost_INCLUDE_DIRS})
-    # add_executable(progname file1.cxx file2.cxx)
-    # target_link_libraries(progname ${Boost_LIBRARIES})
-# endif()
+IF(NOT ${Boost_FOUND})
+  MESSAGE(FATAL_ERROR "
+Error! Cannot find boost library!
+    ")
+ENDIF()
 
 # lib
 include_directories(${Boost_INCLUDE_DIRS})
@@ -54,10 +56,19 @@ SET_TARGET_PROPERTIES (
 # targets
 ADD_EXECUTABLE(wings-pressure ${CMAKE_SOURCE_DIR}/src/wings_pressure.cc)
 DEAL_II_SETUP_TARGET(wings-pressure)
+# ADD_CUSTOM_TARGET(debug
+#   COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Debug ${CMAKE_SOURCE_DIR}
+#   COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target all
+#   COMMENT "Switch CMAKE_BUILD_TYPE to Debug"
+#   )
+
+# ADD_CUSTOM_TARGET(release
+#   COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Release ${CMAKE_SOURCE_DIR}
+#   COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target all
+#   COMMENT "Switch CMAKE_BUILD_TYPE to Release"
+#   )
 
 # linking
 TARGET_LINK_LIBRARIES(wings-pressure lib ${Boost_LIBRARIES})
-# TARGET_LINK_LIBRARIES(wings-pressure lib boost_filesystem boost_algorithms)
-# TARGET_LINK_LIBRARIES(wings-pressure lib)
 
 # DEAL_II_INVOKE_AUTOPILOT()

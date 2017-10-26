@@ -2,7 +2,7 @@ subsection Mesh
   set Global refinement steps   = 4
   set Local refinement regions  = 16, 24, 17.5, 22.5
   set Adaptive refinement steps = 4
-  set Mesh file                 = 3x3.msh
+  set Mesh file                 = square-3x3m-3x3cells.msh
 end
 
 subsection Equation data

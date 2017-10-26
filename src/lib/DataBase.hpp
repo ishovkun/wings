@@ -47,6 +47,8 @@ namespace Data
     Function<dim>*
     get_hetorogeneous_function_from_parameter(const std::string&   par_name,
                                               const Tensor<1,dim>& anisotropy);
+    boost::filesystem::path
+    find_file_in_relative_path(const std::string fname);
 
     // ATTRIBUTES
   public:
@@ -56,6 +58,7 @@ namespace Data
     std::vector<std::pair<double,double>> local_prerefinement_region;
     Units::Units                          units;
     Keywords::Keywords                    keywords;
+    boost::filesystem::path               mesh_file;
   private:
     std::string                           mesh_file_name, input_file_name;
     double                                volume_factor_w,
@@ -185,11 +188,24 @@ namespace Data
       boost::filesystem::path input_file_path(input_file_name);
       boost::filesystem::path data_file =
         input_file_path.parent_path() / entry;
-      std::cout << "Reading " << data_file << std::endl;
       return new BitMap::BitMapFunction<dim>(data_file.string(),
                                              anisotropy);
     }
   }  // eom
+
+
+  template <int dim>
+  boost::filesystem::path
+  DataBase<dim>::find_file_in_relative_path(const std::string fname)
+  {
+    boost::filesystem::path input_file_path(input_file_name);
+    std::cout << "Searching " << mesh_file_name << std::endl;
+    boost::filesystem::path data_file =
+      input_file_path.parent_path() / fname;
+    std::cout << "Found " << data_file << std::endl;
+    return data_file;
+  }  // eom
+
 
   template <int dim>
   void DataBase<dim>::assign_parameters()
@@ -197,6 +213,10 @@ namespace Data
     { // Mesh
       prm.enter_subsection(keywords.section_mesh);
       mesh_file_name = prm.get(keywords.mesh_file);
+      mesh_file =
+        find_file_in_relative_path(mesh_file_name);
+      // std::cout << "mesh_file "<< mesh_file << std::endl;
+
       initial_refinement_level =
         prm.get_integer(keywords.global_refinement_steps);
       n_adaptive_steps = prm.get_integer(keywords.adaptive_refinement_steps);
@@ -232,10 +252,6 @@ namespace Data
         get_hetorogeneous_function_from_parameter(keywords.young_modulus,
                                                   stiffness_anisotropy);
 
-      // test output
-      // std::cout
-      //   << this->get_permeability->value(Point<dim>(1,1), 1)
-      //   << std::endl;
       prm.leave_subsection();
     }
     { // Solver
