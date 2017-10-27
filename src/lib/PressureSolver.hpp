@@ -78,29 +78,25 @@ namespace FluidSolvers
     void setup_system();
     void assemble_system(const double time_step);
     void solve();
-    void print_system_matrix();
-
+    void print_system_matrix(const double denominator=1.0) const;
+    const SparseMatrix<double>& get_system_matrix() const;
 
   private:
-    double get_transmissibility(const Tensor<1,dim> &perm,
-                                const double        visc,
-                                const double        volume_factor,
-                                const Tensor<1,dim> &normal_vector,
-                                const Tensor<1,dim> &dx,
-                                const double        dS) const;
-
+    double get_transmissibility(const Vector<double> &perm,
+                                const double         visc,
+                                const double         volume_factor,
+                                const Tensor<1,dim>  &normal_vector,
+                                const Tensor<1,dim>  &dx,
+                                const double         dS) const;
     double get_cell_mass_matrix(const double cell_volume,
                                 const double volume_factor,
                                 const double porosity,
                                 const double compressibility) const;
-
-    void harmonic_mean(const Tensor<1,dim> &perm_1,
-                       const Tensor<1,dim> &perm_2,
-                       Tensor<1,dim>       &out) const;
-
+    void harmonic_mean(const Vector<double> &perm_1,
+                       const Vector<double> &perm_2,
+                       Vector<double>       &out) const;
     double arithmetic_mean(const double x1,
                            const double x2) const;
-
   private:
     DoFHandler<dim>            dof_handler;
     FE_DGQ<dim>                fe;
@@ -168,13 +164,15 @@ namespace FluidSolvers
 
 
   template <int dim>
-  double PressureSolver<dim>::get_transmissibility(const Tensor<1,dim> &perm,
-                                                   const double        visc,
-                                                   const double        volume_factor,
-                                                   const Tensor<1,dim> &normal_vector,
-                                                   const Tensor<1,dim> &dx,
-                                                   const double        dS) const
+  double PressureSolver<dim>::get_transmissibility(const Vector<double> &perm,
+                                                   const double         visc,
+                                                   const double         volume_factor,
+                                                   const Tensor<1,dim>  &normal_vector,
+                                                   const Tensor<1,dim>  &dx,
+                                                   const double         dS) const
   {
+    AssertThrow(perm.size() == dim,
+                ExcMessage("Wrong dimension of permeability"));
     double distance = dx.norm(); // to normalize
     if (distance == 0)
       return 0.0;
@@ -192,9 +190,9 @@ namespace FluidSolvers
   }  // eom
 
   template <int dim>
-  void PressureSolver<dim>::harmonic_mean(const Tensor<1,dim> &perm_1,
-                                          const Tensor<1,dim> &perm_2,
-                                          Tensor<1,dim>       &out) const
+  void PressureSolver<dim>::harmonic_mean(const Vector<double> &perm_1,
+                                          const Vector<double> &perm_2,
+                                          Vector<double>       &out) const
   {
     for (int d=0; d<dim; ++d){
       if (perm_1[d] == 0 || perm_2[d] == 0)
@@ -222,10 +220,10 @@ namespace FluidSolvers
 
     // FEValues<dim> fe_values(fe, quadrature_formula, update_values);
     FEFaceValues<dim> fe_face_values(fe, face_quadrature_formula,
-                                 update_normal_vectors);
+                                     update_normal_vectors);
 
     Tensor<1, dim>    dx_ij, normal;
-    Tensor<1, dim>    perm_i, perm_j, perm_ij;
+    Vector<double>    perm_i(dim), perm_j(dim), perm_ij(dim);
     // Tensor <1,dim> normal_vector;
 
     typename DoFHandler<dim>::active_cell_iterator
@@ -245,18 +243,21 @@ namespace FluidSolvers
       double p_old = solution_old[i];
 
       // Cell properties
-      // data.get_permeability(i, perm_i);
-      for (int d=0; d<dim; d++)
-        perm_i[d] = data.get_permeability->value(cell->center(), d);
-      const double mu_i = data.get_viscosity();
-      const double volume_factor_i = data.get_volume_factor();
+      data.get_permeability->vector_value(neighbor_cell->center(), perm_i);
+      const double mu_i = data.viscosity_water();
+      const double volume_factor_i = data.volume_factor_water();
       const double poro_i = data.get_porosity->value(cell->center());
-      const double fcomp_i = data.get_compressibility();
+      const double fcomp_i = data.compressibility_water();
 
       // Cell mass matrix
       double B_ii = get_cell_mass_matrix(dV, volume_factor_i, poro_i, fcomp_i);
-
-      // std::cout << "cell pressure: " << solution[cell_index] << std::endl;
+      // std::cout << "Mass entry "
+      //           << B_ii
+      //           << std::endl;
+      // std::cout << "cell measure "
+      //           << dV
+      //           << std::endl;
+      // std::cout << "cell pressure: " << solution[i] << std::endl;
 
       double matrix_ii = B_ii/time_step;
       double rhs_i = B_ii/time_step*p_old;
@@ -279,13 +280,12 @@ namespace FluidSolvers
           dx_ij = neighbor_cell->center() - cell->center();
 
           // neighbor cell data
-          const double mu_j = data.get_viscosity();
-          const double volume_factor_j = data.get_volume_factor();
+          const double mu_j = data.viscosity_water();
+          const double volume_factor_j = data.volume_factor_water();
 
           // get absolute perm
           // Use vector_value instead!!!!!!!!!!!
-          for (int d=0; d<dim; d++)
-            perm_j[d] = data.get_permeability->value(neighbor_cell->center(), d);
+          data.get_permeability->vector_value(neighbor_cell->center(), perm_j);
 
           // Face properties
           harmonic_mean(perm_i, perm_j, perm_ij);
@@ -315,22 +315,17 @@ namespace FluidSolvers
 
 
   template <int dim>
-  void PressureSolver<dim>::print_system_matrix()
+  void PressureSolver<dim>::print_system_matrix(const double denominator) const
   {
-    // for (unsigned int i=0; i<dof_handler.n_dofs(); i++) {
-    //   for (unsigned int j=0; j<dof_handler.n_dofs(); j++) {
-    //     try {
-    //       std::cout << system_matrix(i, j) << "\t";
-    //     }
-    //     catch (...)
-    //     {
-    //       std::cout << 0 << "\t";
-    //     }
-    //   }
-    //   std::cout << std::endl;
-    // }
-
     // out, precision, scientific
-    system_matrix.print_formatted(std::cout, 1, false);
-  } // eom
+    system_matrix.print_formatted(std::cout, 1, false, 0, " ", denominator);
+  }  // eom
+
+
+  template <int dim>
+  const SparseMatrix<double>&
+  PressureSolver<dim>::get_system_matrix() const
+  {
+    return system_matrix;
+  }  // eom
 }  // end of namespace

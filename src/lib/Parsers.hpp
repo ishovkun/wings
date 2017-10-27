@@ -61,69 +61,69 @@ namespace Parsers {
 	// 	return result;
 	// }  // eom
 
-  // template <int dim>
-  // std::vector< Point<dim> > parse_point_list(const std::string &str)
-  // {
-  //   // std::cout << str << std::endl;
-  //   std::vector< Point<dim> > points;
-  //   // std::vector<std::string> point_strings;
-  //   // int point_index = 0;
-  //   unsigned int i = 0;
-  //   // loop over symbols and get strings surrounded by ()
-  //   while (i < str.size())
-  //   {
-  //     if (str.compare(i, 1, "(") == 0)  // if str[i] == "(" -> begin point
-  //       {
-  //         std::string tmp;
-  //         while (i < str.size())
-  //         {
-  //           i++;
+  template <int dim>
+  std::vector< Point<dim> > parse_point_list(const std::string &str)
+  {
+    // std::cout << str << std::endl;
+    std::vector< Point<dim> > points;
+    // std::vector<std::string> point_strings;
+    // int point_index = 0;
+    unsigned int i = 0;
+    // loop over symbols and get strings surrounded by ()
+    while (i < str.size())
+    {
+      if (str.compare(i, 1, "(") == 0)  // if str[i] == "(" -> begin point
+        {
+          std::string tmp;
+          while (i < str.size())
+          {
+            i++;
 
-  //           if (str.compare(i, 1, ")") != 0)
-  //             tmp.push_back(str[i]);
-  //           else
-  //             break;
-  //         }
-  //         // Add point
-  //         std::vector<double> coords = parse_string_list<double>(tmp);
-  //         Point<dim> point;
-  //         for (int p=0; p<dim; ++p)
-  //           point(p) = coords[p];
-  //         points.push_back(point);
-  //       }
-  //       i++;
-  //   }
+            if (str.compare(i, 1, ")") != 0)
+              tmp.push_back(str[i]);
+            else
+              break;
+          }
+          // Add point
+          std::vector<double> coords = parse_string_list<double>(tmp);
+          Point<dim> point;
+          for (int p=0; p<dim; ++p)
+            point(p) = coords[p];
+          points.push_back(point);
+        }
+        i++;
+    }
 
-  //   return points;
-  // }  // eom
+    return points;
+  }  // eom
 
 
-  // std::vector<std::string> parse_pathentheses_list(const std::string &str)
-  // {
-  //   std::vector<std::string> result;
-  //   unsigned int i = 0;
-  //   // loop over symbols and get strings surrounded by ()
-  //   while (i < str.size())
-  //   {
-  //     if (str.compare(i, 1, "(") == 0)  // if str[i] == "(" -> begin point
-  //     {
-  //       std::string tmp;
-  //       while (i < str.size())
-  //       {
-  //         i++;
+  std::vector<std::string> parse_pathentheses_list(const std::string &str)
+  {
+    std::vector<std::string> result;
+    unsigned int i = 0;
+    // loop over symbols and get strings surrounded by ()
+    while (i < str.size())
+    {
+      if (str.compare(i, 1, "(") == 0)  // if str[i] == "(" -> begin point
+      {
+        std::string tmp;
+        while (i < str.size())
+        {
+          i++;
 
-  //         if (str.compare(i, 1, ")") != 0)
-  //           tmp.push_back(str[i]);
-  //         else
-  //           break;
-  //      }  // end insize parentheses
-  //      // add what's inside parantheses
-  //      result.push_back(tmp);
-  //     }
-  //     i++;
-  //   }
-  //   return result;
-  // }  // eom
+          if (str.compare(i, 1, ")") != 0)
+            tmp.push_back(str[i]);
+          else
+            break;
+       }  // end insize parentheses
+       // add what's inside parantheses
+       result.push_back(tmp);
+      }
+      i++;
+    }
+    return result;
+  }  // eom
 
 
   std::string parse_command_line(int argc, char *const *argv) {

@@ -8,25 +8,30 @@ namespace Units
   public:
     // Units();
     void set_system(const UnitSystem&);
-    double pressure() const;
-    double viscosity() const;
-    double permeability() const;
-    double time() const;
-    double gas_rate() const;
-    double fluid_rate() const;
-    double stiffness() const;
+    double length() const {return length_constant;}
+    double time() const {return time_constant;}
+    double pressure() const {return pressure_constant;}
+    double viscosity() const {return viscosity_constant;}
+    double permeability() const {return permeability_constant;}
+    double compressibility() const {return 1.0/stiffness_constant;}
+    double gas_rate() const {return gas_rate_constant;}
+    double fluid_rate() const {return fluid_rate_constant;}
+    double stiffness() const {return stiffness_constant;}
+    double transmissibility() const {return transmissibility_constant;}
 
   private:
     UnitSystem unit_system;
     void compute_quantities();
     double
+      length_constant,
       time_constant,
       pressure_constant,
       viscosity_constant,
       fluid_rate_constant,
       gas_rate_constant,
       stiffness_constant,
-      permeability_constant;
+      permeability_constant,
+      transmissibility_constant;
     // conversion constants
     const double
       pounds_per_square_inch = 6894.76,
@@ -51,6 +56,7 @@ namespace Units
   {
     if (unit_system == si_units)
     {
+      length_constant = 1;
       time_constant = 1;
       pressure_constant = 1;
       viscosity_constant = 1;
@@ -61,6 +67,7 @@ namespace Units
     }
     else if (unit_system == field_units)
     {
+      length_constant = feet;
       time_constant = day;
       pressure_constant = pounds_per_square_inch;
       viscosity_constant = centipoise;
@@ -69,5 +76,7 @@ namespace Units
       stiffness_constant = pressure_constant;
       permeability_constant = milidarcy;
     }
+    transmissibility_constant =
+      permeability_constant*length_constant/viscosity_constant;
   }  // eom
 }

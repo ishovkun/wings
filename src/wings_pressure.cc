@@ -40,10 +40,6 @@ namespace Wings
   {}
 
 
-  // template <int dim>
-  // WingsPressure<dim>::~WingsPressure()
-  // {}
-
   template <int dim>
   void WingsPressure<dim>::read_mesh()
   {
@@ -73,21 +69,70 @@ namespace Wings
   {
     data.read_input(input_file);
     read_mesh();
-    // pressure_solver.setup_system();
-    // test heterogeouns function output
-    std::cout
-      << data.get_permeability->value(Point<dim>(1,1), 1)
-      << std::endl;
+    pressure_solver.setup_system();
 
-    // double time_step = 1;
+
+    const double k = data.get_permeability->value(Point<dim>(1,1), 1);
+    const double phi = data.get_porosity->value(Point<dim>(1,1), 1);
+    const double mu = data.viscosity_water();
+    const double B_w = data.volume_factor_water();
+    const double cw = data.compressibility_water();
+    const double h = 1;
+
+    // Compute transmissibility and mass matrix entries
+    const double T = 1./mu/B_w*(k/h)*h*h;
+    const double B = h*h*h/B_w*phi*cw;
+    // test output
+    std::cout << "Permeability "
+              << k
+              << std::endl;
+    std::cout << "Porosity "
+              << phi
+              << std::endl;
+
+    std::cout << "Transmissibility "
+              << T
+              << std::endl;
+    std::cout << "Mass matrix entriy "
+              << B
+              << std::endl;
+
+    double time = 0;
+    double time_step = data.get_time_step(time);
+
 
     // pressure_solver.solution[0] = 1;
     // pressure_solver.solution[1] = 0;
     // pressure_solver.solution[2] = 0;
     // pressure_solver.solution[3] = 1;
     // pressure_solver.solution_old = pressure_solver.solution;
-    pressure_solver.assemble_system(data.time_step);
-    pressure_solver.print_system_matrix();
+
+    pressure_solver.assemble_system(time_step);
+    // pressure_solver.print_system_matrix(1.0/T);
+    const auto & system_matrix = pressure_solver.get_system_matrix();
+    double A_ij, A_ij_an;
+
+    // Testing A(0, 0) - two neighbors
+    A_ij = system_matrix(0, 0);
+    A_ij_an = B/time_step + 2*T;
+    AssertThrow(abs(A_ij - A_ij_an)/abs(A_ij_an)<1e-9,
+                ExcMessage("System matrix is wrong"));
+    // Testing A(0, 1) = T
+    A_ij = system_matrix(0, 1);
+    A_ij_an = -T;
+    AssertThrow(abs(A_ij - A_ij_an)/abs(A_ij_an)<1e-9,
+                ExcMessage("System matrix is wrong"));
+    // Testing A(1, 1) - 3 neighbors
+    A_ij = system_matrix(1, 1);
+    A_ij_an = B/time_step + 3*T;
+    AssertThrow(abs(A_ij - A_ij_an)/abs(A_ij_an)<1e-9,
+                ExcMessage("System matrix is wrong"));
+    // Testing A(4, 4) - four neighbors
+    A_ij = system_matrix(4, 4);
+    A_ij_an = B/time_step + 4*T;
+    AssertThrow(abs(A_ij - A_ij_an)/abs(A_ij_an)<1e-9,
+                ExcMessage("System matrix is wrong"));
+
   } // eom
 
 } // end of namespace
