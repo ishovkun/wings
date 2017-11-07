@@ -51,15 +51,16 @@ namespace Parsers {
   }  // eom
 
 
-	// // convert string to a base type
-	// template <typename T>
-	// T convert(const std::string &str)
-	// {
-  //   std::stringstream conv(str);
-	// 	T result;
-	// 	conv >> result;
-	// 	return result;
-	// }  // eom
+	// convert string to a base type
+	template <typename T>
+	T convert(const std::string &str)
+	{
+    std::stringstream conv(str);
+		T result;
+		conv >> result;
+		return result;
+	}  // eom
+
 
   template <int dim>
   std::vector< Point<dim> > parse_point_list(const std::string &str)
@@ -126,29 +127,76 @@ namespace Parsers {
   }  // eom
 
 
-  std::vector<std::string> split_avoid_brackets(const std::string &text,
-                                                const std::string delimiter=",")
+  std::vector<std::string>
+  split_bracket_group(const std::string &text,
+                      const std::pair<std::string,std::string> delimiters =
+                      std::pair<std::string, std::string> ("(", ")"))
   {
-    /*splits string with the delimiter but omits the delimiter enclosed in
-     (), [], and {}
-    */
-    namespace qi = boost::spirit::qi;
-    std::vector<std::string> split;
+    std::vector<std::string> result;
+    unsigned int i = 0;
+    // loop over symbols and get strings surrounded by ()
+    while (i < text.size())
+      {
+        if (text.compare(i, 1, delimiters.first) == 0)  // if str[i] == "(" -> begin point
+          {
+            std::string tmp;
+            while (i < text.size())
+              {
+                i++;
 
-    qi::parse(text.begin(), text.end(),
-      qi::raw [
-              // qi::int_ | +qi::alnum >> (
-                +qi::alnum >> (
-                  '(' >> *~qi::char_(')') >> ')'
-                  | '[' >> *~qi::char_(']') >> ']'
-                  | '{' >> *~qi::char_('}') >> '}'
-                  )
-               // ] % delimiter.c_str(),
-               ] % delimiter,
-              split);
-
-    return split;
+                if (text.compare(i, 1, delimiters.second) != 0)
+                  tmp.push_back(text[i]);
+                else
+                  break;
+              }  // end insize parentheses
+            // add what's inside parantheses
+            result.push_back(tmp);
+          }
+        i++;
+      }
+    return result;
   }  // eom
+
+  std::vector<std::string>
+  split_ignore_brackets(const std::string &text,
+                        const std::string &delimiter = ",",
+                        const std::pair<std::string,std::string> brackets =
+                        std::pair<std::string, std::string> ("(", ")"))
+  {
+    std::vector<std::string> result;
+    unsigned int i = 0;
+    // loop over symbols and get strings surrounded by ()
+    std::string tmp;
+    bool skip_delimiter = false;
+
+    while (i < text.size())
+    {
+      if (text.compare(i, 1, brackets.first) == 0)
+      {
+        tmp.clear();
+        skip_delimiter = true;
+      }
+      else if (text.compare(i, 1, brackets.second) == 0)
+      {
+        boost::algorithm::trim(tmp);
+        result.push_back(tmp);
+        skip_delimiter = false;
+      }
+      else if (text.compare(i, 1, delimiter) == 0 && !skip_delimiter)
+      {
+        boost::algorithm::trim(tmp);
+        result.push_back(tmp);
+        tmp.clear();
+      }
+      else
+      {
+        tmp.append(1, text[i]);
+      }
+
+      i++;
+    }
+    return result;
+  } // eom
 
 
   std::string parse_command_line(int argc, char *const *argv) {

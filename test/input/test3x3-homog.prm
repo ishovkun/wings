@@ -6,7 +6,9 @@ subsection Mesh
 end
 
 subsection Well data
-  set Wells = A, 0.1, 0, (1.0, 2.0; 2.0, 1.0);
+  set Wells = \
+  [A, 0.1, 0, (1.0, 2.0; 2.0, 1.0)]; \
+  [B, 0.2, 1, (1.5, 3.0; 7.0, 3.0)];
 end
 
 subsection Equation data

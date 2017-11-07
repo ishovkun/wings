@@ -5,6 +5,7 @@
 #include <deal.II/base/function.h>
 #include <deal.II/base/parameter_handler.h>
 #include <boost/filesystem.hpp>
+#include <boost/algorithm/string.hpp>
 
 // Custom modules
 #include <Wellbore.hpp>
@@ -282,22 +283,42 @@ namespace Data
     { // well data
       prm.enter_subsection(keywords.section_wells);
       /*
-        Keyword structure is as follows (in parantheses and comma-separated):
+        Keyword structure is as follows:
         string well_name
         double radius
         int direction < dim
         comma-semicolon-separated list locations
         example
-        Well1, 0.1, 1, (1,1; 2,2)
+        [Well1, 0.1, 1, (1,1; 2,2)], [Well2, 0.1, 1, (1,1; 2,2)]
        */
       // std::string str_well =
       const std::string str_well = prm.get(keywords.well_parameters);
-      std::cout << str_well << std::endl;
-      // const auto & split = Parsers::split_avoid_brackets(str_well, ";");
-      const auto & split = Parsers::split_avoid_brackets(str_well);
-      std::cout << "Split size = " << split.size() << std::endl;
+      const auto & delim = std::pair<std::string,std::string>("[","]");
+      std::vector<std::string> split =
+        Parsers::split_bracket_group(str_well, delim);
+
       for (auto & item : split)
-        std::cout << item << std::endl;
+      {
+        // std::cout << item << std::endl;
+        const auto & str_params = Parsers::split_ignore_brackets(item);
+        const std::string well_name = str_params[0];
+        const double radius = Parsers::convert<double>(str_params[1]);
+        const int direction = Parsers::convert<int>(str_params[2]);
+        // separate separate points
+        std::vector<std::string> point_strs;
+        std::vector< Point<dim> > locations;
+        boost::algorithm::split(point_strs, str_params[3], boost::is_any_of(";"));
+        for (auto & point_str : point_strs)
+        {
+          const auto & point = Parsers::parse_string_list<double>(point_str);
+          AssertThrow(point.size == dim,
+                      ExcMessage("Dimensions don't match"));
+          Point<dim> p;
+          for (int d=0; d<dim; d++)
+            p[d] = point[d];
+        }
+      }
+
       prm.leave_subsection();
     }
     { // Equation data
