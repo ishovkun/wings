@@ -60,7 +60,7 @@
 
 // Custom modules
 #include <DataBase.hpp>
-
+#include <Wellbore.hpp>
 
 namespace FluidSolvers
 {

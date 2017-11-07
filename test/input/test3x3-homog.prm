@@ -5,6 +5,10 @@ subsection Mesh
   set Mesh file                 = square-3x3m-3x3cells.msh
 end
 
+subsection Well data
+  set Wells = A, 0.1, 0, (1.0, 2.0; 2.0, 1.0);
+end
+
 subsection Equation data
   set Young modulus           = 1e8
   set Poisson ratio           = 0.3

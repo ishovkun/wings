@@ -5,3 +5,6 @@
    https://www.dealii.org/8.4.1/doxygen/deal.II/classCellAccessor.html#acec7a480d2bcdd506a3350dd9ec3cfeb
 ** Write code for treating bitmap input
 ** Parallelize
+
+
+Use cell->point_inside() to check if wellbore is in a cell

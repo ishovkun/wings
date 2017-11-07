@@ -5,6 +5,7 @@
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
 // Custom modules
+#include <Wellbore.hpp>
 #include <PressureSolver.hpp>
 #include <Parsers.hpp>
 

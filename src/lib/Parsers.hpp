@@ -3,7 +3,7 @@
 #include <deal.II/base/point.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
-
+#include <boost/spirit/include/qi.hpp>
 
 namespace Parsers {
 	using namespace dealii;
@@ -123,6 +123,31 @@ namespace Parsers {
       i++;
     }
     return result;
+  }  // eom
+
+
+  std::vector<std::string> split_avoid_brackets(const std::string &text,
+                                                const std::string delimiter=",")
+  {
+    /*splits string with the delimiter but omits the delimiter enclosed in
+     (), [], and {}
+    */
+    namespace qi = boost::spirit::qi;
+    std::vector<std::string> split;
+
+    qi::parse(text.begin(), text.end(),
+      qi::raw [
+              // qi::int_ | +qi::alnum >> (
+                +qi::alnum >> (
+                  '(' >> *~qi::char_(')') >> ')'
+                  | '[' >> *~qi::char_(']') >> ']'
+                  | '{' >> *~qi::char_('}') >> '}'
+                  )
+               // ] % delimiter.c_str(),
+               ] % delimiter,
+              split);
+
+    return split;
   }  // eom
 
 

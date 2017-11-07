@@ -8,6 +8,7 @@ ADD_LIBRARY(lib
   Units.cc
   Tensors.hpp
   Keywords.cpp
+  Wellbore.hpp
 )
 
 DEAL_II_SETUP_TARGET(lib)

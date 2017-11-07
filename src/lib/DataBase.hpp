@@ -7,6 +7,7 @@
 #include <boost/filesystem.hpp>
 
 // Custom modules
+#include <Wellbore.hpp>
 #include <Parsers.hpp>
 #include <BitMap.hpp>
 #include <Units.cc>
@@ -54,27 +55,28 @@ namespace Data
 
     // ATTRIBUTES
   public:
-    int                                   initial_refinement_level,
-                                          n_prerefinement_steps,
-                                          n_adaptive_steps;
-    std::vector<std::pair<double,double>> local_prerefinement_region;
-    Units::Units                          units;
-    Keywords::Keywords                    keywords;
-    boost::filesystem::path               mesh_file;
+    int                                    initial_refinement_level,
+                                           n_prerefinement_steps,
+                                           n_adaptive_steps;
+    std::vector<std::pair<double,double>>  local_prerefinement_region;
+    Units::Units                           units;
+    Keywords::Keywords                     keywords;
+    boost::filesystem::path                mesh_file;
+    std::vector< Wellbore::Wellbore<dim> > wells;
   private:
-    std::string                           mesh_file_name, input_file_name;
-    double                                volume_factor_w_constant,
-                                          viscosity_w_constant,
-                                          compressibility_w_constant,
-                                          porosity,
-                                          young_modulus,
-                                          poisson_ratio_constant;
-    double                                fss_tolerance,
-                                          min_time_step,
-                                          t_max;
-    int                                   max_fss_steps;
-    ParameterHandler                      prm;
-    std::map<double, double>              timestep_table;
+    std::string                            mesh_file_name, input_file_name;
+    double                                 volume_factor_w_constant,
+                                           viscosity_w_constant,
+                                           compressibility_w_constant,
+                                           porosity,
+                                           young_modulus,
+                                           poisson_ratio_constant;
+    double                                 fss_tolerance,
+                                           min_time_step,
+                                           t_max;
+    int                                    max_fss_steps;
+    ParameterHandler                       prm;
+    std::map<double, double>               timestep_table;
   };  // eom
 
 
@@ -160,6 +162,15 @@ namespace Data
                         "0", Patterns::Integer(0, 100));
       prm.declare_entry(keywords.local_refinement_regions,
                         "", Patterns::List(Patterns::Double()));
+      prm.leave_subsection();
+    }
+
+    { // wells
+      prm.enter_subsection(keywords.section_wells);
+      prm.declare_entry(keywords.well_parameters,
+                        "", Patterns::Anything());
+      // prm.declare_entry(keywords.well_schedule,
+      //                   "", Patterns::Anything());
       prm.leave_subsection();
     }
 
@@ -268,6 +279,27 @@ namespace Data
       local_prerefinement_region[1].second = tmp[3];
       prm.leave_subsection();
     }
+    { // well data
+      prm.enter_subsection(keywords.section_wells);
+      /*
+        Keyword structure is as follows (in parantheses and comma-separated):
+        string well_name
+        double radius
+        int direction < dim
+        comma-semicolon-separated list locations
+        example
+        Well1, 0.1, 1, (1,1; 2,2)
+       */
+      // std::string str_well =
+      const std::string str_well = prm.get(keywords.well_parameters);
+      std::cout << str_well << std::endl;
+      // const auto & split = Parsers::split_avoid_brackets(str_well, ";");
+      const auto & split = Parsers::split_avoid_brackets(str_well);
+      std::cout << "Split size = " << split.size() << std::endl;
+      for (auto & item : split)
+        std::cout << item << std::endl;
+      prm.leave_subsection();
+    }
     { // Equation data
       prm.enter_subsection(keywords.section_equation_data);
       if (prm.get(keywords.unit_system)=="SI")
@@ -307,5 +339,5 @@ namespace Data
       this->parse_time_stepping();
       prm.leave_subsection();
     }
-  }  // eom
+    }  // eom
 }  // end of namespace
