@@ -13,7 +13,7 @@
 #include <BitMap.hpp>
 #include <Units.cc>
 #include <Tensors.hpp>
-#include <Keywords.cpp>
+#include <Keywords.cc>
 
 
 namespace Data
@@ -42,6 +42,8 @@ namespace Data
     // double get_volume_factor(const double pressure) const;
     // double get_compressibility(const double pressure) const;
     double get_time_step(const double time) const;
+    std::vector<int> get_well_ids() const;
+    void update_well_controls(const double time);
 
   private:
     void declare_parameters();
@@ -53,6 +55,9 @@ namespace Data
                                               const Tensor<1,dim>& anisotropy);
     boost::filesystem::path find_file_in_relative_path(const std::string fname);
     void parse_time_stepping();
+    void assign_wells(const std::string& text);
+    void assign_schedule(const std::string& text);
+    int get_well_id(const std::string& well_name) const;
 
     // ATTRIBUTES
   public:
@@ -64,6 +69,7 @@ namespace Data
     Keywords::Keywords                     keywords;
     boost::filesystem::path                mesh_file;
     std::vector< Wellbore::Wellbore<dim> > wells;
+    Schedule::Schedule                     schedule;
   private:
     std::string                            mesh_file_name, input_file_name;
     double                                 volume_factor_w_constant,
@@ -78,6 +84,7 @@ namespace Data
     int                                    max_fss_steps;
     ParameterHandler                       prm;
     std::map<double, double>               timestep_table;
+    std::map<std::string, int>             well_ids;
   };  // eom
 
 
@@ -170,8 +177,8 @@ namespace Data
       prm.enter_subsection(keywords.section_wells);
       prm.declare_entry(keywords.well_parameters,
                         "", Patterns::Anything());
-      // prm.declare_entry(keywords.well_schedule,
-      //                   "", Patterns::Anything());
+      prm.declare_entry(keywords.well_schedule,
+                        "", Patterns::Anything());
       prm.leave_subsection();
     }
 
@@ -255,6 +262,142 @@ namespace Data
 
 
   template <int dim>
+  int DataBase<dim>::get_well_id(const std::string& well_name) const
+  {
+    return well_ids.find(well_name)->second;
+  } // eom
+
+
+  template <int dim>
+  std::vector<int> DataBase<dim>::get_well_ids() const
+  {
+    std::vector<int> result;
+    for(auto & id : well_ids)
+      result.push_back(id.second);
+    return result;
+  } // eom
+
+
+  template <int dim>
+  void DataBase<dim>::assign_schedule(const std::string& text)
+  {
+    /*
+      Split first based on ";" - schedule entries
+      Then split based on "," - parameters of schedule as follows:
+      time, well_name, control type id, control value, others (skin etc.)
+    */
+
+    std::vector<std::string> lines;
+    boost::algorithm::split(lines, text, boost::is_any_of(";"));
+    for (auto & line : lines)
+    {
+      // std::cout << line << std::endl;
+      std::vector<std::string> entries;
+      boost::algorithm::split(entries, line, boost::is_any_of(","));
+
+      // Handle case when the last entry in schedule ends with ";"
+      // Boost thinks that there is something after
+      if (entries.size() == 1 && entries[0].size() == 0)
+        break;
+
+      // Process entries
+      AssertThrow(entries.size() >= 4,
+                  ExcMessage("Wrong entry in schedule"));
+
+      Schedule::ScheduleEntry schedule_entry;
+
+      // get time
+      schedule_entry.time = Parsers::convert<double>(entries[0]);
+
+      // get well name and identifier
+      std::string well_name = entries[1];
+      std::cout << "well name = " << well_name << std::endl;
+      boost::algorithm::trim(well_name);
+      // schedule_entry.well_name = well_name;
+      schedule_entry.well_id = get_well_id(well_name);
+
+      // get control type
+      const int control_type_id = Parsers::convert<int>(entries[2]);
+      schedule_entry.control.type =
+        Schedule::well_control_type_indexing.find(control_type_id)->second;
+
+      // get control value
+      schedule_entry.control.value = Parsers::convert<double>(entries[3]);
+
+      // get skin
+      if (entries.size() > 4)
+      {
+        schedule_entry.control.skin = Parsers::convert<double>(entries[4]);
+      }
+
+      schedule.add_entry(schedule_entry);
+    }
+  }  // eom
+
+
+  template <int dim>
+  void DataBase<dim>::assign_wells(const std::string& text)
+  {
+    /*
+      Keyword structure is as follows:
+      string well_name
+      double radius
+      int direction
+      comma-semicolon-separated list locations
+      example
+      [Well1, 0.1, 1, (1,1; 2,2)], [Well2, 0.1, 1, (1,1; 2,2)]
+    */
+    const auto & delim = std::pair<std::string,std::string>("[","]");
+    std::vector<std::string> split =
+      Parsers::split_bracket_group(text, delim);
+
+    for (auto & item : split)
+    {
+      // std::cout << item << std::endl;
+      const auto & str_params = Parsers::split_ignore_brackets(item);
+      const std::string well_name = str_params[0];
+      const double radius = Parsers::convert<double>(str_params[1]);
+      const int direction = Parsers::convert<int>(str_params[2]);
+      // separate separate points
+      std::vector<std::string> point_strs;
+      std::vector< Point<dim> > locations;
+      boost::algorithm::split(point_strs, str_params[3], boost::is_any_of(";"));
+      for (auto & point_str : point_strs)
+      {
+        const auto & point = Parsers::parse_string_list<double>(point_str);
+        AssertThrow(point.size() == dim,
+                    ExcMessage("Dimensions don't match"));
+        Point<dim> p;
+        for (int d=0; d<dim; d++)
+          p[d] = point[d];
+        locations.push_back(p);
+      }
+
+      Wellbore::Wellbore<dim> w(locations, direction, radius);
+      this->wells.push_back(w);
+
+      // check if well_id is in unique_well_ids and add if not
+      if (well_ids.empty())
+        well_ids[well_name] = 0;
+      else
+      {
+        std::map<std::string, int>::iterator
+          it = well_ids.begin(),
+          end = well_ids.end();
+
+        for (; it!=end; it++)
+        {
+          AssertThrow(it->first != well_name, ExcMessage("Duplicates in wells"));
+        }
+        // we use size - 1 because first the entry is
+        // created and only then filled
+        well_ids[well_name] = well_ids.size() - 1;
+      }
+    }
+  }  // eom
+
+
+  template <int dim>
   void DataBase<dim>::assign_parameters()
   {
     { // Mesh
@@ -282,43 +425,8 @@ namespace Data
     }
     { // well data
       prm.enter_subsection(keywords.section_wells);
-      /*
-        Keyword structure is as follows:
-        string well_name
-        double radius
-        int direction < dim
-        comma-semicolon-separated list locations
-        example
-        [Well1, 0.1, 1, (1,1; 2,2)], [Well2, 0.1, 1, (1,1; 2,2)]
-       */
-      // std::string str_well =
-      const std::string str_well = prm.get(keywords.well_parameters);
-      const auto & delim = std::pair<std::string,std::string>("[","]");
-      std::vector<std::string> split =
-        Parsers::split_bracket_group(str_well, delim);
-
-      for (auto & item : split)
-      {
-        // std::cout << item << std::endl;
-        const auto & str_params = Parsers::split_ignore_brackets(item);
-        const std::string well_name = str_params[0];
-        const double radius = Parsers::convert<double>(str_params[1]);
-        const int direction = Parsers::convert<int>(str_params[2]);
-        // separate separate points
-        std::vector<std::string> point_strs;
-        std::vector< Point<dim> > locations;
-        boost::algorithm::split(point_strs, str_params[3], boost::is_any_of(";"));
-        for (auto & point_str : point_strs)
-        {
-          const auto & point = Parsers::parse_string_list<double>(point_str);
-          AssertThrow(point.size == dim,
-                      ExcMessage("Dimensions don't match"));
-          Point<dim> p;
-          for (int d=0; d<dim; d++)
-            p[d] = point[d];
-        }
-      }
-
+      assign_wells(prm.get(keywords.well_parameters));
+      assign_schedule(prm.get(keywords.well_schedule));
       prm.leave_subsection();
     }
     { // Equation data
@@ -360,5 +468,14 @@ namespace Data
       this->parse_time_stepping();
       prm.leave_subsection();
     }
-    }  // eom
+  }  // eom
+
+
+  template <int dim>
+  void DataBase<dim>::update_well_controls(const double time)
+  {
+    for (unsigned int i=0; i<wells.size(); i++)
+      wells[i].set_control(schedule.get_control(time, i));
+  } // eom
+
 }  // end of namespace

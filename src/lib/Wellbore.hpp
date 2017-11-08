@@ -3,8 +3,8 @@
 #include <deal.II/base/function.h>
 #include <deal.II/base/point.h>
 
-enum WellControl {pressure_control, flow_control_total, flow_control_water,
-                  flow_control_oil, flow_control_gas};
+#include <Schedule.cc>
+
 
 namespace Wellbore
 {
@@ -13,23 +13,43 @@ namespace Wellbore
 	template <int dim>
 	class Wellbore : public Function<dim>
   {
+  public:
     Wellbore(const std::vector< Point<dim> >& locations_,
-             const int                        direction_);
-    void set_schedule(const WellControl control_, const double value);
+             const int                        direction_,
+             const double                     radius_);
+    void set_control(const Schedule::WellControl& control_);
+    Schedule::WellControl get_control();
 
   private:
-    WellControl               control;
-    double                    control_value;
     std::vector< Point<dim> > locations;
     int                       direction;
+    double                    radius;
+    Schedule::WellControl     control;
   };  // eom
+
 
   template <int dim>
   Wellbore<dim>::Wellbore(const std::vector< Point<dim> >& locations_,
-                          const int                        direction_)
+                          const int                        direction_,
+                          const double                     radius_)
     :
     locations(locations_),
-    direction(direction_)
+    direction(direction_),
+    radius(radius_)
   {} //  eom
 
+
+  template <int dim>
+  void Wellbore<dim>::set_control(const Schedule::WellControl& control_)
+  {
+    control = control_;
+  }
+
+
+  template <int dim>
+  Schedule::WellControl
+  Wellbore<dim>::get_control()
+  {
+    return control;
+  }
 }  // end of namespace

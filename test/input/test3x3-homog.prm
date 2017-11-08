@@ -9,6 +9,10 @@ subsection Well data
   set Wells = \
   [A, 0.1, 0, (1.0, 2.0; 2.0, 1.0)]; \
   [B, 0.2, 1, (1.5, 3.0; 7.0, 3.0)];
+
+  set Schedule = \
+  0, A, 0, 15, 0; \
+  0, B, 0, -15;
 end
 
 subsection Equation data

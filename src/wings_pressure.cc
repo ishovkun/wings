@@ -72,13 +72,26 @@ namespace Wings
     read_mesh();
     pressure_solver.setup_system();
 
-
     const double k = data.get_permeability->value(Point<dim>(1,1), 1);
     const double phi = data.get_porosity->value(Point<dim>(1,1), 1);
     const double mu = data.viscosity_water();
     const double B_w = data.volume_factor_water();
     const double cw = data.compressibility_water();
     const double h = 1;
+
+    double time = 0;
+    double time_step = data.get_time_step(time);
+
+    // test wellbores and schedule
+    std::vector<int> well_ids = data.get_well_ids();
+    for (auto & id : well_ids)
+      std::cout << "well_id " << id << std::endl;
+
+    data.update_well_controls(time);
+
+    std::cout << "well control value "
+              << data.wells[well_ids[0]].get_control().value
+              << std::endl;
 
     // Compute transmissibility and mass matrix entries
     const double T = 1./mu/B_w*(k/h)*h*h;
@@ -97,10 +110,6 @@ namespace Wings
     std::cout << "Mass matrix entriy "
               << B
               << std::endl;
-
-    double time = 0;
-    double time_step = data.get_time_step(time);
-
 
     // pressure_solver.solution[0] = 1;
     // pressure_solver.solution[1] = 0;

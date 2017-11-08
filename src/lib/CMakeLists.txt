@@ -7,8 +7,9 @@ ADD_LIBRARY(lib
   Parsers.hpp
   Units.cc
   Tensors.hpp
-  Keywords.cpp
+  Keywords.cc
   Wellbore.hpp
+  Schedule.cc
 )
 
 DEAL_II_SETUP_TARGET(lib)
