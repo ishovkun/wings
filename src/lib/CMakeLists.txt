@@ -10,6 +10,7 @@ ADD_LIBRARY(lib
   Keywords.cc
   Wellbore.hpp
   Schedule.cc
+  DefaultValues.cc
 )
 
 DEAL_II_SETUP_TARGET(lib)

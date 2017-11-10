@@ -45,7 +45,9 @@ namespace Data
     double get_time_step(const double time) const;
     std::vector<int> get_well_ids() const;
     void update_well_controls(const double time);
-    void locate_wells(const DoFHandler<dim>& dof_handler);
+    void locate_wells(const DoFHandler<dim>& dof_handler,
+                      const FE_DGQ<dim>&     fe);
+
 
   private:
     void declare_parameters();
@@ -482,9 +484,10 @@ namespace Data
 
 
   template <int dim>
-  void DataBase<dim>::locate_wells(const DoFHandler<dim>& dof_handler)
+  void DataBase<dim>::locate_wells(const DoFHandler<dim>& dof_handler,
+                                   const FE_DGQ<dim>&     fe)
   {
     for (unsigned int i=0; i<wells.size(); i++)
-      wells[i].locate(dof_handler);
+      wells[i].locate(dof_handler, fe);
   } // eom
 }  // end of namespace

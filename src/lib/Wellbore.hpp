@@ -3,13 +3,21 @@
 #include <deal.II/base/function.h>
 #include <deal.II/base/point.h>
 #include <deal.II/dofs/dof_handler.h>
+#include <deal.II/fe/fe_dgq.h>
+#include <deal.II/fe/fe_values.h>
+#include <deal.II/base/quadrature_lib.h>
+#include <math.h>
 
+#include <DefaultValues.cc>
 #include <Schedule.cc>
 
 
 namespace Wellbore
 {
 	using namespace dealii;
+
+  // template <int dim>
+  // using CellIterator = typename DoFHandler<dim>::active_cell_iterator;
 
 	template <int dim>
 	class Wellbore : public Function<dim>
@@ -20,10 +28,11 @@ namespace Wellbore
              const double                     radius_);
     void set_control(const Schedule::WellControl& control_);
     Schedule::WellControl get_control();
-    void locate(const DoFHandler<dim>& dof_handler);
-
-  private:
+    void locate(const DoFHandler<dim>& dof_handler,
+                const FE_DGQ<dim>&     fe);
+    const std::vector<typename DoFHandler<dim>::active_cell_iterator> & get_cells();
     std::vector< Point<dim> > locations;
+  private:
     int                       direction;
     double                    radius;
     Schedule::WellControl     control;
@@ -73,34 +82,49 @@ namespace Wellbore
 
 
   template <int dim>
-  void Wellbore<dim>::locate(const DoFHandler<dim>& dof_handler)
+  inline
+  const std::vector<typename DoFHandler<dim>::active_cell_iterator> &
+  Wellbore<dim>::get_cells()
+  {
+    return cells;
+  }  // eom
+
+
+  template <int dim>
+  void Wellbore<dim>::locate(const DoFHandler<dim>& dof_handler,
+                             const FE_DGQ<dim>&     fe)
   {
     /* Algorithm:
        I. if just one well location, add cell that contains the point.
-       If point is on the boundary, assign just one.
-       Need to loop through neighbors.
+       And break. so no other cells can claim the well
 
        II. If well segments.
        let the segment be defined with eq x = x0 + at,
-       where x is a point on the segment, a is the beginning of the segment,
+       where x is a point on the segment, x0 is the beginning of the segment,
        a is the vector in the direction of the segment, t is a scalar.
        the cell center location is p0.
+       x1 is the end point of the segment.
+
+       point d is the closest point to p0 on the segment.
+       vector n is between p0 and d.
+
        We make three checks:
-       1. Calculate the vector d that starts in p and is perpendicular to the
-       well segment. If (p+d) is not in the cell, skip the segment.
-       2. if (p+d) is in the cell but lies out the segment
-       check whether the end-points of the segment are in the cell.
-       Skip segment if not.
-       3. If either of previous conditions is satisfied the segment is in the cell.
-       But....!
-       4. We check whether the wellbore is aligned with the cell face, and if
-       yes, assign it to only one cell:
-       if face_normal \cdot a = 0 (or small number)
-       and goes through the cell... How to check it???
+       0. If cell already added from another well segment -> discard cell
+       1. Calculate vectors n and d. If d is not in the cell -> discard segment.
+       2. if d is in the cell but lies outside the segment
+       and segment end-points are outside too -> discard.
+       3. We check whether the wellbore is aligned with the cell face, and if
+       yes, assign it to only one cell.
+       4. if only touches a cell in a vertex that's also bad
      */
 
-    Point<dim> x0, x1, p;
-    Tensor<1,dim> a, d;
+    Point<dim> x0, x1, p0, p1, d;
+    Tensor<1,dim> a, n, nf;
+
+    // we need fe_face_values to get cell normals
+    QGauss<dim-1>     face_quadrature_formula(1);
+    FEFaceValues<dim> fe_face_values(fe, face_quadrature_formula,
+                                     update_normal_vectors);
 
     cells.clear();
 
@@ -112,34 +136,23 @@ namespace Wellbore
 	  for (; cell!=endc; ++cell)
     // if (cell->is_locally_owned)
     {
-      p = cell->center();
+      p0 = cell->center();
+      // std::cout << "\nCell " << p0 << std::endl;
+
+      auto it = std::find(cells.begin(), cells.end(), cell);
+      if (it != cells.end())
+        continue;
 
       if(locations.size() == 1)  // case wellbore is one point
       {
+        // std::cout << "Case one point" << std::endl;
         if (cell->point_inside(locations[0]))
         {
-          bool contains_neighbour_cell = false;
+          // std::cout << "Point inside" << std::endl;
 
-          // check if neighbors already have this location (on the boundary)
-          for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
-          {
-            unsigned int j = cell->neighbor_index(f);
-            unsigned int no_neighbor_index = -1;
-
-            if(j == no_neighbor_index) // if neighbor don't exist
-              continue;
-
-            if(cell->neighbor(f)->point_inside(locations[0]))
-            {
-              // check if neighbor cell is already added
-              auto it = std::find(cells.begin(), cells.end(), neighbor_cell);
-              if (it != cells.end())
-                contains_neighbour_cell = true;
-            }
-          }
-
-          if (!contains_neighbour_cell)
-            cells.push_back(cell);
+          cells.push_back(cell);
+          // cell = endc;
+          break;
         }  // end if point inside
 
       }  // end case I
@@ -147,27 +160,93 @@ namespace Wellbore
       else  // well segments
         for (unsigned int i=1; i<locations.size(); i++)
         {
+          // std::cout << "\nsegment i = " << i << std::endl;
+          // std::cout << "\nCell " << p0 << std::endl;
+
           x0 = locations[i-1];
           x1 = locations[i];
           a = x1 - x0;
-          double x0x1_norm = a.norm();
-          a = a/x0x1_norm;
+          double segment_len = a.norm();
+          a = a/segment_len;
           // distance from cell center to the line
-          d = (x0-p) - a*scalar_product(x0-p, a);
-          Point<dim> pd(p+d);
+          d = x0 + a*scalar_product(p0-x0, a);
+          n = d - p0;
 
-          if (!cell->point_inside(pd))
+          // std::cout << "a " << a << std::endl;
+          // std::cout << "d " << d << std::endl;
+          // std::cout << "n " << n << std::endl;
+
+          // check d inside cell
+          if (!cell->point_inside(d))
+          {
+            // std::cout << "Too far" << std::endl;
             continue;
+          }
 
-          // check if the distance vector d is between x1 and x0
-          // (p+d) = x0 + a*td
-          double td = - scalar_product((x0 - p), a);
+          // check if d is between x1 and x0
+          // d = x0 + a*td
+          double td = scalar_product((p0 - x0), a);
           // x1 = x0 + a*t1
-          double t1 = x0x1_norm;
+          double t1 = segment_len;
+
+          // std::cout << "td = " << td << std::endl;
+
           if((td < 0 || td > t1) && // distance vector outside segment
              (!cell->point_inside(x0) || !cell->point_inside(x1))) //end-points
-            continue();
+          {
+            // std::cout << "d in cell but outside segment" << std::endl;
+            continue;
+          }
+
+          bool skip_cell = false;
+          // check if segment aligned with faces and select the closest cell
+          for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
+          {
+            unsigned int j = cell->neighbor_index(f);
+            unsigned int no_neighbor_index = -1;
+            if(j != no_neighbor_index) // if this neighbor exists
+            {
+              fe_face_values.reinit(cell, f);
+              nf = fe_face_values.normal_vector(0); // 0 is gauss point
+              p1 = cell->neighbor(f)->center();
+
+              const bool face_aligned_with_well =
+                abs(scalar_product(n, nf))/n.norm() > cos(DefaultValues::small_angle);
+
+              const bool well_closer_to_neighbour =
+                n.norm() >= (p1-d).norm() &&
+                j < cell->active_cell_index();
+
+              // if (face_aligned_with_well)
+              //   std::cout << "Aligned with face " << j << std::endl;
+
+              // if (well_closer_to_neighbour)
+              //   std::cout << "Closer to " << p1 << std::endl;
+
+              if (face_aligned_with_well && well_closer_to_neighbour)
+              {
+                skip_cell = true;
+                break;
+              }
+
+            } // end if neighbor exists
+          } // end face loop
+
+          // iterate vertices
+          for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell; ++v)
+            if ((cell->vertex(v) - d).norm() < DefaultValues::small_number)
+              skip_cell = true;
+
+
+          if (skip_cell)
+          {
+            // std::cout << "OK but another cell is better" << std::endl;
+            continue;
+          }
+
+          cells.push_back(cell);
         } // end loop segments
-    }
+
+    }  // end cell loop
   }  // eom
 }  // end of namespace

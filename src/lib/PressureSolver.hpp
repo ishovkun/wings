@@ -80,7 +80,8 @@ namespace FluidSolvers
     void solve();
     void print_system_matrix(const double denominator=1.0) const;
     const SparseMatrix<double>& get_system_matrix();
-    const DoFHandler<dim> & get_dof_handler();
+    const DoFHandler<dim> &     get_dof_handler();
+    const FE_DGQ<dim> &         get_fe();
 
   private:
     double get_transmissibility(const Vector<double> &perm,
@@ -336,5 +337,13 @@ namespace FluidSolvers
   PressureSolver<dim>::get_dof_handler()
   {
     return dof_handler;
+  }  // eom
+
+
+  template <int dim>
+  const FE_DGQ<dim> &
+  PressureSolver<dim>::get_fe()
+  {
+    return fe;
   }  // eom
 }  // end of namespace
