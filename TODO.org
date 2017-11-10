@@ -5,6 +5,9 @@
    https://www.dealii.org/8.4.1/doxygen/deal.II/classCellAccessor.html#acec7a480d2bcdd506a3350dd9ec3cfeb
 ** Write code for treating bitmap input
 ** Parallelize
+*** Use trilinos parallel classes
+*** Properly extract fevalues and distribute into the stiffness matrix
+*** Locate wellbore on cell interfaces between two processes
 
 
-Use cell->point_inside() to check if wellbore is in a cell
+ Use cell->point_inside() to check if wellbore is in a cell

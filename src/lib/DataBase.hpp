@@ -41,9 +41,11 @@ namespace Data
     // double get_viscosity(const double pressure) const;
     // double get_volume_factor(const double pressure) const;
     // double get_compressibility(const double pressure) const;
+
     double get_time_step(const double time) const;
     std::vector<int> get_well_ids() const;
     void update_well_controls(const double time);
+    void locate_wells(const DoFHandler<dim>& dof_handler);
 
   private:
     void declare_parameters();
@@ -478,4 +480,11 @@ namespace Data
       wells[i].set_control(schedule.get_control(time, i));
   } // eom
 
+
+  template <int dim>
+  void DataBase<dim>::locate_wells(const DoFHandler<dim>& dof_handler)
+  {
+    for (unsigned int i=0; i<wells.size(); i++)
+      wells[i].locate(dof_handler);
+  } // eom
 }  // end of namespace

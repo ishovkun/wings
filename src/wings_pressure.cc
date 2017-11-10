@@ -71,6 +71,8 @@ namespace Wings
     data.read_input(input_file);
     read_mesh();
     pressure_solver.setup_system();
+    const auto & pressure_dof_handler = pressure_solver.get_dof_handler();
+    data.locate_wells(pressure_dof_handler);
 
     const double k = data.get_permeability->value(Point<dim>(1,1), 1);
     const double phi = data.get_porosity->value(Point<dim>(1,1), 1);
@@ -89,7 +91,9 @@ namespace Wings
 
     data.update_well_controls(time);
 
-    std::cout << "well control value "
+    std::cout << "well "
+              << well_ids[0]
+              << " control value "
               << data.wells[well_ids[0]].get_control().value
               << std::endl;
 

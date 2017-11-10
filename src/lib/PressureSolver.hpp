@@ -10,8 +10,8 @@
 // vectors and matrices
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/sparse_matrix.h>
-// for numbers::is_nan
-#include <deal.II/base/config.h>
+
+#include <deal.II/base/config.h>  // for numbers::is_nan
 
 // to print sparsity pattern, remove later
 #include <fstream>
@@ -79,7 +79,8 @@ namespace FluidSolvers
     void assemble_system(const double time_step);
     void solve();
     void print_system_matrix(const double denominator=1.0) const;
-    const SparseMatrix<double>& get_system_matrix() const;
+    const SparseMatrix<double>& get_system_matrix();
+    const DoFHandler<dim> & get_dof_handler();
 
   private:
     double get_transmissibility(const Vector<double> &perm,
@@ -324,8 +325,16 @@ namespace FluidSolvers
 
   template <int dim>
   const SparseMatrix<double>&
-  PressureSolver<dim>::get_system_matrix() const
+  PressureSolver<dim>::get_system_matrix()
   {
     return system_matrix;
+  }  // eom
+
+
+  template <int dim>
+  const DoFHandler<dim> &
+  PressureSolver<dim>::get_dof_handler()
+  {
+    return dof_handler;
   }  // eom
 }  // end of namespace
