@@ -31,13 +31,20 @@ namespace Wellbore
     void locate(const DoFHandler<dim>& dof_handler,
                 const FE_DGQ<dim>&     fe);
     const std::vector<typename DoFHandler<dim>::active_cell_iterator> & get_cells();
+    const std::vector< Point<dim> > & get_locations();
     std::vector< Point<dim> > locations;
   private:
+    double                    get_segment_length(const Point<dim>& start,
+                                                 const typename DoFHandler<dim>::
+                                                 active_cell_iterator& cell,
+                                                 const Tensor<1,dim>& tangent);
     int                       direction;
     double                    radius;
     Schedule::WellControl     control;
 
     std::vector<typename DoFHandler<dim>::active_cell_iterator> cells;
+    std::vector<double> segment_length;
+    std::vector< Tensor<1,dim> > segment_tangent;
   };  // eom
 
 
@@ -116,9 +123,11 @@ namespace Wellbore
        3. We check whether the wellbore is aligned with the cell face, and if
        yes, assign it to only one cell.
        4. if only touches a cell in a vertex that's also bad
+
+       we also calculate dl - the length of the well segment in each cell
      */
 
-    Point<dim> x0, x1, p0, p1, d;
+    Point<dim> x0, x1, p0, p1, d, start;
     Tensor<1,dim> a, n, nf;
 
     // we need fe_face_values to get cell normals
@@ -130,7 +139,7 @@ namespace Wellbore
 
     typename DoFHandler<dim>::active_cell_iterator
 		  cell = dof_handler.begin_active(),
-      neighbor_cell = dof_handler.begin_active(),
+      // neighbor_cell = dof_handler.begin_active(),
 		  endc = dof_handler.end();
 
 	  for (; cell!=endc; ++cell)
@@ -191,12 +200,23 @@ namespace Wellbore
 
           // std::cout << "td = " << td << std::endl;
 
+          const bool x0_inside = cell->point_inside(x0);
+          const bool x1_inside = cell->point_inside(x1);
+
           if((td < 0 || td > t1) && // distance vector outside segment
-             (!cell->point_inside(x0) || !cell->point_inside(x1))) //end-points
+             (!x0_inside || !x1_inside)) //end-points
           {
             // std::cout << "d in cell but outside segment" << std::endl;
             continue;
           }
+
+          // initial point to seek segment length
+          if (td < 0 && x0_inside)
+            start = x0;
+          if (td > t1 && x1_inside)
+            start = x1;
+          if (td >= 0 && td <= t1)
+            start = d;
 
           bool skip_cell = false;
           // check if segment aligned with faces and select the closest cell
@@ -245,8 +265,52 @@ namespace Wellbore
           }
 
           cells.push_back(cell);
+          const double l = get_segment_length(start, cell, a);
+          segment_length.push_back(l);
+          segment_tangent.push_back(a);
         } // end loop segments
 
     }  // end cell loop
   }  // eom
+
+
+  template <int dim>
+  double Wellbore<dim>::
+  get_segment_length(const Point<dim>& start,
+                     const typename DoFHandler<dim>::active_cell_iterator& cell,
+                     const Tensor<1,dim>& tangent)
+  {
+    /* Assuming that the start point is in the cell,
+       calculate the length of the well segment in the cell */
+
+    // first check if the tangent is a unit vector
+    Tensor<1,dim> t = tangent;
+    if (abs(t.norm() - 1.0) > DefaultValues::small_number)
+      t = t/t.norm();
+
+    const double d = cell->diameter();
+    const double step = d/100;
+
+    double length = 0;
+    // first move in the direction of a
+    Point<dim> p = start, pp = start;
+    while (cell->point_inside(p))
+    {
+      length += (p - pp).norm();
+      pp = p;
+      p = p + t*step;
+    } // end moving along tangent
+
+    // then move in the opposite direction
+    p = start, pp = start;
+    while (cell->point_inside(p))
+      {
+        length += (p - pp).norm();
+        pp = p;
+        p = p - t*step;
+      } // end moving along tangent
+
+    return length;
+  }  // eom
+
 }  // end of namespace

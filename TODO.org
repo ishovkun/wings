@@ -11,3 +11,10 @@
 
 
  Use cell->point_inside() to check if wellbore is in a cell
+** Wells
+approximated algorithm for inclined well permeabiltiy
+wellbore unit tangent a = {ax, ay, az}
+we calculate effective permeability as
+k = kx^(0.5-ax/2)*ky^(0.5-ay/2)*kz^(0.5-ax/2)
+let's see what this approach gives us:
+if a = {0, 0, 1}, then k = kx^0.5 * ky^0.5
