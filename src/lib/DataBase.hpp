@@ -315,7 +315,7 @@ namespace Data
 
       // get well name and identifier
       std::string well_name = entries[1];
-      std::cout << "well name = " << well_name << std::endl;
+      // std::cout << "well name = " << well_name << std::endl;
       boost::algorithm::trim(well_name);
       // schedule_entry.well_name = well_name;
       schedule_entry.well_id = get_well_id(well_name);
@@ -393,9 +393,9 @@ namespace Data
         {
           AssertThrow(it->first != well_name, ExcMessage("Duplicates in wells"));
         }
-        // we use size - 1 because first the entry is
-        // created and only then filled
-        well_ids[well_name] = well_ids.size() - 1;
+
+        const int id = well_ids.size();
+        well_ids[well_name] = id;
       }
     }
   }  // eom

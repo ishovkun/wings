@@ -261,8 +261,18 @@ namespace FluidSolvers
       //           << std::endl;
       // std::cout << "cell pressure: " << solution[i] << std::endl;
 
+
       double matrix_ii = B_ii/time_step;
       double rhs_i = B_ii/time_step*p_old;
+
+      // // Wells
+      // double Q_i = 0;
+      // double J_i = 0;
+      // for (auto & well : data.wells)
+      // {
+      //   Q_i += well.get_rate_water(cell);
+      //   J_i += well.get_productivity(cell);
+      // } // end well loop
 
       for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
       {

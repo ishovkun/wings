@@ -16,8 +16,8 @@ namespace Wellbore
 {
 	using namespace dealii;
 
-  // template <int dim>
-  // using CellIterator = typename DoFHandler<dim>::active_cell_iterator;
+  template <int dim>
+  using CellIterator = typename DoFHandler<dim>::active_cell_iterator;
 
 	template <int dim>
 	class Wellbore : public Function<dim>
@@ -30,21 +30,20 @@ namespace Wellbore
     Schedule::WellControl get_control();
     void locate(const DoFHandler<dim>& dof_handler,
                 const FE_DGQ<dim>&     fe);
-    const std::vector<typename DoFHandler<dim>::active_cell_iterator> & get_cells();
-    const std::vector< Point<dim> > & get_locations();
-    std::vector< Point<dim> > locations;
+    const std::vector<CellIterator<dim>> & get_cells();
+    const std::vector< Point<dim> >      & get_locations();
   private:
-    double                    get_segment_length(const Point<dim>& start,
-                                                 const typename DoFHandler<dim>::
-                                                 active_cell_iterator& cell,
-                                                 const Tensor<1,dim>& tangent);
+    double get_segment_length(const Point<dim>& start,
+                              const CellIterator<dim>& cell,
+                              const Tensor<1,dim>& tangent);
+    std::vector< Point<dim> > locations;
     int                       direction;
     double                    radius;
     Schedule::WellControl     control;
 
-    std::vector<typename DoFHandler<dim>::active_cell_iterator> cells;
-    std::vector<double> segment_length;
-    std::vector< Tensor<1,dim> > segment_tangent;
+    std::vector<CellIterator<dim>> cells;
+    std::vector<double>            segment_length;
+    std::vector< Tensor<1,dim> >   segment_tangent;
   };  // eom
 
 
@@ -90,7 +89,7 @@ namespace Wellbore
 
   template <int dim>
   inline
-  const std::vector<typename DoFHandler<dim>::active_cell_iterator> &
+  const std::vector<CellIterator<dim>> &
   Wellbore<dim>::get_cells()
   {
     return cells;
@@ -277,7 +276,7 @@ namespace Wellbore
   template <int dim>
   double Wellbore<dim>::
   get_segment_length(const Point<dim>& start,
-                     const typename DoFHandler<dim>::active_cell_iterator& cell,
+                     const CellIterator<dim>& cell,
                      const Tensor<1,dim>& tangent)
   {
     /* Assuming that the start point is in the cell,
@@ -313,4 +312,10 @@ namespace Wellbore
     return length;
   }  // eom
 
+  template <int dim>
+  const std::vector< Point<dim> > &
+  Wellbore<dim>::get_locations()
+  {
+    return locations;
+  }
 }  // end of namespace

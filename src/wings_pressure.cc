@@ -76,46 +76,21 @@ namespace Wings
 
     data.locate_wells(pressure_dof_handler, pressure_fe);
 
-    // test wellbores and schedule
-    std::vector<int> well_ids = data.get_well_ids();
-    for (auto & id : well_ids)
+    for (auto & id : data.get_well_ids())
     {
-      std::cout << "\nwell_id " << id << std::endl;
+      std::cout << "well_id " << id << std::endl;
       auto & well = data.wells[id];
 
       std::cout << "Real locations"  << std::endl;
-      for (auto & loc : well.locations)
+      for (auto & loc : well.get_locations())
         std::cout << loc << std::endl;
 
       std::cout << "Assigned locations"  << std::endl;
       for (auto & cell : well.get_cells())
         std::cout << cell->center() << std::endl;
-    }
 
-    // check cells that contains wells
-    std::cout << "Well 0 locations" << std::endl;
-    {
-      std::cout << data.wells[0].locations[0] << std::endl;
-      // std::cout << std::endl;
-      for (auto & cell : data.wells[0].get_cells())
-        std::cout << cell->center() << std::endl;
       std::cout << std::endl;
     }
-
-    // data.wells[2].locate(pressure_dof_handler, pressure_fe);
-
-    // // check cells that contains wells
-    // std::cout << "Well 2 locations" << std::endl;
-    // {
-    //   std::cout << data.wells[2].locations.size() << " points" << std::endl;
-    //   std::cout << data.wells[2].locations[0] << std::endl;
-    //   std::cout << data.wells[2].locations[1] << std::endl;
-    //   std::cout << std::endl;
-    //   for (auto & cell : data.wells[2].get_cells())
-    //     std::cout << cell->center() << std::endl;
-    //   std::cout << std::endl;
-    // }
-
 
     const double k = data.get_permeability->value(Point<dim>(1,1), 1);
     const double phi = data.get_porosity->value(Point<dim>(1,1), 1);
@@ -130,11 +105,11 @@ namespace Wings
 
     data.update_well_controls(time);
 
-    std::cout << "well "
-              << well_ids[0]
-              << " control value "
-              << data.wells[well_ids[0]].get_control().value
-              << std::endl;
+    // std::cout << "well "
+    //           << well_ids[0]
+    //           << " control value "
+    //           << data.wells[well_ids[0]].get_control().value
+    //           << std::endl;
 
     // Compute transmissibility and mass matrix entries
     const double T = 1./mu/B_w*(k/h)*h*h;
