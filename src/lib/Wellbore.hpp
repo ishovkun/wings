@@ -30,12 +30,17 @@ namespace Wellbore
     Schedule::WellControl get_control();
     void locate(const DoFHandler<dim>& dof_handler,
                 const FE_DGQ<dim>&     fe);
-    const std::vector<CellIterator<dim>> & get_cells();
-    const std::vector< Point<dim> >      & get_locations();
+    const  std::vector<CellIterator<dim>> & get_cells();
+    const  std::vector< Point<dim> >      & get_locations();
+    double get_rate(const CellIterator<dim> & cell) const;
+    double get_transmissibility(const CellIterator<dim> & cell) const;
+    void   calculate_values(const Data::DataBase<dim>& data);
+
   private:
     double get_segment_length(const Point<dim>& start,
                               const CellIterator<dim>& cell,
                               const Tensor<1,dim>& tangent);
+    int    find_cell(const CellIterator<dim> & cell) const;
     std::vector< Point<dim> > locations;
     int                       direction;
     double                    radius;
@@ -317,5 +322,71 @@ namespace Wellbore
   Wellbore<dim>::get_locations()
   {
     return locations;
-  }
+  } // eom
+
+
+  template <int dim>
+  int Wellbore<dim>::find_cell(const CellIterator<dim> & cell) const
+  {
+    /*
+      Returns index in this->wells, segment_length, segment_tangent
+      if not found returns 1
+     */
+    for (int i=0; i<cells.size(); i++)
+    {
+      if (cell == cells[i])
+        return i;
+      else
+        continue;
+    }
+
+    return -1;
+  }  // eom
+
+
+  template <int dim>
+  void Wellbore<dim>::calculate_values(const Data::DataBase<dim>& data)
+  {
+    /*
+      First compute the sum of permeabilities for the flux normalization
+      Then compute transmissibilities.
+      How do I normalize permeability when it's a tensor?
+     */
+    double permeability_sum = 0;
+    Tensor<1,dim> permeability;
+    for (auto & cell : cells)
+    {
+      // permeability_sum +=
+      data.get_permeability->vector_value(cell->center(), permeability);
+      permeability_sum += permeability.norm();
+    }
+  }  // eom
+
+  // template <int dim>
+  // double Wellbore<dim>::get_rate(const CellIterator<dim> & cell) const
+  // {
+  //   Assert(control.type == Schedule::WellControlType::flow_control_water,
+  //          ExcNotImplemented());
+
+  //   int segment = find_cell(cell);
+  //   if (control.type == Schedule::WellControlType::flow_control_water &&
+  //       segment != -1)
+  //     return control.value/wells.size();
+  //   else
+  //     return 0;
+  // }  // eom
+
+
+  // template <int dim>
+  // double Wellbore<dim>::get_transmissibility(const CellIterator<dim> & cell) const
+  // {
+  //   if (control.type == Schedule::WellControlType::pressure_control &&
+  //       in_cell(cell))
+  //   {
+  //     return 1;
+  //   }
+  //   else
+  //     return 0;
+  // }  // eom
+
 }  // end of namespace

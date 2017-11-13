@@ -18,3 +18,6 @@ we calculate effective permeability as
 k = kx^(0.5-ax/2)*ky^(0.5-ay/2)*kz^(0.5-ax/2)
 let's see what this approach gives us:
 if a = {0, 0, 1}, then k = kx^0.5 * ky^0.5
+** Problems
+*** Inclined well calculation is wrong
+*** How to properly distribute flux between wells
