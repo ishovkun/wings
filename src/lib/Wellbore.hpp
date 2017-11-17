@@ -34,7 +34,7 @@ namespace Wellbore
     const  std::vector< Point<dim> >      & get_locations();
     double get_rate(const CellIterator<dim> & cell) const;
     double get_transmissibility(const CellIterator<dim> & cell) const;
-    void   calculate_values(const Data::DataBase<dim>& data);
+    void update_transmissibility(const Function<dim>* get_permeability);
 
   private:
     double get_segment_length(const Point<dim>& start,
@@ -345,20 +345,19 @@ namespace Wellbore
 
 
   template <int dim>
-  void Wellbore<dim>::calculate_values(const Data::DataBase<dim>& data)
+  void Wellbore<dim>::update_transmissibility(const Function<dim>* get_permeability)
   {
     /*
       First compute the sum of permeabilities for the flux normalization
       Then compute transmissibilities.
       How do I normalize permeability when it's a tensor?
      */
-    double permeability_sum = 0;
-    Tensor<1,dim> permeability;
+    // double permeability_sum = 0;
+    Tensor<1,dim> perm;
     for (auto & cell : cells)
     {
       // permeability_sum +=
-      data.get_permeability->vector_value(cell->center(), permeability);
-      permeability_sum += permeability.norm();
+      get_permeability->vector_value(cell->center(), perm);
     }
   }  // eom
 

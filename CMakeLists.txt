@@ -30,6 +30,9 @@ DEAL_II_INITIALIZE_CACHED_VARIABLES()
 #SET(CLEAN_UP_FILES *.log *.gmv *.gnuplot *.gpl *.eps *.pov *.vtk *.ucd *.d2 *.vtu *.pvtu)
 PROJECT(wings)
 
+# For YouCompleteMe
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 set(Boost_USE_STATIC_LIBS OFF)
 set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_RUNTIME ON)

@@ -47,6 +47,7 @@ namespace Data
     void update_well_controls(const double time);
     void locate_wells(const DoFHandler<dim>& dof_handler,
                       const FE_DGQ<dim>&     fe);
+    void update_well_transmissibilities();
 
 
   private:
@@ -490,4 +491,11 @@ namespace Data
     for (unsigned int i=0; i<wells.size(); i++)
       wells[i].locate(dof_handler, fe);
   } // eom
+
+  template <int dim>
+  void DataBase<dim>::update_well_transmissibilities()
+  {
+    for (auto & well : wells)
+      well.update_transmissibility(this->get_permeability);
+  }  // eom
 }  // end of namespace

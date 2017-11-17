@@ -75,6 +75,7 @@ namespace Wings
     const auto & pressure_fe = pressure_solver.get_fe();
 
     data.locate_wells(pressure_dof_handler, pressure_fe);
+    data.update_well_transmissibilities();
 
     for (auto & id : data.get_well_ids())
     {
