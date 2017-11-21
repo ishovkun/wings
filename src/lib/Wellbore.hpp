@@ -40,12 +40,15 @@ namespace Wellbore
     double get_segment_length(const Point<dim>& start,
                               const CellIterator<dim>& cell,
                               const Tensor<1,dim>& tangent);
+    std::vector< Tensor<1,dim> > get_cell_sizes() const;
+
     int    find_cell(const CellIterator<dim> & cell) const;
     std::vector< Point<dim> > locations;
     int                       direction;
     double                    radius;
     Schedule::WellControl     control;
 
+  	const DoFHandler<dim>          *p_dof_handler;
     std::vector<CellIterator<dim>> cells;
     std::vector<double>            segment_length;
     std::vector< Tensor<1,dim> >   segment_tangent;
@@ -130,6 +133,7 @@ namespace Wellbore
 
        we also calculate dl - the length of the well segment in each cell
      */
+    p_dof_handler = &dof_handler;
 
     Point<dim> x0, x1, p0, p1, d, start;
     Tensor<1,dim> a, n, nf;
@@ -345,20 +349,73 @@ namespace Wellbore
 
 
   template <int dim>
+  std::vector< Tensor<1,dim> >
+  Wellbore<dim>::get_cell_sizes() const
+  {
+    /*
+      Loop cells, loop faces, find minimum and maximum coordinate
+      for each cell, take differences, those are dx dy dz
+     */
+    const auto & dof_handler = (*p_dof_handler);
+    const auto & fe = dof_handler.get_fe();
+    QGauss<dim-1>     face_quadrature_formula(1);
+    FEFaceValues<dim> fe_face_values(fe, face_quadrature_formula,
+                                     update_quadrature_points);
+    std::vector< Tensor<1,dim> > h(cells.size()); // cell sizes
+    std::vector<std::pair <double,double> > min_max(dim);
+    int counter = 0;
+
+    for (auto & cell : cells)
+    {
+      // first fill min_max otherwise may get weird values
+      for (int d=0; d<dim; d++)
+        {
+          min_max[d].first = cell->center()[d];
+          min_max[d].second = cell->center()[d];
+        }
+      // loop over faces and figure out dx dy dz
+      for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
+        {
+          fe_face_values.reinit(cell, f);
+          const Point<dim> q_point = fe_face_values.quadrature_point(0);
+          for (int d=0; d<dim; d++)
+            {
+              if (q_point[d] < min_max[d].first)
+                min_max[d].first = q_point[d];
+              if (q_point[d] > min_max[d].second)
+                min_max[d].second = q_point[d];
+            }
+        }  // end face loop
+
+      for (int d=0; d<dim; d++)
+        h[counter][d] = min_max[d].second - min_max[d].first;
+
+      counter++;
+    }  // end cell loop
+
+    return h;
+  }  // eom
+
+
+  template <int dim>
   void Wellbore<dim>::update_transmissibility(const Function<dim>* get_permeability)
   {
     /*
+      First get cell dimensions dx dy dz
       First compute the sum of permeabilities for the flux normalization
       Then compute transmissibilities.
       How do I normalize permeability when it's a tensor?
      */
+    // const auto & dof_handler = (*p_dof_handler);
+    // const auto & fe = dof_handler.get_fe();
+
     // double permeability_sum = 0;
-    Tensor<1,dim> perm;
-    for (auto & cell : cells)
+    Vector<double>    perm(dim);
+    const std::vector< Tensor<1,dim> > h = get_cell_sizes();
+    for (unsigned int i=0; i<cells.size(); i++)
     {
-      // permeability_sum +=
-      get_permeability->vector_value(cell->center(), perm);
-    }
+      // const auto & cell =
+    }  // end cell loop
   }  // eom
 
   // template <int dim>
