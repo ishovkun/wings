@@ -3,6 +3,7 @@
 ** Adaptive mesh refinement
    Make PressureSolver work with refined mesh, see
    https://www.dealii.org/8.4.1/doxygen/deal.II/classCellAccessor.html#acec7a480d2bcdd506a3350dd9ec3cfeb
+   Info on how to handle: https://www.dealii.org/8.4.0/doxygen/deal.II/step_46.html
 ** Write code for treating bitmap input
 ** Parallelize
 *** Use trilinos parallel classes

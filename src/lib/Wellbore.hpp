@@ -361,7 +361,9 @@ namespace Wellbore
     QGauss<dim-1>     face_quadrature_formula(1);
     FEFaceValues<dim> fe_face_values(fe, face_quadrature_formula,
                                      update_quadrature_points);
-    std::vector< Tensor<1,dim> > h(cells.size()); // cell sizes
+    // We can't do dim here, because we need all three dimensions
+    // for the productivity calculation
+    std::vector< Tensor<1,dim> > h(cells.size()); //
     std::vector<std::pair <double,double> > min_max(dim);
     int counter = 0;
 
@@ -414,6 +416,7 @@ namespace Wellbore
     const std::vector< Tensor<1,dim> > h = get_cell_sizes();
     for (unsigned int i=0; i<cells.size(); i++)
     {
+      get_permeability->vector_value(cells[i]->center(), perm);
       // const auto & cell =
     }  // end cell loop
   }  // eom
