@@ -1,6 +1,7 @@
 # lib/CMakeLists.txt
 
 ADD_LIBRARY(lib
+  CellValues.hpp
   PressureSolver.hpp
   DataBase.hpp
   BitMap.hpp
@@ -11,6 +12,7 @@ ADD_LIBRARY(lib
   Wellbore.hpp
   Schedule.cc
   DefaultValues.cc
+  Math.hpp
 )
 
 DEAL_II_SETUP_TARGET(lib)

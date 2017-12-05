@@ -61,6 +61,7 @@
 // Custom modules
 #include <DataBase.hpp>
 #include <Wellbore.hpp>
+#include <CellValues.hpp>
 
 namespace FluidSolvers
 {
@@ -76,7 +77,9 @@ namespace FluidSolvers
     ~PressureSolver();
 
     void setup_system();
-    void assemble_system(const double time_step);
+    void assemble_system(CellValues::CellValuesBase<dim> &cell_data,
+                         CellValues::CellValuesBase<dim> &neighbor_data,
+                         const double time_step);
     void solve();
     void print_system_matrix(const double denominator=1.0) const;
     const SparseMatrix<double>& get_system_matrix();
@@ -84,21 +87,16 @@ namespace FluidSolvers
     const FE_DGQ<dim> &         get_fe();
 
   private:
-    double get_transmissibility(const Vector<double> &perm,
-                                const double         visc,
-                                const double         volume_factor,
-                                const Tensor<1,dim>  &normal_vector,
-                                const Tensor<1,dim>  &dx,
-                                const double         dS) const;
-    double get_cell_mass_matrix(const double cell_volume,
-                                const double volume_factor,
-                                const double porosity,
-                                const double compressibility) const;
-    void harmonic_mean(const Vector<double> &perm_1,
-                       const Vector<double> &perm_2,
-                       Vector<double>       &out) const;
-    double arithmetic_mean(const double x1,
-                           const double x2) const;
+    // double get_transmissibility(const Vector<double> &perm,
+    //                             const double         visc,
+    //                             const double         volume_factor,
+    //                             const Tensor<1,dim>  &normal_vector,
+    //                             const Tensor<1,dim>  &dx,
+    //                             const double         dS) const;
+    // double get_cell_mass_matrix(const double cell_volume,
+    //                             const double volume_factor,
+    //                             const double porosity,
+    //                             const double compressibility) const;
   private:
     DoFHandler<dim>            dof_handler;
     FE_DGQ<dim>                fe;
@@ -154,79 +152,69 @@ namespace FluidSolvers
   } // eom
 
 
-  template <int dim>
-  double PressureSolver<dim>::get_cell_mass_matrix(const double cell_volume,
-                                                   const double volume_factor,
-                                                   const double porosity,
-                                                   const double compressibility) const
-  {
-    double B_ii = cell_volume/volume_factor*(porosity*compressibility);
-    return B_ii;
-  }  // eom
+  // template <int dim>
+  // double PressureSolver<dim>::get_cell_mass_matrix(const double cell_volume,
+  //                                                  const double volume_factor,
+  //                                                  const double porosity,
+  //                                                  const double compressibility) const
+  // {
+  //   double B_ii = cell_volume/volume_factor*(porosity*compressibility);
+  //   return B_ii;
+  // }  // eom
+
+
+  // template <int dim>
+  // double PressureSolver<dim>::get_transmissibility(const Vector<double> &perm,
+  //                                                  const double         visc,
+  //                                                  const double         volume_factor,
+  //                                                  const Tensor<1,dim>  &normal_vector,
+  //                                                  const Tensor<1,dim>  &dx,
+  //                                                  const double         dS) const
+  // {
+  //   AssertThrow(perm.size() == dim,
+  //               ExcMessage("Wrong dimension of permeability"));
+  //   double distance = dx.norm(); // to normalize
+  //   if (distance == 0)
+  //     return 0.0;
+
+  //   double T = 0;
+  //   for (int d=0; d<dim; ++d)
+  //   {
+  //     if (abs(dx[d]/distance) > 1e-10)
+  //     {
+  //       T += 1./visc/volume_factor*(perm[d]*normal_vector[d]/dx[d])*dS;
+  //     }
+  //   }
+
+  //   return T;
+  // }  // eom
 
 
   template <int dim>
-  double PressureSolver<dim>::get_transmissibility(const Vector<double> &perm,
-                                                   const double         visc,
-                                                   const double         volume_factor,
-                                                   const Tensor<1,dim>  &normal_vector,
-                                                   const Tensor<1,dim>  &dx,
-                                                   const double         dS) const
-  {
-    AssertThrow(perm.size() == dim,
-                ExcMessage("Wrong dimension of permeability"));
-    double distance = dx.norm(); // to normalize
-    if (distance == 0)
-      return 0.0;
-
-    double T = 0;
-    for (int d=0; d<dim; ++d)
-    {
-      if (abs(dx[d]/distance) > 1e-10)
-      {
-        T += 1./visc/volume_factor*(perm[d]*normal_vector[d]/dx[d])*dS;
-      }
-    }
-
-    return T;
-  }  // eom
-
-  template <int dim>
-  void PressureSolver<dim>::harmonic_mean(const Vector<double> &perm_1,
-                                          const Vector<double> &perm_2,
-                                          Vector<double>       &out) const
-  {
-    for (int d=0; d<dim; ++d){
-      if (perm_1[d] == 0 || perm_2[d] == 0)
-        out[d] = 0;
-      else
-        out[d] = 2/(1./perm_1[d] + 1./perm_2[d]);
-    }
-  }  // eom
-
-
-  template <int dim>
-  double PressureSolver<dim>::arithmetic_mean(const double x1,
-                                              const double x2) const
-  {
-    return 0.5*(x1+x2);
-  }  // eom
-
-
-  template <int dim>
-  void PressureSolver<dim>::assemble_system(const double time_step)
+  void
+  PressureSolver<dim>::assemble_system(CellValues::CellValuesBase<dim> &cell_values,
+                                       CellValues::CellValuesBase<dim> &neighbor_values,
+                                       const double time_step)
   {
     // Only one integration point in FVM
     QGauss<dim>       quadrature_formula(1);
     QGauss<dim-1>     face_quadrature_formula(1);
 
-    // FEValues<dim> fe_values(fe, quadrature_formula, update_values);
+    FEValues<dim> fe_values(fe, quadrature_formula, update_values);
+    FEValues<dim> fe_values_neighbor(fe, quadrature_formula,
+                                     update_values);
     FEFaceValues<dim> fe_face_values(fe, face_quadrature_formula,
                                      update_normal_vectors);
+    FESubfaceValues<dim> fe_subface_values(fe, face_quadrature_formula,
+                                           update_normal_vectors);
+
+    const unsigned int dofs_per_cell = fe.dofs_per_cell;
+    std::vector<types::global_dof_index>
+      local_dof_indices(dofs_per_cell),
+      local_dof_indices_neighbor(dofs_per_cell);
 
     Tensor<1, dim>    dx_ij, normal;
-    Vector<double>    perm_i(dim), perm_j(dim), perm_ij(dim);
-    // Tensor <1,dim> normal_vector;
+    std::vector<double>    p_old_values(quadrature_formula.size());
 
     typename DoFHandler<dim>::active_cell_iterator
 		  cell = dof_handler.begin_active(),
@@ -238,30 +226,18 @@ namespace FluidSolvers
 
 	  for (; cell!=endc; ++cell)
     {
-      unsigned int i = cell->active_cell_index();
+      cell->get_dof_indices(local_dof_indices);
+      unsigned int i = local_dof_indices[0];
+      fe_values.reinit(cell);
+      fe_values.get_function_values(solution, p_old_values);
       // std::cout << "cell: " << i << std::endl;
-      const double dV = cell->measure();
       // double p_i = solution[i];
-      double p_old = solution_old[i];
+      // double p_old = solution_old[i];
+      double p_old = p_old_values[0];
 
-      // Cell properties
-      data.get_permeability->vector_value(neighbor_cell->center(), perm_i);
-      const double mu_i = data.viscosity_water();
-      const double volume_factor_i = data.volume_factor_water();
-      const double poro_i = data.get_porosity->value(cell->center());
-      const double fcomp_i = data.compressibility_water();
+      cell_values.update(cell);
 
-      // Cell mass matrix
-      double B_ii = get_cell_mass_matrix(dV, volume_factor_i, poro_i, fcomp_i);
-      // std::cout << "Mass entry "
-      //           << B_ii
-      //           << std::endl;
-      // std::cout << "cell measure "
-      //           << dV
-      //           << std::endl;
-      // std::cout << "cell pressure: " << solution[i] << std::endl;
-
-
+      const double B_ii = cell_values.get_mass_matrix_entry();
       double matrix_ii = B_ii/time_step;
       double rhs_i = B_ii/time_step*p_old;
 
@@ -274,48 +250,58 @@ namespace FluidSolvers
       //   J_i += well.get_productivity(cell);
       // } // end well loop
 
+      unsigned int j;
+      double dS;
+      dx_ij = 0;
       for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
       {
-        unsigned int j = cell->neighbor_index(f);
-        unsigned int no_neighbor_index = -1;
-
-        if(j != no_neighbor_index) // if this neighbor exists
+        // T_ij = 0;
+        dS = 0;
+        if (cell->at_boundary(f) == false)
         {
-          // CHECK IF NEIGHBOR IS NOT REFINED, OTHERWISE WRITE CODE!!!!!
-          // if neighbor is not at the maximum refinement level
-          fe_face_values.reinit(cell, f);
+          if(cell->neighbor(f)->level() == cell->level() &&
+             cell->neighbor(f)->has_children() == false)
+          {
+            cell->neighbor(f)->get_dof_indices(local_dof_indices_neighbor);
+            fe_face_values.reinit(cell, f);
+            normal = fe_face_values.normal_vector(0); // 0 is gauss point
+            j = local_dof_indices_neighbor[0];
+            dS = cell->face(f)->measure();  // face area
+            dx_ij = cell->neighbor(f)->center() - cell->center();
+            neighbor_values.update(cell->neighbor(f));
+          }
+          else if ((cell->neighbor(f)->level() == cell->level()) &&
+                   (cell->neighbor(f)->has_children() == true))
+          {
+            for (unsigned int subface=0;
+                 subface<cell->face(f)->n_children(); ++subface)
+            {
+              fe_subface_values.reinit(cell, f, subface);
+              normal = fe_subface_values.normal_vector(0); // 0 is gauss point
+              typename DoFHandler<dim>::cell_iterator neighbor_child
+                = cell->neighbor_child_on_subface(f, subface);
+              neighbor_values.update(neighbor_child);
+              // dS =
+              dx_ij = cell->neighbor(f)->center() - neighbor_child->center();
+              // compute_intercell_data();
+            }
+          }
+          else if (cell->neighbor_is_coarser(f))
+          {
+            // compute dh on cell
+            // dx is not between cell centers i think
+            // get_cell_data(neighbor);
+            // compute_intercell_data();
+            dx_ij = cell->neighbor(f)->center() - cell->center();
+          }
 
-          // geometry props
-          double dS = cell->face(f)->measure();  // face area
-          neighbor_cell = cell->neighbor(f);
-          normal = fe_face_values.normal_vector(0); // 0 is gauss point
-          dx_ij = neighbor_cell->center() - cell->center();
-
-          // neighbor cell data
-          const double mu_j = data.viscosity_water();
-          const double volume_factor_j = data.volume_factor_water();
-
-          // get absolute perm
-          // Use vector_value instead!!!!!!!!!!!
-          data.get_permeability->vector_value(neighbor_cell->center(), perm_j);
-
-          // Face properties
-          harmonic_mean(perm_i, perm_j, perm_ij);
-          const double mu_ij = arithmetic_mean(mu_i, mu_j);
-          const double volume_factor_ij = arithmetic_mean(volume_factor_i,
-                                                          volume_factor_j);
-
-          // Face transmissibility
-          double T_ij = get_transmissibility(perm_ij, mu_ij, volume_factor_ij,
-                                             normal, dx_ij, dS);
-          // std::cout << "trans: " << T_ij << std::endl;
+          // !!!!!!!!!!!!!!!!1
+          double T_ij = cell_values.face_transmissibility
+            (neighbor_values, dx_ij, normal, dS);
 
           matrix_ii += T_ij;
           system_matrix.add(i, j, -T_ij);
-        } // end face loop
-        else  // if the neighbor doesn't exist
-          continue;
-
+        } // end if face not at boundary
       }  // end face loop
       system_matrix.add(i, i, matrix_ii);
       rhs_vector[i] += rhs_i;

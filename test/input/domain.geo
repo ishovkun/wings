@@ -1,10 +1,10 @@
 
 // Inputs
-squareSide = 200; //m
-gridsize = squareSide / 3;
+squareSide = 4; //m
+gridsize = squareSide / 4;
 meshThickness = gridsize;
 
-      // Geometry
+// Geometry
 Point(1) = {-squareSide/2, -squareSide/2, 0, gridsize};
 Point(2) = {squareSide/2, -squareSide/2, 0, gridsize};
 Point(3) = {squareSide/2, squareSide/2, 0, gridsize};
@@ -16,7 +16,7 @@ Line(4) = {4, 1};				// left line
 Line Loop(5) = {1, 2, 3, 4};
 Plane Surface(6) = {5};
 
-      //Transfinite surface:
+//Transfinite surface:
 Transfinite Surface {6};
 Recombine Surface {6};
 

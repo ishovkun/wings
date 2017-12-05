@@ -12,12 +12,15 @@
 namespace BitMap {
   using namespace dealii;
 
-  template <int dim>
+  // template <int dim>
   class BitMapFile
   {
   public:
     BitMapFile(const std::string &name);
     double get_value(const double x, const double y) const;
+    double get_value(const double x,
+                     const double y,
+                     const double z) const;
 
   private:
     std::vector<double> bitmap_data;
@@ -25,12 +28,17 @@ namespace BitMap {
     double maxvalue = 255;
     int nx, ny, nz;
     std::vector<double> dimensions;
+    unsigned int dim;
     double get_pixel_value(const int i, const int j) const;
+    double get_pixel_value(const int i,
+                           const int j,
+                           const int k) const;
   };
 
 
-  template <int dim>
-  BitMapFile<dim>::BitMapFile(const std::string &name)
+  // template <int dim>
+  // BitMapFile<dim>::BitMapFile(const std::string &name)
+  BitMapFile::BitMapFile(const std::string &name)
     :
     bitmap_data(0),
     hx(0),
@@ -51,25 +59,28 @@ namespace BitMap {
     // std::cout << temp << std::endl;
 
     dimensions = Parsers::parse_string_list<double>(temp, "\t ");
-    // std::cout << "n dim " << dimensions.size() << std::endl;
-    AssertThrow(dimensions.size() == 2*dim,
-                ExcMessage("Wrong dimensions in permeability file"));
-    // for (int i=0; i<dimensions.size(); ++i)
-    //   AssertThrow(dimensions[i] > 0,  ExcMessage("Invalid file format."));
+
+    dim = dimensions.size()/2;
+    // AssertThrow(dimensions.size()%2 == 0,
+    //             ExcMessage("Wrong dimensions in bitmap file"));
+    AssertThrow(dimensions.size() == 6,
+                ExcMessage("Wrong dimensions in bitmap file"));
 
     // Read numbers of pixels
     getline(f, temp);
     std::vector<unsigned int> n_pixels =
       Parsers::parse_string_list<unsigned int>(temp, "\t ");
+
     AssertThrow(n_pixels.size() == dim,
                 ExcMessage("Wrong grid size in permeability file"));
+
     // Calculate total number of pixels
     unsigned int total_pixels = 1;
-    for (int d=0; d<dim; d++)
-      {
-        total_pixels *= n_pixels[d];
-        AssertThrow(n_pixels[d] > 0,  ExcMessage("Invalid file format."));
-      }
+    for (unsigned int d=0; d<dim; d++)
+    {
+      total_pixels *= n_pixels[d];
+      AssertThrow(n_pixels[d] > 0,  ExcMessage("Invalid file format."));
+    }
 
     // Read values
     bitmap_data.resize(total_pixels);
@@ -80,8 +91,6 @@ namespace BitMap {
       f >> x;
       AssertThrow(x > 0,  ExcMessage("Invalid entry."));
       bitmap_data[i] = x;
-      // std::cout << x << std::endl;
-      // std::cout << !f.eof() << std::endl;
     }
 
     nx = n_pixels[0];
@@ -91,29 +100,45 @@ namespace BitMap {
       case 2:
         ny = n_pixels[1];
         hy = 1.0 / (ny - 1);
+        nz = 1;
+        hz = 0.0;
         break;
       case 3:
         ny = n_pixels[1];
         nz = n_pixels[2];
         hy = 1.0 / (ny - 1);
-        hz = 1.0 / (nz - 1);
+        if (nz != 1)
+          hz = 1.0 / (nz - 1);
+        else
+          hz = 0;
         break;
     }
   }  // eom
 
 
-  template <>
-  double BitMapFile<2>::get_pixel_value(const int i,
-                                        const int j) const
+  double BitMapFile::get_pixel_value(const int i,
+                                     const int j) const
   {
     assert(i >= 0 && i < nx);
     assert(j >= 0 && j < ny);
     return bitmap_data[nx * (ny - 1 - j) + i];
   }  // eom
 
-  template <>
-  double BitMapFile<2>::get_value(const double x,
-                                  const double y) const
+
+  double BitMapFile::get_pixel_value(const int i,
+                                     const int j,
+                                     const int k) const
+  {
+    assert(i >= 0 && i < nx);
+    assert(j >= 0 && j < ny);
+    assert(k >= 0 && k < nz);
+    // return bitmap_data[nx * (ny - 1 - j) + i];
+    return bitmap_data[nx*ny*k + nx*j + i];
+  }  // eom
+
+
+  double BitMapFile::get_value(const double x,
+                               const double y) const
   {
     // normalized x and y
     const double xn = (x-dimensions[0])/(dimensions[2]-dimensions[0]);
@@ -121,10 +146,10 @@ namespace BitMap {
     // pixel numbers
     const int ix = std::min(std::max((int) (xn / hx), 0), nx - 2);
     const int iy = std::min(std::max((int) (yn / hy), 0), ny - 2);
-    // some relative location... I'm not sure
+    // normalized coordinates in unit square
     const double xi  = std::min(std::max((xn-ix*hx)/hx, 1.), 0.);
     const double eta = std::min(std::max((yn-iy*hy)/hy, 1.), 0.);
-
+    // bilinear interpolation
     return ((1-xi)*(1-eta)*get_pixel_value(ix,iy)
             +
             xi*(1-eta)*get_pixel_value(ix+1,iy)
@@ -132,6 +157,45 @@ namespace BitMap {
             (1-xi)*eta*get_pixel_value(ix,iy+1)
             +
             xi*eta*get_pixel_value(ix+1,iy+1));
+  }  // eom
+
+
+  double BitMapFile::get_value(const double x,
+                               const double y,
+                               const double z) const
+  {
+    if (nz == 1)
+      return get_value(x, y);
+
+    // normalized x and y
+    const double xn = (x-dimensions[0])/(dimensions[3]-dimensions[0]);
+    const double yn = (y-dimensions[1])/(dimensions[4]-dimensions[1]);
+    const double zn = (z-dimensions[2])/(dimensions[5]-dimensions[2]);
+    // pixel numbers
+    const int ix = std::min(std::max((int) (xn / hx), 0), nx - 2);
+    const int iy = std::min(std::max((int) (yn / hy), 0), ny - 2);
+    const int iz = std::min(std::max((int) (zn / hz), 0), ny - 2);
+    // normalized coordinates in unit cube
+    const double xi  = std::min(std::max((xn-ix*hx)/hx, 1.), 0.);
+    const double eta = std::min(std::max((yn-iy*hy)/hy, 1.), 0.);
+    const double zeta = std::min(std::max((zn-iz*hz)/hz, 1.), 0.);
+    // trilinear interpolation
+    return
+      (1-xi)*(1-eta)*(1-zeta)*get_pixel_value(ix, iy, iz)
+      +
+      xi*(1-eta)*(1-zeta)*get_pixel_value(ix+1, iy, iz)
+      +
+      (1-xi)*eta*(1-zeta)*get_pixel_value(ix, iy+1, iz)
+      +
+      (1-xi)*(1-eta)*zeta*get_pixel_value(ix, iy, iz+1)
+      +
+      xi*(1-eta)*zeta*get_pixel_value(ix+1, iy, iz+1)
+      +
+      (1-xi)*eta*zeta*get_pixel_value(ix, iy+1, iz+1)
+      +
+      xi*eta*(1-zeta)*get_pixel_value(ix+1, iy+1, iz)
+      +
+      xi*eta*zeta*get_pixel_value(ix+1, iy+1, iz+1);
   }  // eom
 
 
@@ -150,7 +214,8 @@ namespace BitMap {
     void vector_value(const Point<dim> &p,
                       Vector<double>   &v) const;
   private:
-    BitMapFile<dim> f;
+    // BitMapFile<dim> f;
+    BitMapFile f;
     Tensor<1,dim> anisotropy;
   };
 
@@ -161,7 +226,7 @@ namespace BitMap {
     Function<dim>(1),
     f(filename)
   {
-    for (int d=0; d<dim; d++)
+    for (unsigned int d=0; d<dim; d++)
       anisotropy[d] = 1;
   }  // eom
 
@@ -176,12 +241,14 @@ namespace BitMap {
   {}  // eom
 
 
+
   template<int dim>
   void
   BitMapFunction<dim>::vector_value(const Point<dim> &p,
-                                    Tensor<1,dim>    &v) const
+                                    Vector<double>   &v) const
   {
-    AssertThrow(v.size() < dim, ExcMessage("Wrong dimensions"));
+    AssertThrow(v.size() == dim,
+                ExcMessage("Dimension mismatch"));
     for (int c=0; c<dim; c++)
       v[c] = value(p, c);
   }  // eom
@@ -190,7 +257,7 @@ namespace BitMap {
   template<int dim>
   void
   BitMapFunction<dim>::vector_value(const Point<dim> &p,
-                                    Vector<double>   &v) const
+                                    Tensor<1,dim>    &v) const
   {
     for (int c=0; c<dim; c++)
       v[c] = value(p, c);
@@ -202,8 +269,18 @@ namespace BitMap {
   BitMapFunction<2>::value(const Point<2> &p,
                            const unsigned int /*component*/ c) const
   {
-    Assert(c<2, ExcNotImplemented());
+    // Assert(c<2, ExcNotImplemented());
     return f.get_value(p(0),p(1))*anisotropy[c];
+  }  // eom
+
+
+  template<>
+  double
+  BitMapFunction<3>::value(const Point<3> &p,
+                           const unsigned int /*component*/ c) const
+  {
+    // Assert(c<2, ExcNotImplemented());
+    return f.get_value(p(0),p(1), p(2))*anisotropy[c];
   }  // eom
 
 }  // end of namespace
