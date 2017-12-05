@@ -347,7 +347,6 @@ namespace Data
       Keyword structure is as follows:
       string well_name
       double radius
-      int direction
       comma-semicolon-separated list locations
       example
       [Well1, 0.1, 1, (1,1; 2,2)], [Well2, 0.1, 1, (1,1; 2,2)]
@@ -362,11 +361,10 @@ namespace Data
       const auto & str_params = Parsers::split_ignore_brackets(item);
       const std::string well_name = str_params[0];
       const double radius = Parsers::convert<double>(str_params[1]);
-      const int direction = Parsers::convert<int>(str_params[2]);
       // separate separate points
       std::vector<std::string> point_strs;
       std::vector< Point<dim> > locations;
-      boost::algorithm::split(point_strs, str_params[3], boost::is_any_of(";"));
+      boost::algorithm::split(point_strs, str_params[2], boost::is_any_of(";"));
       for (auto & point_str : point_strs)
       {
         const auto & point = Parsers::parse_string_list<double>(point_str);
@@ -378,7 +376,7 @@ namespace Data
         locations.push_back(p);
       }
 
-      Wellbore::Wellbore<dim> w(locations, direction, radius);
+      Wellbore::Wellbore<dim> w(locations, radius);
       this->wells.push_back(w);
 
       // check if well_id is in unique_well_ids and add if not

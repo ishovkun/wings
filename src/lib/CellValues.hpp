@@ -51,6 +51,11 @@ namespace CellValues
     phi = data.get_porosity->value(cell->center());
     C_w = data.compressibility_water();
     cell_volume = cell->measure();
+    // calculate source term
+    // for (const auto & well : data.wells)
+    // {
+
+    // }
   } // eom
 
 

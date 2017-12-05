@@ -218,7 +218,6 @@ namespace FluidSolvers
 
     typename DoFHandler<dim>::active_cell_iterator
 		  cell = dof_handler.begin_active(),
-      neighbor_cell = dof_handler.begin_active(),
 		  endc = dof_handler.end();
 
     system_matrix = 0;
@@ -250,7 +249,7 @@ namespace FluidSolvers
       //   J_i += well.get_productivity(cell);
       // } // end well loop
 
-      unsigned int j;
+      unsigned int j = 0;
       double dS;
       dx_ij = 0;
       for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
@@ -278,7 +277,7 @@ namespace FluidSolvers
             {
               fe_subface_values.reinit(cell, f, subface);
               normal = fe_subface_values.normal_vector(0); // 0 is gauss point
-              typename DoFHandler<dim>::cell_iterator neighbor_child
+              const auto & neighbor_child
                 = cell->neighbor_child_on_subface(f, subface);
               neighbor_values.update(neighbor_child);
               // dS =

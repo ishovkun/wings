@@ -46,15 +46,15 @@ namespace Wings
   void WingsPressure<dim>::read_mesh()
   {
     GridIn<dim> gridin;
-	  gridin.attach_triangulation(triangulation);
+    gridin.attach_triangulation(triangulation);
     std::cout << "Reading mesh file "
               << data.mesh_file.string()
               << std::endl;
-	  std::ifstream f(data.mesh_file.string());
+    std::ifstream f(data.mesh_file.string());
 
     // typename GridIn<dim>::Format format = GridIn<dim>::ucd;
     // gridin.read(f, format);
-	  gridin.read_msh(f);
+    gridin.read_msh(f);
   }  // eom
 
 
@@ -150,22 +150,23 @@ namespace Wings
     A_ij_an = B/time_step + 2*T;
     AssertThrow(abs(A_ij - A_ij_an)/abs(A_ij_an)<DefaultValues::small_number,
                 ExcMessage("System matrix is wrong"));
-    // // Testing A(0, 1) = T
-    // A_ij = system_matrix(0, 1);
-    // A_ij_an = -T;
-    // AssertThrow(abs(A_ij - A_ij_an)/abs(A_ij_an)<1e-9,
-    //             ExcMessage("System matrix is wrong"));
-    // // Testing A(1, 1) - 3 neighbors
-    // A_ij = system_matrix(1, 1);
-    // A_ij_an = B/time_step + 3*T;
-    // AssertThrow(abs(A_ij - A_ij_an)/abs(A_ij_an)<1e-9,
-    //             ExcMessage("System matrix is wrong"));
-    // // Testing A(4, 4) - four neighbors
-    // A_ij = system_matrix(4, 4);
-    // A_ij_an = B/time_step + 4*T;
-    // AssertThrow(abs(A_ij - A_ij_an)/abs(A_ij_an)<1e-9,
-    //             ExcMessage("System matrix is wrong"));
+    // Testing A(0, 1) = T
+    A_ij = system_matrix(0, 1);
+    A_ij_an = -T;
+    AssertThrow(abs(A_ij - A_ij_an)/abs(A_ij_an)<1e-9,
+                ExcMessage("System matrix is wrong"));
+    // Testing A(1, 1) - 3 neighbors
+    A_ij = system_matrix(1, 1);
+    A_ij_an = B/time_step + 3*T;
+    AssertThrow(abs(A_ij - A_ij_an)/abs(A_ij_an)<1e-9,
+                ExcMessage("System matrix is wrong"));
+    // Testing A(5, 5) - four neighbors
+    A_ij = system_matrix(5, 5);
+    A_ij_an = B/time_step + 4*T;
+    AssertThrow(abs(A_ij - A_ij_an)/abs(A_ij_an)<1e-9,
+                ExcMessage("System matrix is wrong"));
 
+    data.wells[0].update_transmissibility(data.get_permeability);
   } // eom
 
 } // end of namespace

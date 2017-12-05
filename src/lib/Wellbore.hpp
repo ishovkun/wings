@@ -24,7 +24,6 @@ namespace Wellbore
   {
   public:
     Wellbore(const std::vector< Point<dim> >& locations_,
-             const int                        direction_,
              const double                     radius_);
     void set_control(const Schedule::WellControl& control_);
     Schedule::WellControl get_control();
@@ -34,7 +33,7 @@ namespace Wellbore
     const  std::vector< Point<dim> >      & get_locations();
     double get_rate(const CellIterator<dim> & cell) const;
     double get_transmissibility(const CellIterator<dim> & cell) const;
-    void update_transmissibility(const Function<dim>* get_permeability);
+    void update_transmissibility(const Function<dim>* permeability);
 
   private:
     double get_segment_length(const Point<dim>& start,
@@ -44,28 +43,23 @@ namespace Wellbore
 
     int    find_cell(const CellIterator<dim> & cell) const;
     std::vector< Point<dim> > locations;
-    int                       direction;
     double                    radius;
     Schedule::WellControl     control;
 
   	const DoFHandler<dim>          *p_dof_handler;
     std::vector<CellIterator<dim>> cells;
     std::vector<double>            segment_length;
-    std::vector< Tensor<1,dim> >   segment_tangent;
+    std::vector< Tensor<1,dim> >   segment_direction;
   };  // eom
 
 
   template <int dim>
   Wellbore<dim>::Wellbore(const std::vector< Point<dim> >& locations_,
-                          const int                        direction_,
                           const double                     radius_)
     :
     locations(locations_),
-    direction(direction_),
     radius(radius_)
   {
-    AssertThrow(direction >= 0 && direction < 3,
-                ExcMessage("Wrong well direction"));
     AssertThrow(locations.size() > 0,
                 ExcMessage("That ain't no a proper well"));
     AssertThrow(radius > 0,
@@ -275,7 +269,7 @@ namespace Wellbore
           cells.push_back(cell);
           const double l = get_segment_length(start, cell, a);
           segment_length.push_back(l);
-          segment_tangent.push_back(a);
+          segment_direction.push_back(a);
         } // end loop segments
 
     }  // end cell loop
@@ -333,7 +327,7 @@ namespace Wellbore
   int Wellbore<dim>::find_cell(const CellIterator<dim> & cell) const
   {
     /*
-      Returns index in this->wells, segment_length, segment_tangent
+      Returns index in this->wells, segment_length, segment_direction
       if not found returns 1
      */
     for (int i=0; i<cells.size(); i++)
@@ -417,6 +411,7 @@ namespace Wellbore
     for (unsigned int i=0; i<cells.size(); i++)
     {
       get_permeability->vector_value(cells[i]->center(), perm);
+      // std::cout << perm << std::endl;
       // const auto & cell =
     }  // end cell loop
   }  // eom
