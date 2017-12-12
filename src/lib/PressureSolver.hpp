@@ -65,7 +65,7 @@
 
 namespace FluidSolvers
 {
-	using namespace dealii;
+  using namespace dealii;
 
 
   template <int dim>
@@ -217,13 +217,13 @@ namespace FluidSolvers
     std::vector<double>    p_old_values(quadrature_formula.size());
 
     typename DoFHandler<dim>::active_cell_iterator
-		  cell = dof_handler.begin_active(),
-		  endc = dof_handler.end();
+      cell = dof_handler.begin_active(),
+      endc = dof_handler.end();
 
     system_matrix = 0;
     rhs_vector = 0;
 
-	  for (; cell!=endc; ++cell)
+    for (; cell!=endc; ++cell)
     {
       cell->get_dof_indices(local_dof_indices);
       unsigned int i = local_dof_indices[0];

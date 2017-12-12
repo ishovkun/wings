@@ -34,12 +34,20 @@ namespace Wellbore
     double get_rate(const CellIterator<dim> & cell) const;
     double get_transmissibility(const CellIterator<dim> & cell) const;
     void update_transmissibility(const Function<dim>* permeability);
+    double compute_transmissibility(const double k1, const double k2,
+                                    const double dx1, const double dx2,
+                                    const double length) const;
 
   private:
     double get_segment_length(const Point<dim>& start,
                               const CellIterator<dim>& cell,
                               const Tensor<1,dim>& tangent);
-    std::vector< Tensor<1,dim> > get_cell_sizes() const;
+    std::vector< Tensor<1,dim> >
+    get_cell_sizes(const std::vector<CellIterator<dim>> &cells_) const;
+
+    void get_cell_size(FEFaceValues<dim> &fe_face_values,
+                       const CellIterator<dim> &cell,
+                       Tensor<1,dim> &h) const;
 
     int    find_cell(const CellIterator<dim> & cell) const;
     std::vector< Point<dim> > locations;
@@ -50,6 +58,7 @@ namespace Wellbore
     std::vector<CellIterator<dim>> cells;
     std::vector<double>            segment_length;
     std::vector< Tensor<1,dim> >   segment_direction;
+    std::vector<double>            transmissibilities;
   };  // eom
 
 
@@ -162,6 +171,17 @@ namespace Wellbore
           // std::cout << "Point inside" << std::endl;
 
           cells.push_back(cell);
+          // single-point wells are vertical
+          Tensor<1,3> direction;
+          direction.clear();
+          direction[2] = 1;
+          segment_direction.push_back(direction);
+          std::vector<CellIterator<dim>> cell_container(1);
+          cell_container[0] = cell;
+          const std::vector<Tensor<1,dim>> h =
+            get_cell_sizes(cell_container);
+          segment_length.push_back(h[0][2]);
+
           // cell = endc;
           break;
         }  // end if point inside
@@ -343,13 +363,46 @@ namespace Wellbore
 
 
   template <int dim>
+  void
+  Wellbore<dim>::get_cell_size(FEFaceValues<dim> &fe_face_values,
+                               const CellIterator<dim> &cell,
+                               Tensor<1,dim> &h) const
+  { // compute size of one cell into h
+    // first fill min_max otherwise may get weird values
+    std::vector<std::pair <double,double> > min_max(dim);
+    for (int d=0; d<dim; d++)
+    {
+      min_max[d].first = cell->center()[d];
+      min_max[d].second = cell->center()[d];
+    }
+    // loop over faces and figure out dx dy dz
+    for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
+    {
+      fe_face_values.reinit(cell, f);
+      const Point<dim> q_point = fe_face_values.quadrature_point(0);
+      for (int d=0; d<dim; d++)
+      {
+        if (q_point[d] < min_max[d].first)
+          min_max[d].first = q_point[d];
+        if (q_point[d] > min_max[d].second)
+          min_max[d].second = q_point[d];
+      }
+    }  // end face loop
+
+    for (int d=0; d<dim; d++)
+      h[d] = min_max[d].second - min_max[d].first;
+  }  // eom
+
+
+  template <int dim>
   std::vector< Tensor<1,dim> >
-  Wellbore<dim>::get_cell_sizes() const
-  {
+  Wellbore<dim>::
+  get_cell_sizes(const std::vector<CellIterator<dim>> &cells_) const
+  { // compute cell sizes for the cells in the cells_ vector
     /*
       Loop cells, loop faces, find minimum and maximum coordinate
       for each cell, take differences, those are dx dy dz
-     */
+    */
     const auto & dof_handler = (*p_dof_handler);
     const auto & fe = dof_handler.get_fe();
     QGauss<dim-1>     face_quadrature_formula(1);
@@ -358,34 +411,11 @@ namespace Wellbore
     // We can't do dim here, because we need all three dimensions
     // for the productivity calculation
     std::vector< Tensor<1,dim> > h(cells.size()); //
-    std::vector<std::pair <double,double> > min_max(dim);
     int counter = 0;
 
-    for (auto & cell : cells)
+    for (const auto & cell : cells_)
     {
-      // first fill min_max otherwise may get weird values
-      for (int d=0; d<dim; d++)
-        {
-          min_max[d].first = cell->center()[d];
-          min_max[d].second = cell->center()[d];
-        }
-      // loop over faces and figure out dx dy dz
-      for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
-        {
-          fe_face_values.reinit(cell, f);
-          const Point<dim> q_point = fe_face_values.quadrature_point(0);
-          for (int d=0; d<dim; d++)
-            {
-              if (q_point[d] < min_max[d].first)
-                min_max[d].first = q_point[d];
-              if (q_point[d] > min_max[d].second)
-                min_max[d].second = q_point[d];
-            }
-        }  // end face loop
-
-      for (int d=0; d<dim; d++)
-        h[counter][d] = min_max[d].second - min_max[d].first;
-
+      get_cell_size(fe_face_values, cell, h[counter]);
       counter++;
     }  // end cell loop
 
@@ -394,7 +424,8 @@ namespace Wellbore
 
 
   template <int dim>
-  void Wellbore<dim>::update_transmissibility(const Function<dim>* get_permeability)
+  void Wellbore<dim>::
+  update_transmissibility(const Function<dim>* get_permeability)
   {
     /*
       First get cell dimensions dx dy dz
@@ -402,20 +433,35 @@ namespace Wellbore
       Then compute transmissibilities.
       How do I normalize permeability when it's a tensor?
      */
-    // const auto & dof_handler = (*p_dof_handler);
-    // const auto & fe = dof_handler.get_fe();
-
-    // double permeability_sum = 0;
     Vector<double>    perm(dim);
-    const std::vector< Tensor<1,dim> > h = get_cell_sizes();
+    Tensor<1,dim>     transmissibility;
+    const std::vector< Tensor<1,dim> > h = get_cell_sizes(cells);
     for (unsigned int i=0; i<cells.size(); i++)
     {
       get_permeability->vector_value(cells[i]->center(), perm);
+      transmissibility[0] = compute_transmissibility
+        (perm[0], perm[1], h[i][0], h[i][1], segment_length[i]);
       // std::cout << perm << std::endl;
       // const auto & cell =
     }  // end cell loop
   }  // eom
 
+
+  template <int dim>
+  double Wellbore<dim>::compute_transmissibility(const double k1,
+                                                 const double k2,
+                                                 const double dx1,
+                                                 const double dx2,
+                                                 const double length) const
+  {
+    // pieceman radius
+    const double r =
+      0.28*std::sqrt(std::sqrt(k2/k1)*dx1*dx1 + std::sqrt(k1/k2)*dx2*dx2) /
+      (std::pow(k2/k1, 0.25) + std::pow(k1/k2, 0.25));
+    double trans =
+      2*M_PI*std::sqrt(k1*k2)*length/(std::log(r/radius) + control.skin);
+    return trans;
+  }  // eom
   // template <int dim>
   // double Wellbore<dim>::get_rate(const CellIterator<dim> & cell) const
   // {
