@@ -37,6 +37,8 @@ namespace Data
     double viscosity_water() const;
     double volume_factor_water() const;
     double compressibility_water() const;
+    double density_sc_water() const;
+    double gravity() const;
     // Methods getting pressure-dependent values
     // double get_viscosity(const double pressure) const;
     // double get_volume_factor(const double pressure) const;
@@ -47,7 +49,7 @@ namespace Data
     void update_well_controls(const double time);
     void locate_wells(const DoFHandler<dim>& dof_handler,
                       const FE_DGQ<dim>&     fe);
-    void update_well_transmissibilities();
+    void update_well_productivities();
 
 
   private:
@@ -80,6 +82,7 @@ namespace Data
     double                                 volume_factor_w_constant,
                                            viscosity_w_constant,
                                            compressibility_w_constant,
+                                           density_sc_w_constant,
                                            porosity,
                                            young_modulus,
                                            poisson_ratio_constant;
@@ -117,6 +120,22 @@ namespace Data
   double DataBase<dim>::compressibility_water() const
   {
     return this->compressibility_w_constant;
+  }  // eom
+
+
+  template <int dim>
+  inline
+  double DataBase<dim>::density_sc_water() const
+  {
+    return this->density_sc_w_constant;
+  }  // eom
+
+
+  template <int dim>
+  inline
+  double DataBase<dim>::gravity() const
+  {
+    return units.gravity();
   }  // eom
 
 
@@ -201,6 +220,8 @@ namespace Data
       prm.declare_entry(keywords.viscosity_water, "1e-3",
                         Patterns::Double());
       prm.declare_entry(keywords.compressibility_water, "1e-8",
+                        Patterns::Double());
+      prm.declare_entry(keywords.density_sc_water, "1000",
                         Patterns::Double());
       prm.declare_entry(keywords.permeability, "1e-12",
                         Patterns::Anything());
@@ -428,6 +449,7 @@ namespace Data
     }
     { // well data
       prm.enter_subsection(keywords.section_wells);
+      std::cout << prm.get(keywords.well_parameters) << std::endl;
       assign_wells(prm.get(keywords.well_parameters));
       assign_schedule(prm.get(keywords.well_schedule));
       prm.leave_subsection();
@@ -445,6 +467,8 @@ namespace Data
         prm.get_double(keywords.viscosity_water)*units.viscosity();
       this->compressibility_w_constant =
         prm.get_double(keywords.compressibility_water)*units.stiffness();
+      this->density_sc_w_constant =
+          prm.get_double(keywords.density_sc_water)*units.mass();
 
       // coefficients that are either constant or mapped
       Tensor<1,dim> perm_anisotropy = Tensors::get_unit_vector<dim>();
@@ -491,9 +515,9 @@ namespace Data
   } // eom
 
   template <int dim>
-  void DataBase<dim>::update_well_transmissibilities()
+  void DataBase<dim>::update_well_productivities()
   {
     for (auto & well : wells)
-      well.update_transmissibility(this->get_permeability);
+      well.update_productivity(this->get_permeability);
   }  // eom
 }  // end of namespace

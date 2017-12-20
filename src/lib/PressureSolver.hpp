@@ -152,44 +152,6 @@ namespace FluidSolvers
   } // eom
 
 
-  // template <int dim>
-  // double PressureSolver<dim>::get_cell_mass_matrix(const double cell_volume,
-  //                                                  const double volume_factor,
-  //                                                  const double porosity,
-  //                                                  const double compressibility) const
-  // {
-  //   double B_ii = cell_volume/volume_factor*(porosity*compressibility);
-  //   return B_ii;
-  // }  // eom
-
-
-  // template <int dim>
-  // double PressureSolver<dim>::get_transmissibility(const Vector<double> &perm,
-  //                                                  const double         visc,
-  //                                                  const double         volume_factor,
-  //                                                  const Tensor<1,dim>  &normal_vector,
-  //                                                  const Tensor<1,dim>  &dx,
-  //                                                  const double         dS) const
-  // {
-  //   AssertThrow(perm.size() == dim,
-  //               ExcMessage("Wrong dimension of permeability"));
-  //   double distance = dx.norm(); // to normalize
-  //   if (distance == 0)
-  //     return 0.0;
-
-  //   double T = 0;
-  //   for (int d=0; d<dim; ++d)
-  //   {
-  //     if (abs(dx[d]/distance) > 1e-10)
-  //     {
-  //       T += 1./visc/volume_factor*(perm[d]*normal_vector[d]/dx[d])*dS;
-  //     }
-  //   }
-
-  //   return T;
-  // }  // eom
-
-
   template <int dim>
   void
   PressureSolver<dim>::assemble_system(CellValues::CellValuesBase<dim> &cell_values,
@@ -237,9 +199,9 @@ namespace FluidSolvers
       cell_values.update(cell);
 
       const double B_ii = cell_values.get_mass_matrix_entry();
-      double matrix_ii = B_ii/time_step;
-      double rhs_i = B_ii/time_step*p_old;
 
+      const double J_i = cell_values.J;
+      const double Q_i = cell_values.Q;
       // // Wells
       // double Q_i = 0;
       // double J_i = 0;
@@ -248,6 +210,10 @@ namespace FluidSolvers
       //   Q_i += well.get_rate_water(cell);
       //   J_i += well.get_productivity(cell);
       // } // end well loop
+
+
+      double matrix_ii = B_ii/time_step + J_i;
+      double rhs_i = B_ii/time_step*p_old + Q_i;
 
       unsigned int j = 0;
       double dS;
@@ -294,12 +260,12 @@ namespace FluidSolvers
             dx_ij = cell->neighbor(f)->center() - cell->center();
           }
 
-          // !!!!!!!!!!!!!!!!1
-          double T_ij = cell_values.face_transmissibility
-            (neighbor_values, dx_ij, normal, dS);
+          cell_values.update_face_values(neighbor_values, dx_ij, normal, dS);
 
-          matrix_ii += T_ij;
-          system_matrix.add(i, j, -T_ij);
+          matrix_ii += cell_values.T_face;
+          rhs_i += cell_values.G_face;
+
+          system_matrix.add(i, j, -cell_values.T_face);
         } // end if face not at boundary
       }  // end face loop
       system_matrix.add(i, i, matrix_ii);

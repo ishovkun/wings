@@ -10,6 +10,8 @@ namespace Units
     void set_system(const UnitSystem&);
     double length() const {return length_constant;}
     double time() const {return time_constant;}
+    double mass() const {return mass_constant;}
+    double gravity() const {return gravity_constant;}
     double pressure() const {return pressure_constant;}
     double viscosity() const {return viscosity_constant;}
     double permeability() const {return permeability_constant;}
@@ -25,6 +27,7 @@ namespace Units
     double
       length_constant,
       time_constant,
+      mass_constant,
       pressure_constant,
       viscosity_constant,
       fluid_rate_constant,
@@ -34,7 +37,9 @@ namespace Units
       transmissibility_constant;
     // conversion constants
     const double
+      gravity_constant = 9.80665,
       pounds_per_square_inch = 6894.76,
+      pounds_mass = 0.453592,
       centipoise = 1e-3,
       feet = 0.3048,
       day = 60*60*24,
@@ -58,6 +63,7 @@ namespace Units
     {
       length_constant = 1;
       time_constant = 1;
+      mass_constant = 1;
       pressure_constant = 1;
       viscosity_constant = 1;
       fluid_rate_constant = 1;
@@ -69,6 +75,7 @@ namespace Units
     {
       length_constant = feet;
       time_constant = day;
+      mass_constant = pounds_mass/standard_cubic_feet;
       pressure_constant = pounds_per_square_inch;
       viscosity_constant = centipoise;
       fluid_rate_constant = us_oil_barrel/day;

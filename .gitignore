@@ -7,4 +7,4 @@ src/lib/Makefile
 src/lib/cmake_install.cmake
 src/lib/liblib.a
 wings-pressure
-
+compile_commands.json

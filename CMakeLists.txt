@@ -56,6 +56,7 @@ SET_TARGET_PROPERTIES (
     PROPERTIES LINKER_LANGUAGE CXX
 )
 
+set(CMAKE_BUILD_TYPE Debug)
 # set(CMAKE_BUILD_TYPE RelWithDebInfo)
 # targets
 ADD_EXECUTABLE(wings-pressure ${CMAKE_SOURCE_DIR}/src/wings_pressure.cc)

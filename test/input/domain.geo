@@ -5,10 +5,14 @@ gridsize = squareSide / 4;
 meshThickness = gridsize;
 
 // Geometry
-Point(1) = {-squareSide/2, -squareSide/2, 0, gridsize};
-Point(2) = {squareSide/2, -squareSide/2, 0, gridsize};
-Point(3) = {squareSide/2, squareSide/2, 0, gridsize};
-Point(4) = {-squareSide/2, squareSide/2, 0, gridsize};
+// Point(1) = {-squareSide/2, -squareSide/2, -meshThickness/2, gridsize};
+// Point(2) = {squareSide/2, -squareSide/2, -meshThickness/2, gridsize};
+// Point(3) = {squareSide/2, squareSide/2, -meshThickness/2, gridsize};
+// Point(4) = {-squareSide/2, squareSide/2, -meshThickness/2, gridsize};
+Point(1) = {0, 0, -meshThickness/2, gridsize};
+Point(2) = {squareSide, 0, -meshThickness/2, gridsize};
+Point(3) = {squareSide, squareSide, -meshThickness/2, gridsize};
+Point(4) = {0, squareSide, -meshThickness/2, gridsize};
 Line(1) = {1, 2};				// bottom line
 Line(2) = {2, 3};				// right line
 Line(3) = {3, 4};				// top line

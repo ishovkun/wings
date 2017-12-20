@@ -6,10 +6,11 @@ subsection Mesh
   set Mesh file                 = domain.msh
 end
 
+
 subsection Well data
   set Wells = \
-  [A, 0.1, (1.5, 1.0, +0.5)], \
-  [B, 0.2, (1.5, 2.5, -0.5; 2.5, 1.5, 0.0)], \
+  [A, 0.1, (1.5, 1.0, 0.0)], \
+  [B, 0.2, (1.5, 2.5, 0.0; 2.5, 1.5, 0.0)], \
   [C, 0.2, (1.5, 1.0, 0.0; 3.5, 1.0, 0.0)];
 
   set Schedule = \
@@ -23,7 +24,9 @@ subsection Equation data
   set Poisson ratio           = 0.3
   set Volume factor water     = 1
   set Viscosity water         = 1e-3
-  set Compressibility water   = 1e-8
+  set Density water           = 1000
+  # set Compressibility water   = 1e-8
+  set Compressibility water   = 5e-10
   set Permeability            = perm3x3_homog.dat
 end
 

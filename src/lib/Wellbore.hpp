@@ -31,14 +31,15 @@ namespace Wellbore
                 const FE_DGQ<dim>&     fe);
     const  std::vector<CellIterator<dim>> & get_cells();
     const  std::vector< Point<dim> >      & get_locations();
-    double get_rate(const CellIterator<dim> & cell) const;
+    std::pair<double,double> get_J_and_Q(const CellIterator<dim> & cell) const;
     double get_transmissibility(const CellIterator<dim> & cell) const;
-    void update_transmissibility(const Function<dim>* permeability);
-    double compute_transmissibility(const double k1, const double k2,
-                                    const double dx1, const double dx2,
-                                    const double length) const;
+    void update_productivity(const Function<dim>* permeability);
+    std::vector<double> & get_productivities();
 
   private:
+    double compute_productivity(const double k1, const double k2,
+                                    const double dx1, const double dx2,
+                                    const double length) const;
     double get_segment_length(const Point<dim>& start,
                               const CellIterator<dim>& cell,
                               const Tensor<1,dim>& tangent);
@@ -58,7 +59,7 @@ namespace Wellbore
     std::vector<CellIterator<dim>> cells;
     std::vector<double>            segment_length;
     std::vector< Tensor<1,dim> >   segment_direction;
-    std::vector<double>            transmissibilities;
+    std::vector<double>            productivities;
   };  // eom
 
 
@@ -197,7 +198,7 @@ namespace Wellbore
           x0 = locations[i-1];
           x1 = locations[i];
           a = x1 - x0;
-          double segment_len = a.norm();
+          const double segment_len = a.norm();
           a = a/segment_len;
           // distance from cell center to the line
           d = x0 + a*scalar_product(p0-x0, a);
@@ -240,8 +241,8 @@ namespace Wellbore
           if (td >= 0 && td <= t1)
             start = d;
 
-          bool skip_cell = false;
           // check if segment aligned with faces and select the closest cell
+          bool skip_cell = false;
           for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
           {
             unsigned int j = cell->neighbor_index(f);
@@ -271,13 +272,22 @@ namespace Wellbore
                 break;
               }
 
+
             } // end if neighbor exists
           } // end face loop
 
+          // This segment will just have a very small length
+          // If closest point near a vertex
           // iterate vertices
-          for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell; ++v)
-            if ((cell->vertex(v) - d).norm() < DefaultValues::small_number)
-              skip_cell = true;
+          // std::cout << "d " << d << std::endl;
+          // for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell; ++v)
+          // {
+          //   std::cout << "v " << cell->vertex(v) << std::endl;
+
+          //   if ((cell->vertex(v) - d).norm() <
+          //       cell->diameter()*DefaultValues::small_number_geometry)
+          //     skip_cell = true;
+          // }
 
 
           if (skip_cell)
@@ -311,7 +321,7 @@ namespace Wellbore
       t = t/t.norm();
 
     const double d = cell->diameter();
-    const double step = d/100;
+    const double step = d*DefaultValues::small_number_geometry;
 
     double length = 0;
     // first move in the direction of a
@@ -350,7 +360,7 @@ namespace Wellbore
       Returns index in this->wells, segment_length, segment_direction
       if not found returns 1
      */
-    for (int i=0; i<cells.size(); i++)
+    for (unsigned int i=0; i<cells.size(); i++)
     {
       if (cell == cells[i])
         return i;
@@ -424,8 +434,16 @@ namespace Wellbore
 
 
   template <int dim>
+  std::vector<double> &
+  Wellbore<dim>:: get_productivities()
+  {
+    return productivities;
+  } // eom
+
+
+  template <int dim>
   void Wellbore<dim>::
-  update_transmissibility(const Function<dim>* get_permeability)
+  update_productivity(const Function<dim>* get_permeability)
   {
     /*
       First get cell dimensions dx dy dz
@@ -434,25 +452,33 @@ namespace Wellbore
       How do I normalize permeability when it's a tensor?
      */
     Vector<double>    perm(dim);
-    Tensor<1,dim>     transmissibility;
+    Tensor<1,dim>     productivity;
     const std::vector< Tensor<1,dim> > h = get_cell_sizes(cells);
     for (unsigned int i=0; i<cells.size(); i++)
     {
       get_permeability->vector_value(cells[i]->center(), perm);
-      transmissibility[0] = compute_transmissibility
-        (perm[0], perm[1], h[i][0], h[i][1], segment_length[i]);
-      // std::cout << perm << std::endl;
+      productivity[0] = compute_productivity
+        (perm[1], perm[2], h[i][1], h[i][2],
+         segment_length[i]*segment_direction[i][0]);
+      productivity[1] = compute_productivity
+        (perm[0], perm[2], h[i][0], h[i][2],
+         segment_length[i]*segment_direction[i][1]);
+      productivity[2] = compute_productivity
+        (perm[0], perm[1], h[i][0], h[i][1],
+         segment_length[i]*segment_direction[i][2]);
+      productivities.push_back(productivity.norm());
+      // std::cout << "J: " << productivity << std::endl;
       // const auto & cell =
     }  // end cell loop
   }  // eom
 
 
   template <int dim>
-  double Wellbore<dim>::compute_transmissibility(const double k1,
-                                                 const double k2,
-                                                 const double dx1,
-                                                 const double dx2,
-                                                 const double length) const
+  double Wellbore<dim>::compute_productivity(const double k1,
+                                             const double k2,
+                                             const double dx1,
+                                             const double dx2,
+                                             const double length) const
   {
     // pieceman radius
     const double r =
@@ -462,19 +488,42 @@ namespace Wellbore
       2*M_PI*std::sqrt(k1*k2)*length/(std::log(r/radius) + control.skin);
     return trans;
   }  // eom
-  // template <int dim>
-  // double Wellbore<dim>::get_rate(const CellIterator<dim> & cell) const
-  // {
-  //   Assert(control.type == Schedule::WellControlType::flow_control_water,
-  //          ExcNotImplemented());
 
-  //   int segment = find_cell(cell);
-  //   if (control.type == Schedule::WellControlType::flow_control_water &&
-  //       segment != -1)
-  //     return control.value/wells.size();
-  //   else
-  //     return 0;
-  // }  // eom
+
+  template <int dim>
+  // double Wellbore<dim>::get_rate(const CellIterator<dim> & cell) const
+  std::pair<double,double> Wellbore<dim>::get_J_and_Q(const CellIterator<dim> & cell) const
+  {
+    /*
+      Returns a pair of entries of J and Q vectors
+     */
+    Assert(control.type == Schedule::WellControlType::flow_control_total,
+           ExcNotImplemented());
+
+    const int segment = find_cell(cell);
+    if (segment == -1)
+      return std::make_pair(0.0, 0.0);
+
+    if (control.type == Schedule::WellControlType::pressure_control)
+    {
+      return std::make_pair(productivities[segment],
+                            control.value*productivities[segment]);
+    }
+    else // if (control.type == Schedule::WellControlType::flow_control_total)
+    {
+      double sum_productivities = 0;
+      for (unsigned int s=0; s<productivities.size(); s++)
+        sum_productivities += productivities[s];
+      // sum_productivities = Utilities::MPI::sum(sum_productivities, mpi_communicator);
+      if (sum_productivities > 0)
+        return std::make_pair(0.0,
+                              control.value*productivities[segment]/sum_productivities);
+      else
+        return std::make_pair(0.0, 0.0);
+    }
+
+    //   return 0;
+  }  // eom
 
 
   // template <int dim>

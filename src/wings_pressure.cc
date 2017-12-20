@@ -76,7 +76,6 @@ namespace Wings
     const auto & pressure_fe = pressure_solver.get_fe();
 
     data.locate_wells(pressure_dof_handler, pressure_fe);
-    data.update_well_transmissibilities();
 
     for (auto & id : data.get_well_ids())
     {
@@ -94,6 +93,8 @@ namespace Wings
       std::cout << std::endl;
     }
 
+    data.update_well_productivities();
+
     const double k = data.get_permeability->value(Point<dim>(1,1,1), 1);
     const double phi = data.get_porosity->value(Point<dim>(1,1,1), 1);
     const double mu = data.viscosity_water();
@@ -101,11 +102,33 @@ namespace Wings
     const double cw = data.compressibility_water();
     const double h = 1;
 
+    // Well a
+    const auto & j_ind_a = data.wells[0].get_productivities();
+    std::cout << "Well A J index = " << j_ind_a[0] << std::endl;
+    // Well b
+    const auto & j_ind_b = data.wells[1].get_productivities();
+    std::cout << "Well B J index = " << j_ind_b[0] << std::endl;
+    AssertThrow(abs(j_ind_b[0]) < DefaultValues::small_number*k,
+                ExcMessage("This cell J index should be zero!"));
+    std::cout << "Well B J index = " << j_ind_b[1] << std::endl;
+    std::cout << "Well B J index = " << j_ind_b[2] << std::endl;
+    // Well c
+    const auto & j_ind_c = data.wells[2].get_productivities();
+    std::cout << "Well C J index = " << j_ind_c[0] << std::endl;
+    std::cout << "Well C J index = " << j_ind_c[1] << std::endl;
+
     double time = 0;
     double time_step = data.get_time_step(time);
 
 
     data.update_well_controls(time);
+
+    // auto cells_A = data.wells[0].get_cells();
+    // auto cell_A = cells_A[0];
+    // std::pair<double,double> well_A_J_and_Q =
+    // std::cout << "Well A rate = " << data.wells[0].get_rate(cell_A) << std::endl;
+    // AssertThrow(data.wells[0].get_rate(cell_A) == 15.0,
+    //             ExcMessage("Rate A didn't match"));
 
     // std::cout << "well "
     //           << well_ids[0]
@@ -166,7 +189,6 @@ namespace Wings
     AssertThrow(abs(A_ij - A_ij_an)/abs(A_ij_an)<1e-9,
                 ExcMessage("System matrix is wrong"));
 
-    data.wells[0].update_transmissibility(data.get_permeability);
   } // eom
 
 } // end of namespace
