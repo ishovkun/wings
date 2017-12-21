@@ -203,6 +203,7 @@ namespace Wings
     const int n_pressure_iter = pressure_solver.solve();
     std::cout << "Pressure solver " << n_pressure_iter << " steps" << std::endl;
 
+    pressure_solver.solution.print(std::cout, 3, true, false);
   } // eom
 
 } // end of namespace
