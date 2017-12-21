@@ -102,39 +102,38 @@ namespace Wings
     const double cw = data.compressibility_water();
     const double h = 1;
 
+    auto & well_A = data.wells[0];
+    auto & well_B = data.wells[1];
+    auto & well_C = data.wells[2];
     // Well a
-    const auto & j_ind_a = data.wells[0].get_productivities();
+    const auto & j_ind_a = well_A.get_productivities();
     std::cout << "Well A J index = " << j_ind_a[0] << std::endl;
+    // hand_calculation
+    const double well_A_radius = well_A.get_radius();
+    const double pieceman_radius =
+        0.28*std::sqrt(2*h*h)/(2);
+    const double J_index_A =
+        2*M_PI*k /
+        (std::log(pieceman_radius/well_A_radius));
+    std::cout << "J A true " << J_index_A << std::endl;
+    AssertThrow(abs(J_index_A - j_ind_a[0])/j_ind_a[0] < DefaultValues::small_number,
+                ExcMessage("Wrong J index well A"));
     // Well b
-    const auto & j_ind_b = data.wells[1].get_productivities();
+    const auto & j_ind_b = well_B.get_productivities();
     std::cout << "Well B J index = " << j_ind_b[0] << std::endl;
     AssertThrow(abs(j_ind_b[0]) < DefaultValues::small_number*k,
                 ExcMessage("This cell J index should be zero!"));
     std::cout << "Well B J index = " << j_ind_b[1] << std::endl;
     std::cout << "Well B J index = " << j_ind_b[2] << std::endl;
     // Well c
-    const auto & j_ind_c = data.wells[2].get_productivities();
+    const auto & j_ind_c = well_C.get_productivities();
     std::cout << "Well C J index = " << j_ind_c[0] << std::endl;
     std::cout << "Well C J index = " << j_ind_c[1] << std::endl;
 
     double time = 0;
     double time_step = data.get_time_step(time);
 
-
     data.update_well_controls(time);
-
-    // auto cells_A = data.wells[0].get_cells();
-    // auto cell_A = cells_A[0];
-    // std::pair<double,double> well_A_J_and_Q =
-    // std::cout << "Well A rate = " << data.wells[0].get_rate(cell_A) << std::endl;
-    // AssertThrow(data.wells[0].get_rate(cell_A) == 15.0,
-    //             ExcMessage("Rate A didn't match"));
-
-    // std::cout << "well "
-    //           << well_ids[0]
-    //           << " control value "
-    //           << data.wells[well_ids[0]].get_control().value
-    //           << std::endl;
 
     // Compute transmissibility and mass matrix entries
     const double T = 1./mu/B_w*(k/h)*h*h;
@@ -157,12 +156,13 @@ namespace Wings
     pressure_solver.solution[0] = 1;
     pressure_solver.solution[1] = 0;
     pressure_solver.solution[2] = 0;
-    pressure_solver.solution[3] = 1;
+    pressure_solver.solution[3] = 0;
     pressure_solver.solution_old = pressure_solver.solution;
 
     CellValues::CellValuesBase<dim>
       cell_values(data), neighbor_values(data);
     pressure_solver.assemble_system(cell_values, neighbor_values, time_step);
+
     // pressure_solver.print_system_matrix(1.0/T);
 
     double A_ij, A_ij_an;
@@ -188,6 +188,20 @@ namespace Wings
     A_ij_an = B/time_step + 4*T;
     AssertThrow(abs(A_ij - A_ij_an)/abs(A_ij_an)<1e-9,
                 ExcMessage("System matrix is wrong"));
+
+    const auto & rhs_vector = pressure_solver.get_rhs_vector();
+    // rhs_vector.print(std::cout, 3, true, false);
+    const double rate_A = well_A.get_control().value;
+    // std::cout << "Rate A = " << rate_A << std::endl;
+    AssertThrow(abs(rhs_vector[4] - rate_A)/rate_A<DefaultValues::small_number,
+                    ExcMessage("rhs entry 4 is wrong"));
+
+    const double rhs_0 = B/time_step*pressure_solver.solution[0];
+    AssertThrow(abs(rhs_vector[0] - rhs_0)/rhs_0<DefaultValues::small_number,
+                ExcMessage("rhs entry 0 is wrong"));
+
+    const int n_pressure_iter = pressure_solver.solve();
+    std::cout << "Pressure solver " << n_pressure_iter << " steps" << std::endl;
 
   } // eom
 

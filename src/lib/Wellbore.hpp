@@ -26,7 +26,9 @@ namespace Wellbore
     Wellbore(const std::vector< Point<dim> >& locations_,
              const double                     radius_);
     void set_control(const Schedule::WellControl& control_);
-    Schedule::WellControl get_control();
+    const Schedule::WellControl &get_control();
+    double get_radius() const;
+
     void locate(const DoFHandler<dim>& dof_handler,
                 const FE_DGQ<dim>&     fe);
     const  std::vector<CellIterator<dim>> & get_cells();
@@ -92,10 +94,18 @@ namespace Wellbore
 
   template <int dim>
   inline
-  Schedule::WellControl
+  const Schedule::WellControl &
   Wellbore<dim>::get_control()
   {
-    return control;
+    return this->control;
+  }  // eom
+
+  template <int dim>
+  inline
+  double
+  Wellbore<dim>::get_radius() const
+  {
+    return radius;
   }  // eom
 
 
@@ -491,7 +501,6 @@ namespace Wellbore
 
 
   template <int dim>
-  // double Wellbore<dim>::get_rate(const CellIterator<dim> & cell) const
   std::pair<double,double> Wellbore<dim>::get_J_and_Q(const CellIterator<dim> & cell) const
   {
     /*
@@ -511,31 +520,23 @@ namespace Wellbore
     }
     else // if (control.type == Schedule::WellControlType::flow_control_total)
     {
+      // compute sum of productivities to normalize flow in a segment
       double sum_productivities = 0;
       for (unsigned int s=0; s<productivities.size(); s++)
         sum_productivities += productivities[s];
+
       // sum_productivities = Utilities::MPI::sum(sum_productivities, mpi_communicator);
+
+      const double normalized_flux =
+          control.value*productivities[segment]/sum_productivities;
+
       if (sum_productivities > 0)
-        return std::make_pair(0.0,
-                              control.value*productivities[segment]/sum_productivities);
+        return std::make_pair(0.0, normalized_flux);
       else
         return std::make_pair(0.0, 0.0);
     }
 
     //   return 0;
   }  // eom
-
-
-  // template <int dim>
-  // double Wellbore<dim>::get_transmissibility(const CellIterator<dim> & cell) const
-  // {
-  //   if (control.type == Schedule::WellControlType::pressure_control &&
-  //       in_cell(cell))
-  //   {
-  //     return 1;
-  //   }
-  //   else
-  //     return 0;
-  // }  // eom
 
 }  // end of namespace

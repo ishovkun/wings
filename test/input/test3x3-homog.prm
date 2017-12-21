@@ -14,10 +14,13 @@ subsection Well data
   [C, 0.2, (1.5, 1.0, 0.0; 3.5, 1.0, 0.0)];
 
   set Schedule = \
-  0, A, 0, 15, 0; \
-  0, B, 0, 0; \
-  0, C, 0, 0;
+  0, A, 0, 15, 0;
 end
+
+  # set Schedule = \
+  # 0, A, 0, 15, 0; \
+  # 0, B, 0, 0; \
+  # 0, C, 0, 0;
 
 subsection Equation data
   set Young modulus           = 1e8

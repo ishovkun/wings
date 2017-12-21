@@ -42,6 +42,8 @@
 // #include <deal.II/lac/generic_linear_algebra.h>
 // #include <deal.II/lac/solver_gmres.h>
 // #include <deal.II/lac/trilinos_solver.h>
+#include <deal.II/lac/solver_cg.h>
+#include <deal.II/lac/precondition.h>
 // #include <deal.II/lac/trilinos_block_sparse_matrix.h>
 // #include <deal.II/lac/trilinos_block_vector.h>
 
@@ -80,9 +82,11 @@ namespace FluidSolvers
     void assemble_system(CellValues::CellValuesBase<dim> &cell_data,
                          CellValues::CellValuesBase<dim> &neighbor_data,
                          const double time_step);
-    void solve();
-    void print_system_matrix(const double denominator=1.0) const;
+    unsigned int solve();
+    // void print_system_matrix(const double denominator=1.0) const;
     const SparseMatrix<double>& get_system_matrix();
+    const Vector<double>& get_rhs_vector();
+
     const DoFHandler<dim> &     get_dof_handler();
     const FE_DGQ<dim> &         get_fe();
 
@@ -278,11 +282,26 @@ namespace FluidSolvers
 
 
   template <int dim>
-  void PressureSolver<dim>::print_system_matrix(const double denominator) const
+  unsigned int
+  PressureSolver<dim>::solve()
   {
-    // out, precision, scientific
-    system_matrix.print_formatted(std::cout, 1, false, 0, " ", denominator);
-  }  // eom
+    double tol = 1e-10*rhs_vector.l2_norm();
+    if (tol == 0.0)
+      tol = 1e-10;
+    SolverControl solver_control(1000, tol);
+    SolverCG<> solver(solver_control);
+    PreconditionSSOR<> preconditioner;
+    preconditioner.initialize(system_matrix, 1.0);
+    solver.solve(system_matrix, solution, rhs_vector, preconditioner);
+    return solver_control.last_step();
+  }
+
+  // template <int dim>
+  // void PressureSolver<dim>::print_system_matrix(const double denominator) const
+  // {
+  //   // out, precision, scientific
+  //   system_matrix.print_formatted(std::cout, 1, false, 0, " ", denominator);
+  // }  // eom
 
 
   template <int dim>
@@ -291,6 +310,15 @@ namespace FluidSolvers
   {
     return system_matrix;
   }  // eom
+
+
+  template <int dim>
+  const Vector<double>&
+  PressureSolver<dim>::get_rhs_vector()
+  {
+    return rhs_vector;
+  }  // eom
+
 
 
   template <int dim>
