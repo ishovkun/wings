@@ -2,7 +2,7 @@ subsection Mesh
   set Global refinement steps   = 4
   set Local refinement regions  = 16, 24, 17.5, 22.5, 0 ,0
   set Adaptive refinement steps = 4
-  # set Mesh file                 = square-3x3m-3x3cells.msh
+  # set Mesh file                 = square-4x4cells.msh
   set Mesh file                 = domain.msh
 end
 
@@ -30,7 +30,7 @@ subsection Equation data
   set Density water           = 1000
   # set Compressibility water   = 1e-8
   set Compressibility water   = 5e-10
-  set Permeability            = perm3x3_homog.dat
+  set Permeability            = perm4x4_homog.dat
 end
 
 subsection Solver

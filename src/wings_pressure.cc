@@ -72,51 +72,105 @@ namespace Wings
     data.read_input(input_file);
     read_mesh();
     pressure_solver.setup_system();
-    const auto & pressure_dof_handler = pressure_solver.get_dof_handler();
-    const auto & pressure_fe = pressure_solver.get_fe();
 
-    data.locate_wells(pressure_dof_handler, pressure_fe);
+    auto & well_A = data.wells[0];
+    auto & well_B = data.wells[1];
+    auto & well_C = data.wells[2];
 
-    for (auto & id : data.get_well_ids())
-    {
-      std::cout << "well_id " << id << std::endl;
-      auto & well = data.wells[id];
-
-      std::cout << "Real locations"  << std::endl;
-      for (auto & loc : well.get_locations())
-        std::cout << loc << std::endl;
-
-      std::cout << "Assigned locations"  << std::endl;
-      for (auto & cell : well.get_cells())
-        std::cout << cell->center() << std::endl;
-
-      std::cout << std::endl;
-    }
-
-    data.update_well_productivities();
-
+    // true values that should be given by solution
+    // data
     const double k = data.get_permeability->value(Point<dim>(1,1,1), 1);
     const double phi = data.get_porosity->value(Point<dim>(1,1,1), 1);
     const double mu = data.viscosity_water();
     const double B_w = data.volume_factor_water();
     const double cw = data.compressibility_water();
     const double h = 1;
+    // Well cell centers
+    const Point<3> cell_A_t = Point<3>(1.5, 0.5, 0.0);
+    std::vector<Point<3>> cells_B_t(3);
+    cells_B_t[0] = Point<3>(1.5, 1.5, 0);
+    cells_B_t[1] = Point<3>(1.5, 2.5, 0);
+    cells_B_t[2] = Point<3>(2.5, 1.5, 0);
+    // I don't like this entry since the well is parallel to the face
+    // we'll see what the J index gives
+    std::vector<Point<3>> cells_C_t(2);
+    cells_C_t[0] = Point<3>(2.5, 0.5, 0);
+    cells_C_t[1] = Point<3>(3.5, 1.5, 0);
+    // well A productivity
+    const double well_A_radius = well_A.get_radius();
+    const double pieceman_radius = 0.28*std::sqrt(2*h*h)/2;
+    const double J_index_A =
+      2*M_PI*k / (std::log(pieceman_radius/well_A_radius));
+    const double J_index_B =
+      2*M_PI*k / (std::log(pieceman_radius/well_A_radius));
+    const double delta = DefaultValues::small_number;
 
-    auto & well_A = data.wells[0];
-    auto & well_B = data.wells[1];
-    auto & well_C = data.wells[2];
+    //  What code gives
+    const auto & pressure_dof_handler = pressure_solver.get_dof_handler();
+    const auto & pressure_fe = pressure_solver.get_fe();
+    data.locate_wells(pressure_dof_handler, pressure_fe);
+    data.update_well_productivities();
+
+    // some init values
+    pressure_solver.solution = 0;
+    pressure_solver.solution[0] = 1;
+    pressure_solver.solution_old = pressure_solver.solution;
+
+    double time = 0;
+    double time_step = data.get_time_step(time);
+
+    data.update_well_controls(time);
+
+    CellValues::CellValuesBase<dim>
+      cell_values(data), neighbor_values(data);
+    pressure_solver.assemble_system(cell_values, neighbor_values, time_step);
+
+
+    // for (auto & id : data.get_well_ids())
+    // {
+    //   std::cout << "well_id " << id << std::endl;
+    //   auto & well = data.wells[id];
+
+    //   std::cout << "Real locations"  << std::endl;
+    //   for (auto & loc : well.get_locations())
+    //     std::cout << loc << std::endl;
+
+    //   std::cout << "Assigned locations"  << std::endl;
+    //   for (auto & cell : well.get_cells())
+    //     std::cout << cell->center() << std::endl;
+
+    //   std::cout << std::endl;
+    // }
+
+    // A test for properly placing wells into cells
+    const auto & cells_A = well_A.get_cells();
+    AssertThrow(cells_A.size() == 1,
+                ExcDimensionMismatch(cells_A.size(), 1));
+    AssertThrow(cells_A[0]->center().distance(cell_A_t) < delta,
+                ExcMessage("well A located wrong"));
+    const auto & cells_B = well_B.get_cells();
+    AssertThrow(cells_B.size() == 3,
+                ExcDimensionMismatch(cells_B.size(), 3));
+    for (unsigned int i=0; i< cells_B.size(); i++)
+    {
+      AssertThrow(cells_B[i]->center().distance(cells_B_t[i]) < delta,
+                  ExcMessage("well B located wrong"));
+    }
+    const auto & cells_C = well_C.get_cells();
+    AssertThrow(cells_C.size() == 2,
+                ExcDimensionMismatch(cells_C.size(), 2));
+    for (unsigned int i=0; i< cells_C.size(); i++)
+    {
+      AssertThrow(cells_C[i]->center().distance(cells_C_t[i]) < delta,
+                  ExcMessage("well C located wrong"));
+    }
+
+    // Cell J indices
     // Well a
     const auto & j_ind_a = well_A.get_productivities();
     std::cout << "Well A J index = " << j_ind_a[0] << std::endl;
-    // hand_calculation
-    const double well_A_radius = well_A.get_radius();
-    const double pieceman_radius =
-        0.28*std::sqrt(2*h*h)/(2);
-    const double J_index_A =
-        2*M_PI*k /
-        (std::log(pieceman_radius/well_A_radius));
     std::cout << "J A true " << J_index_A << std::endl;
-    AssertThrow(abs(J_index_A - j_ind_a[0])/j_ind_a[0] < DefaultValues::small_number,
+    AssertThrow(abs(J_index_A - j_ind_a[0])/j_ind_a[0] < delta,
                 ExcMessage("Wrong J index well A"));
     // Well b
     const auto & j_ind_b = well_B.get_productivities();
@@ -130,38 +184,24 @@ namespace Wings
     std::cout << "Well C J index = " << j_ind_c[0] << std::endl;
     std::cout << "Well C J index = " << j_ind_c[1] << std::endl;
 
-    double time = 0;
-    double time_step = data.get_time_step(time);
-
-    data.update_well_controls(time);
-
     // Compute transmissibility and mass matrix entries
     const double T = 1./mu/B_w*(k/h)*h*h;
     const double B = h*h*h/B_w*phi*cw;
-    // test output
-    std::cout << "Permeability "
-              << k
-              << std::endl;
-    std::cout << "Porosity "
-              << phi
-              << std::endl;
+    // // test output
+    // std::cout << "Permeability "
+    //           << k
+    //           << std::endl;
+    // std::cout << "Porosity "
+    //           << phi
+    //           << std::endl;
 
-    std::cout << "Transmissibility "
-              << T
-              << std::endl;
-    std::cout << "Mass matrix entry "
-              << B
-              << std::endl;
+    // std::cout << "Transmissibility "
+    //           << T
+    //           << std::endl;
+    // std::cout << "Mass matrix entry "
+    //           << B
+    //           << std::endl;
 
-    pressure_solver.solution[0] = 1;
-    pressure_solver.solution[1] = 0;
-    pressure_solver.solution[2] = 0;
-    pressure_solver.solution[3] = 0;
-    pressure_solver.solution_old = pressure_solver.solution;
-
-    CellValues::CellValuesBase<dim>
-      cell_values(data), neighbor_values(data);
-    pressure_solver.assemble_system(cell_values, neighbor_values, time_step);
 
     // pressure_solver.print_system_matrix(1.0/T);
 
@@ -203,7 +243,7 @@ namespace Wings
     const int n_pressure_iter = pressure_solver.solve();
     std::cout << "Pressure solver " << n_pressure_iter << " steps" << std::endl;
 
-    pressure_solver.solution.print(std::cout, 3, true, false);
+    // pressure_solver.solution.print(std::cout, 3, true, false);
   } // eom
 
 } // end of namespace

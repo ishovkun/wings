@@ -1,6 +1,6 @@
 # lib/CMakeLists.txt
 
-ADD_LIBRARY(lib
+ADD_LIBRARY(wings
   CellValues.hpp
   PressureSolver.hpp
   DataBase.hpp
@@ -15,4 +15,4 @@ ADD_LIBRARY(lib
   Math.hpp
 )
 
-DEAL_II_SETUP_TARGET(lib)
+DEAL_II_SETUP_TARGET(wings)

@@ -1,8 +1,7 @@
 
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8.8)
 
-# FIND_PACKAGE(deal.II 8.4 QUIET
-FIND_PACKAGE(deal.II 8.4
+FIND_PACKAGE(deal.II 8.5
   HINTS ${deal.II_DIR} ${DEAL_II_DIR} ../ ../../ $ENV{DEAL_II_DIR}
   )
 IF(NOT ${deal.II_FOUND})
@@ -28,7 +27,7 @@ ENDIF()
 
 DEAL_II_INITIALIZE_CACHED_VARIABLES()
 #SET(CLEAN_UP_FILES *.log *.gmv *.gnuplot *.gpl *.eps *.pov *.vtk *.ucd *.d2 *.vtu *.pvtu)
-PROJECT(wings)
+PROJECT(wings CXX)
 
 # For YouCompleteMe
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -52,8 +51,8 @@ include_directories(${Boost_INCLUDE_DIRS})
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/src/lib)
 ADD_SUBDIRECTORY(src/lib)
 SET_TARGET_PROPERTIES (
-    lib
-    PROPERTIES LINKER_LANGUAGE CXX
+  wings
+  PROPERTIES LINKER_LANGUAGE CXX
 )
 
 set(CMAKE_BUILD_TYPE Debug)
@@ -61,6 +60,7 @@ set(CMAKE_BUILD_TYPE Debug)
 # targets
 ADD_EXECUTABLE(wings-pressure ${CMAKE_SOURCE_DIR}/src/wings_pressure.cc)
 DEAL_II_SETUP_TARGET(wings-pressure)
+
 # ADD_CUSTOM_TARGET(debug
 #   COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Debug ${CMAKE_SOURCE_DIR}
 #   COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target all
@@ -74,6 +74,12 @@ DEAL_II_SETUP_TARGET(wings-pressure)
 #   )
 
 # linking
-TARGET_LINK_LIBRARIES(wings-pressure lib ${Boost_LIBRARIES})
+TARGET_LINK_LIBRARIES(wings-pressure wings ${Boost_LIBRARIES})
 
 # DEAL_II_INVOKE_AUTOPILOT()
+
+# ADD_SUBDIRECTORY(tests)
+# ENABLE_TESTING()
+# ADD_TEST(NAME single_pressure_uncoup COMMAND Test)
+# add_executable (test1 ${CMAKE_SOURCE_DIR}/test/test_single_pressure_uncoupled_4x4.cpp)
+# TARGET_LINK_LIBRARIES(test1 wings ${Boost_LIBRARIES})
