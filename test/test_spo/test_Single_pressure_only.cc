@@ -39,8 +39,6 @@ namespace Wings
     void run();
 
   private:
-    void make_mesh();
-
     Triangulation<dim>                triangulation;
     FluidSolvers::PressureSolver<dim> pressure_solver;
     Data::DataBase<dim>               data;
@@ -61,9 +59,6 @@ namespace Wings
   {
     GridIn<dim> gridin;
     gridin.attach_triangulation(triangulation);
-    std::cout << "Reading mesh file "
-              << data.mesh_file.string()
-              << std::endl;
     std::ifstream f(data.mesh_file.string());
 
     // typename GridIn<dim>::Format format = GridIn<dim>::ucd;
@@ -73,17 +68,10 @@ namespace Wings
 
 
   template <int dim>
-  void WingsPressure<dim>::make_mesh()
-  {
-    GridGenerator::hyper_cube(triangulation, -1, 1);
-    triangulation.refine_global(2);
-  } // eom
-
-
-  template <int dim>
   void WingsPressure<dim>::run()
   {
     data.read_input(input_file);
+    // data.print_input();
     read_mesh();
     pressure_solver.setup_system();
 
@@ -248,8 +236,8 @@ namespace Wings
     AssertThrow(abs(rhs_vector[0] - rhs_0)/rhs_0<DefaultValues::small_number,
                 ExcMessage("rhs entry 0 is wrong"));
 
-    const int n_pressure_iter = pressure_solver.solve();
-    std::cout << "Pressure solver " << n_pressure_iter << " steps" << std::endl;
+    pressure_solver.solve();
+    // std::cout << "Pressure solver " << n_pressure_iter << " steps" << std::endl;
 
     // pressure_solver.solution.print(std::cout, 3, true, false);
   } // eom
@@ -261,7 +249,7 @@ int main()
 {
     using namespace dealii;
     dealii::deallog.depth_console (0);
-    std::string input_file_name = "../data/test4x4-homog.prm";
+    std::string input_file_name = SOURCE_DIR "/../data/test4x4-homog.prm";
     Wings::WingsPressure<3> problem(input_file_name);
     problem.run();
     return 0;

@@ -26,7 +26,9 @@ namespace Data
   public:
     DataBase();
     // ~DataBase();
-    void read_input(const std::string&);
+    void read_input(const std::string&,
+                    const int verbosity_=0);
+    void print_input();
 
     // Functions of a coordinate
     Function<dim> *get_young_modulus,
@@ -93,6 +95,8 @@ namespace Data
     ParameterHandler                       prm;
     std::map<double, double>               timestep_table;
     std::map<std::string, int>             well_ids;
+
+    int                                    verbosity;
   };  // eom
 
 
@@ -100,19 +104,29 @@ namespace Data
   DataBase<dim>::DataBase()
   {
     declare_parameters();
+    verbosity = 0;
   }  // eom
 
 
   template <int dim>
-  void DataBase<dim>::read_input(const std::string& file_name)
+  void DataBase<dim>::read_input(const std::string& file_name,
+                                 const int verbosity_)
   {
-    std::cout << "Reading " << file_name << std::endl;
+    verbosity = verbosity_;
+    if (verbosity > 0)
+      std::cout << "Reading " << file_name << std::endl;
     input_file_name = file_name;
     prm.parse_input(file_name);
-    prm.print_parameters(std::cout, ParameterHandler::Text);
     assign_parameters();
     // compute_runtime_parameters();
     // check_input();
+  }  // eom
+
+
+  template <int dim>
+  void DataBase<dim>::print_input()
+  {
+    prm.print_parameters(std::cout, ParameterHandler::Text);
   }  // eom
 
 
@@ -264,7 +278,8 @@ namespace Data
       }
     else
     {
-      std::cout << "Searching " << par_name << std::endl;
+      if (verbosity > 0)
+        std::cout << "Searching " << par_name << std::endl;
       boost::filesystem::path input_file_path(input_file_name);
       boost::filesystem::path data_file =
         input_file_path.parent_path() / entry;
@@ -278,10 +293,12 @@ namespace Data
   boost::filesystem::path
   DataBase<dim>::find_file_in_relative_path(const std::string fname)
   {
+    if (verbosity > 0)
+      std::cout << "Searching " << fname << std::endl;
     boost::filesystem::path input_file_path(input_file_name);
-    std::cout << "Searching " << fname << std::endl;
     boost::filesystem::path data_file =
       input_file_path.parent_path() / fname;
+    if (verbosity > 0)
     std::cout << "Found " << data_file << std::endl;
     return data_file;
   }  // eom

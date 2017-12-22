@@ -83,7 +83,8 @@ namespace Wings
   template <int dim>
   void WingsPressure<dim>::run()
   {
-    data.read_input(input_file);
+    data.read_input(input_file, /* verbosity = */ 1);
+    // data.print_input();
     read_mesh();
     pressure_solver.setup_system();
 

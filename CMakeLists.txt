@@ -13,12 +13,9 @@ IF(NOT ${deal.II_FOUND})
 ENDIF()
 
 
-IF(NOT (DEAL_II_WITH_PETSC OR DEAL_II_WITH_TRILINOS) OR NOT DEAL_II_WITH_P4EST)
+IF(NOT  DEAL_II_WITH_TRILINOS OR NOT DEAL_II_WITH_P4EST)
   MESSAGE(FATAL_ERROR "
 Error! The deal.II library found at ${DEAL_II_PATH} was not configured with
-    DEAL_II_WITH_PETSC = ON
-    DEAL_II_WITH_P4EST = ON
-or
     DEAL_II_WITH_TRILINOS = ON
     DEAL_II_WITH_P4EST = ON
 One or both of these combinations are OFF in your installation but at least one is required for this tutorial step.
@@ -32,6 +29,7 @@ PROJECT(wings CXX)
 # For YouCompleteMe
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# BOOST
 set(Boost_USE_STATIC_LIBS OFF)
 # set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_MULTITHREADED ON)
@@ -39,7 +37,7 @@ set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_RUNTIME OFF)
 set(Boost_NO_SYSTEM_PATHS OFF)
 find_package(Boost 1.65.1
-  COMPONENTS filesystem iostreams)
+  COMPONENTS filesystem iostreams unit_test_framework REQUIRED)
 # find_package(Boost REQUIRED COMPONENTS filesystem iostreams)
 
 IF(NOT ${Boost_FOUND})
@@ -48,8 +46,10 @@ Error! Cannot find boost library!
     ")
 ENDIF()
 
-# lib
+set(BOOST_INCLUDE_DIRS $boost_installation_prefix/include)
 include_directories(${Boost_INCLUDE_DIRS})
+
+# lib
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/src/lib)
 ADD_SUBDIRECTORY(src/lib)
 SET_TARGET_PROPERTIES (
@@ -80,7 +80,8 @@ TARGET_LINK_LIBRARIES(wings-pressure wings ${Boost_LIBRARIES})
 # DEAL_II_INVOKE_AUTOPILOT()
 
 ENABLE_TESTING()
-ADD_SUBDIRECTORY(test/test_Single_pressure_only)
+ADD_SUBDIRECTORY(test/test_spo)
+# ADD_SUBDIRECTORY(test)
 # ADD_TEST(NAME single_pressure_uncoup COMMAND Test)
 # add_executable (test1 ${CMAKE_SOURCE_DIR}/test/test_single_pressure_uncoupled_4x4.cpp)
 # TARGET_LINK_LIBRARIES(test1 wings ${Boost_LIBRARIES})
