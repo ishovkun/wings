@@ -90,7 +90,7 @@ namespace CellValues
     const double B_w_face = Math::arithmetic_mean(B_w, neighbor_data.B_w);
 
     double distance = dx.norm(); // to normalize
-    if (distance == 0)
+    if (distance == 0.0)
       return;
 
     for (int d=0; d<dim; ++d)

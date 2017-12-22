@@ -114,14 +114,14 @@ namespace Wings
     // // true values that should be given by solution
     // // data
     const double k = data.get_permeability->value(Point<dim>(1,1,1), 1);
-    // const double phi = data.get_porosity->value(Point<dim>(1,1,1), 1);
-    // const double mu = data.viscosity_water();
-    // const double B_w = data.volume_factor_water();
-    // const double cw = data.compressibility_water();
+    const double phi = data.get_porosity->value(Point<dim>(1,1,1), 1);
+    const double mu = data.viscosity_water();
+    const double B_w = data.volume_factor_water();
+    const double cw = data.compressibility_water();
     const double h = 1;
-    // // // Compute transmissibility and mass matrix entries
-    // const double T = 1./mu/B_w*(k/h)*h*h;
-    // const double B = h*h*h/B_w*phi*cw;
+    // Compute transmissibility and mass matrix entries
+    const double T = 1./mu/B_w*(k/h)*h*h;
+    const double B = h*h*h/B_w*phi*cw;
     // // Well cell centers
     // const Point<3> cell_A_t = Point<3>(1.5, 0.5, 0.0);
     std::vector<Point<3>> cells_B_t(5);
@@ -186,9 +186,10 @@ namespace Wings
     const auto & well_B_control = well_B.get_control();
     AssertThrow(well_B_control.type == Schedule::WellControlType::pressure_control,
                 ExcMessage("Wrong control of well B"));
-    // CellValues::CellValuesBase<dim>
-    //   cell_values(data), neighbor_values(data);
-    // pressure_solver.assemble_system(cell_values, neighbor_values, time_step);
+
+    CellValues::CellValuesBase<dim>
+      cell_values(data), neighbor_values(data);
+    pressure_solver.assemble_system(cell_values, neighbor_values, time_step);
 
     // for (auto & id : data.get_well_ids())
     // {
@@ -233,8 +234,13 @@ namespace Wings
     // Wells A and C are the same as in the last test
 
     // double A_ij, A_ij_an;
-    // const auto & system_matrix = pressure_solver.get_system_matrix();
-    // system_matrix.print_formatted(std::cout);
+    const auto & system_matrix = pressure_solver.get_system_matrix();
+    system_matrix.print_formatted(std::cout,
+                                  /* precision = */ 3,
+                                  /*scientific = */ false,
+                                  /*width = */ 0,
+                                  /*zero_string = */ " ",
+                                  /*denominator = */ time_step/B);
 
     // // // Testing A(0, 0) - two neighbors
     // A_ij = system_matrix(0, 0);

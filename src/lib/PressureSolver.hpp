@@ -171,13 +171,16 @@ namespace FluidSolvers
                                      update_values);
     FEFaceValues<dim> fe_face_values(fe, face_quadrature_formula,
                                      update_normal_vectors);
+    // We need subface values for subfaces since there is no
+    // method to determine sub face area in triangulation class
     FESubfaceValues<dim> fe_subface_values(fe, face_quadrature_formula,
-                                           update_normal_vectors);
+                                           update_normal_vectors |
+                                           update_JxW_values);
 
     const unsigned int dofs_per_cell = fe.dofs_per_cell;
     std::vector<types::global_dof_index>
-      local_dof_indices(dofs_per_cell),
-      local_dof_indices_neighbor(dofs_per_cell);
+      dof_indices(dofs_per_cell),
+      dof_indices_neighbor(dofs_per_cell);
 
     Tensor<1, dim>    dx_ij, normal;
     std::vector<double>    p_old_values(quadrature_formula.size());
@@ -191,8 +194,8 @@ namespace FluidSolvers
 
     for (; cell!=endc; ++cell)
     {
-      cell->get_dof_indices(local_dof_indices);
-      unsigned int i = local_dof_indices[0];
+      cell->get_dof_indices(dof_indices);
+      unsigned int i = dof_indices[0];
       fe_values.reinit(cell);
       fe_values.get_function_values(solution, p_old_values);
       // std::cout << "cell: " << i << std::endl;
@@ -228,16 +231,22 @@ namespace FluidSolvers
         dS = 0;
         if (cell->at_boundary(f) == false)
         {
-          if(cell->neighbor(f)->level() == cell->level() &&
-             cell->neighbor(f)->has_children() == false)
+          if((cell->neighbor(f)->level() == cell->level() &&
+             cell->neighbor(f)->has_children() == false) ||
+             cell->neighbor_is_coarser(f))
           {
-            cell->neighbor(f)->get_dof_indices(local_dof_indices_neighbor);
+            cell->neighbor(f)->get_dof_indices(dof_indices_neighbor);
             fe_face_values.reinit(cell, f);
             normal = fe_face_values.normal_vector(0); // 0 is gauss point
-            j = local_dof_indices_neighbor[0];
+            j = dof_indices_neighbor[0];
             dS = cell->face(f)->measure();  // face area
             dx_ij = cell->neighbor(f)->center() - cell->center();
             neighbor_values.update(cell->neighbor(f));
+            // assemble local matrix and distribute
+            cell_values.update_face_values(neighbor_values, dx_ij, normal, dS);
+            matrix_ii += cell_values.T_face;
+            rhs_i += cell_values.G_face;
+            system_matrix.add(i, j, -cell_values.T_face);
           }
           else if ((cell->neighbor(f)->level() == cell->level()) &&
                    (cell->neighbor(f)->has_children() == true))
@@ -245,31 +254,32 @@ namespace FluidSolvers
             for (unsigned int subface=0;
                  subface<cell->face(f)->n_children(); ++subface)
             {
+              // compute parameters
+              const auto & neighbor_child
+                  = cell->neighbor_child_on_subface(f, subface);
+              neighbor_child->get_dof_indices(dof_indices_neighbor);
+              j = dof_indices_neighbor[0];
               fe_subface_values.reinit(cell, f, subface);
               normal = fe_subface_values.normal_vector(0); // 0 is gauss point
-              const auto & neighbor_child
-                = cell->neighbor_child_on_subface(f, subface);
               neighbor_values.update(neighbor_child);
-              // dS =
-              dx_ij = cell->neighbor(f)->center() - neighbor_child->center();
-              // compute_intercell_data();
+              dS = fe_subface_values.JxW(0);
+              dx_ij = neighbor_child->center() - cell->center();
+              // assemble local matrix and distribute
+              cell_values.update_face_values(neighbor_values, dx_ij, normal, dS);
+              matrix_ii += cell_values.T_face;
+              rhs_i += cell_values.G_face;
+              system_matrix.add(i, j, -cell_values.T_face);
             }
           }
-          else if (cell->neighbor_is_coarser(f))
-          {
-            // compute dh on cell
-            // dx is not between cell centers i think
-            // get_cell_data(neighbor);
-            // compute_intercell_data();
-            dx_ij = cell->neighbor(f)->center() - cell->center();
-          }
+          // else if (cell->neighbor_is_coarser(f))
+          // {
+          //   // compute dh on cell
+          //   // dx is not between cell centers i think
+          //   // get_cell_data(neighbor);
+          //   // compute_intercell_data();
+          //   dx_ij = cell->neighbor(f)->center() - cell->center();
+          // }
 
-          cell_values.update_face_values(neighbor_values, dx_ij, normal, dS);
-
-          matrix_ii += cell_values.T_face;
-          rhs_i += cell_values.G_face;
-
-          system_matrix.add(i, j, -cell_values.T_face);
         } // end if face not at boundary
       }  // end face loop
       system_matrix.add(i, i, matrix_ii);
