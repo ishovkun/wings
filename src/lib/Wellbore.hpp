@@ -37,14 +37,18 @@ namespace Wellbore
     double get_transmissibility(const CellIterator<dim> & cell) const;
     void update_productivity(const Function<dim>* permeability);
     std::vector<double> & get_productivities();
+    static bool point_inside_cell(const CellIterator<dim> &cell,
+                                  const Point<dim>        &p);
+
 
   private:
     double compute_productivity(const double k1, const double k2,
                                     const double dx1, const double dx2,
                                     const double length) const;
-    double get_segment_length(const Point<dim>& start,
-                              const CellIterator<dim>& cell,
-                              const Tensor<1,dim>& tangent);
+    double get_segment_length(const Point<dim>                       &start,
+                              const CellIterator<dim>                &cell,
+                              const Tensor<1,dim>                    &tangent,
+                              const std::pair<Point<dim>,Point<dim>> &end_points);
     std::vector< Tensor<1,dim> >
     get_cell_sizes(const std::vector<CellIterator<dim>> &cells_) const;
 
@@ -217,14 +221,21 @@ namespace Wellbore
           // std::cout << "a " << a << std::endl;
           // std::cout << "d " << d << std::endl;
           // std::cout << "n " << n << std::endl;
-
-          // check d inside cell
-          if (!cell->point_inside(d))
+          // // check d inside cell
+          // if (!(
+          //         cell->point_inside(d) ||
+          //         cell->point_inside(d + Point<dim>(eps,0,0))  ||
+          //         cell->point_inside(d + Point<dim>(-eps,0,0)) ||
+          //         cell->point_inside(d + Point<dim>(0,eps,0))  ||
+          //         cell->point_inside(d + Point<dim>(0,-eps,0)) ||
+          //         cell->point_inside(d + Point<dim>(0,0,eps))  ||
+          //         cell->point_inside(d + Point<dim>(0,0,-eps))
+          //       ))
+          if (!point_inside_cell(cell, d))
           {
-            // std::cout << "Too far" << std::endl;
+            // std::cout << "No" << std::endl;
             continue;
           }
-
           // check if d is between x1 and x0
           // d = x0 + a*td
           double td = scalar_product((p0 - x0), a);
@@ -237,11 +248,12 @@ namespace Wellbore
           const bool x1_inside = cell->point_inside(x1);
 
           if((td < 0 || td > t1) && // distance vector outside segment
-             (!x0_inside || !x1_inside)) //end-points
+             !(x0_inside || x1_inside)) //end-points
           {
-            // std::cout << "d in cell but outside segment" << std::endl;
+            // std::cout << "No" << std::endl;
             continue;
           }
+          // std::cout << "Yes" << std::endl;
 
           // initial point to seek segment length
           if (td < 0 && x0_inside)
@@ -253,6 +265,7 @@ namespace Wellbore
 
           // check if segment aligned with faces and select the closest cell
           bool skip_cell = false;
+          // std::cout << "testing cell " << cell->center() << " for alignment" << std::endl;
           for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
           {
             unsigned int j = cell->neighbor_index(f);
@@ -266,22 +279,29 @@ namespace Wellbore
               const bool face_aligned_with_well =
                 abs(scalar_product(n, nf))/n.norm() > cos(DefaultValues::small_angle);
 
-              const bool well_closer_to_neighbour =
-                n.norm() >= (p1-d).norm() &&
-                j < cell->active_cell_index();
+              const double eps = DefaultValues::small_number*cell->diameter();
+              const bool well_closer_to_cell =
+                n.norm() <= (p1-d).norm() + eps &&
+                  (cell->active_cell_index() < cell->neighbor(f)->active_cell_index());
 
               // if (face_aligned_with_well)
+              // {
               //   std::cout << "Aligned with face " << j << std::endl;
+              //   std::cout << "Dist to cell " << (n.norm()) << std::endl;
+              //   std::cout << "Dist to neighbor " << (p1-d).norm() << std::endl;
+              //   std::cout << "cell ind " << cell->active_cell_index() << std::endl;
+              //   std::cout << "neighbor ind " << cell->neighbor(f)->active_cell_index() << std::endl;
+              //   std::cout << "condition_1 " << (n.norm() <= (p1-d).norm()) << std::endl;
+              // }
 
-              // if (well_closer_to_neighbour)
+              // if (!well_closer_to_cell)
               //   std::cout << "Closer to " << p1 << std::endl;
 
-              if (face_aligned_with_well && well_closer_to_neighbour)
+              if (face_aligned_with_well && !well_closer_to_cell)
               {
                 skip_cell = true;
                 break;
               }
-
 
             } // end if neighbor exists
           } // end face loop
@@ -306,21 +326,59 @@ namespace Wellbore
             continue;
           }
 
-          cells.push_back(cell);
-          const double l = get_segment_length(start, cell, a);
-          segment_length.push_back(l);
-          segment_direction.push_back(a);
+
+          const double l = get_segment_length(start, cell, a,
+                                              std::make_pair(x0, x1));
+          // std::cout << "\nCell " << p0 << std::endl;
+          // std::cout << "segment  = " << i << std::endl;
+          // std::cout << "Segment length = " << l << std::endl;
+          // if no other segment contains the cell
+          const int cell_exists = find_cell(cell);
+          if (cell_exists == -1)
+          {
+            cells.push_back(cell);
+            segment_length.push_back(l);
+            segment_direction.push_back(a);
+          }
+          else
+          {
+            segment_length[cell_exists] += l;
+            // take average of the tangents
+            const auto old_a = segment_direction[cell_exists];
+            segment_direction[l] = 0.5*(old_a + a);
+          }
         } // end loop segments
 
     }  // end cell loop
   }  // eom
 
+  template <int dim>
+  bool Wellbore<dim>::
+  point_inside_cell(const CellIterator<dim> &cell,
+                    const Point<dim>        &p)
+  {
+    // const double eps = DefaultValues::small_number*cell->diameter();
+    const double eps = DefaultValues::small_number_geometry*cell->diameter();
+    if (
+          cell->point_inside(p + Point<dim>(eps,0,0))  ||
+          cell->point_inside(p + Point<dim>(-eps,0,0)) ||
+          cell->point_inside(p + Point<dim>(0,eps,0))  ||
+          cell->point_inside(p + Point<dim>(0,-eps,0)) ||
+          cell->point_inside(p + Point<dim>(0,0,eps))  ||
+          cell->point_inside(p + Point<dim>(0,0,-eps))
+        )
+      return true;
+    else
+      return false;
+  }  // eom
+
 
   template <int dim>
   double Wellbore<dim>::
-  get_segment_length(const Point<dim>& start,
-                     const CellIterator<dim>& cell,
-                     const Tensor<1,dim>& tangent)
+  get_segment_length(const Point<dim>                       &start,
+                     const CellIterator<dim>                &cell,
+                     const Tensor<1,dim>                    &tangent,
+                     const std::pair<Point<dim>,Point<dim>> &end_points)
   {
     /* Assuming that the start point is in the cell,
        calculate the length of the well segment in the cell */
@@ -330,27 +388,34 @@ namespace Wellbore
     if (abs(t.norm() - 1.0) > DefaultValues::small_number)
       t = t/t.norm();
 
-    const double d = cell->diameter();
+    const double d = (end_points.second - end_points.first).norm();
     const double step = d*DefaultValues::small_number_geometry;
 
     double length = 0;
     // first move in the direction of a
     Point<dim> p = start, pp = start;
-    while (cell->point_inside(p))
+    while (point_inside_cell(cell, p))
     {
+      // check if point still between endpoints
+      if (start.distance(p) > start.distance(end_points.second))
+        break;
       length += (p - pp).norm();
+      // std::cout << "current_length = " << length << std::endl;
       pp = p;
       p = p + t*step;
     } // end moving along tangent
-
+    // std::cout << "moving back " << std::endl;
     // then move in the opposite direction
     p = start, pp = start;
-    while (cell->point_inside(p))
-      {
-        length += (p - pp).norm();
-        pp = p;
-        p = p - t*step;
-      } // end moving along tangent
+    while (point_inside_cell(cell, p))
+    {
+      if (start.distance(p) > start.distance(end_points.first))
+        break;
+      length += (p - pp).norm();
+      // std::cout << "current_length = " << length << std::endl;
+      pp = p;
+      p = p - t*step;
+    } // end moving along tangent
 
     return length;
   }  // eom

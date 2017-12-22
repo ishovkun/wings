@@ -1,10 +1,16 @@
 * General
 ** Handle units
+*** DONE Implement unit systems
+    CLOSED: [2017-12-21 Thu 18:04]
+*** Upon reading mesh node coordinate needs to be multiplied by units
 ** Adaptive mesh refinement
    Make PressureSolver work with refined mesh, see
    https://www.dealii.org/8.4.1/doxygen/deal.II/classCellAccessor.html#acec7a480d2bcdd506a3350dd9ec3cfeb
    Info on how to handle: https://www.dealii.org/8.4.0/doxygen/deal.II/step_46.html
-** Write code for treating bitmap input
+** 3D bitmap input
+*** DONE Write code for treating bitmap input
+    CLOSED: [2017-12-21 Thu 18:02]
+*** Test 3D heterogeneous bitmap
 ** Parallelize
 *** Use trilinos parallel classes
 *** Properly extract fevalues and distribute into the stiffness matrix
@@ -13,12 +19,9 @@
 
  Use cell->point_inside() to check if wellbore is in a cell
 ** Wells
-approximated algorithm for inclined well permeabiltiy
-wellbore unit tangent a = {ax, ay, az}
-we calculate effective permeability as
-k = kx^(0.5-ax/2)*ky^(0.5-ay/2)*kz^(0.5-ax/2)
-let's see what this approach gives us:
-if a = {0, 0, 1}, then k = kx^0.5 * ky^0.5
+*** Well segment function is either inaccurate or slow
 ** Problems
-*** Inclined well calculation is wrong
-*** How to properly distribute flux between wells
+*** DONE Inclined well calculation is wrong
+    CLOSED: [2017-12-21 Thu 18:03]
+*** DONE How to properly distribute flux between wells
+    CLOSED: [2017-12-21 Thu 18:03]

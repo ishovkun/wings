@@ -256,42 +256,13 @@ namespace Wings
 
 } // end of namespace
 
-int main(int argc, char *argv[])
+// int main(int argc, char *argv[])
+int main()
 {
-  try
-  {
     using namespace dealii;
     dealii::deallog.depth_console (0);
-    // Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
-    std::string input_file_name = Parsers::parse_command_line(argc, argv);
+    std::string input_file_name = "../data/test4x4-homog.prm";
     Wings::WingsPressure<3> problem(input_file_name);
     problem.run();
     return 0;
-  }
-  catch (std::exception &exc)
-    {
-      std::cerr << std::endl << std::endl
-                << "----------------------------------------------------"
-                << std::endl;
-      std::cerr << "Exception on processing: " << std::endl
-                << exc.what() << std::endl
-                << "Aborting!" << std::endl
-                << "----------------------------------------------------"
-                << std::endl;
-
-      return 1;
-    }
-  catch (...)
-    {
-      std::cerr << std::endl << std::endl
-                << "----------------------------------------------------"
-                << std::endl;
-      std::cerr << "Unknown exception!" << std::endl
-                << "Aborting!" << std::endl
-                << "----------------------------------------------------"
-                << std::endl;
-      return 1;
-    }
-
-  return 0;
 }

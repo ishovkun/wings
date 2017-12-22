@@ -1,0 +1,44 @@
+Reading ../test/data/test4x4-homog.prm
+# Listing of Parameters
+# ---------------------
+subsection Equation data
+  set Compressibility water = 5e-10             # default: 1e-8
+  set Density water         = 1000
+  set Permeability          = perm4x4_homog.dat # default: 1e-12
+  set Poisson ratio         = 0.3
+  set Porosity              = 0.3
+  set Units                 = SI
+  set Viscosity water       = 1e-3
+  set Volume factor water   = 1
+  set Young modulus         = 1e8               # default: 1e9
+end
+
+
+subsection Mesh
+  set Adaptive refinement steps = 4                        # default: 0
+  set Global refinement steps   = 4                        # default: 0
+  set Local refinement regions  = 16, 24, 17.5, 22.5, 0 ,0 # default:
+  set Mesh file                 = domain.msh               # default:
+end
+
+
+subsection Solver
+  set FSS tolerance     = 1e-8       # default: 1e-9
+  set Max FSS steps     = 30
+  set Minimum time step = 1e-5       # default: 1e-9
+  set T max             = 100        # default: 1
+  set Time stepping     = (0, 0.01); # default: (0, 1e-3)
+end
+
+
+subsection Well data
+  set Schedule = 0, A, 0, 15, 0;                                                                                                               # default:
+  set Wells    = [A, 0.1, (1.5, 0.5, 0.0)], [B, 0.1, (1.5, 2.5, 0.0; 2.5, 1.5, 0.0)], [C, 0.1, (1.5, 1.0, 0.0; 2.5, 1.0, 0.0; 3.5, 1.0, 0.0)]; # default:
+end
+
+
+Searching domain.msh
+Found "../test/data/domain.msh"
+Searching Permeability
+Reading mesh file ../test/data/domain.msh
+Pressure solver 4 steps

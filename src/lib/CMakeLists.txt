@@ -1,6 +1,6 @@
 # lib/CMakeLists.txt
 
-ADD_LIBRARY(wings
+ADD_LIBRARY(wings SHARED
   CellValues.hpp
   PressureSolver.hpp
   DataBase.hpp

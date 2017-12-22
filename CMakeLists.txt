@@ -33,8 +33,10 @@ PROJECT(wings CXX)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(Boost_USE_STATIC_LIBS OFF)
+# set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_MULTITHREADED ON)
-set(Boost_USE_STATIC_RUNTIME ON)
+# set(Boost_USE_STATIC_RUNTIME ON)
+set(Boost_USE_STATIC_RUNTIME OFF)
 set(Boost_NO_SYSTEM_PATHS OFF)
 find_package(Boost 1.65.1
   COMPONENTS filesystem iostreams)
@@ -55,31 +57,30 @@ SET_TARGET_PROPERTIES (
   PROPERTIES LINKER_LANGUAGE CXX
 )
 
-set(CMAKE_BUILD_TYPE Debug)
-# set(CMAKE_BUILD_TYPE RelWithDebInfo)
+# set(CMAKE_BUILD_TYPE Debug)
 # targets
 ADD_EXECUTABLE(wings-pressure ${CMAKE_SOURCE_DIR}/src/wings_pressure.cc)
 DEAL_II_SETUP_TARGET(wings-pressure)
 
-# ADD_CUSTOM_TARGET(debug
-#   COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Debug ${CMAKE_SOURCE_DIR}
-#   COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target all
-#   COMMENT "Switch CMAKE_BUILD_TYPE to Debug"
-#   )
+ADD_CUSTOM_TARGET(debug
+  COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Debug ${CMAKE_SOURCE_DIR}
+  COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target all
+  COMMENT "Switch CMAKE_BUILD_TYPE to Debug"
+  )
 
-# ADD_CUSTOM_TARGET(release
-#   COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Release ${CMAKE_SOURCE_DIR}
-#   COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target all
-#   COMMENT "Switch CMAKE_BUILD_TYPE to Release"
-#   )
+ADD_CUSTOM_TARGET(release
+  COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Release ${CMAKE_SOURCE_DIR}
+  COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target all
+  COMMENT "Switch CMAKE_BUILD_TYPE to Release"
+  )
 
 # linking
 TARGET_LINK_LIBRARIES(wings-pressure wings ${Boost_LIBRARIES})
 
 # DEAL_II_INVOKE_AUTOPILOT()
 
-# ADD_SUBDIRECTORY(tests)
-# ENABLE_TESTING()
+ENABLE_TESTING()
+ADD_SUBDIRECTORY(test/test_Single_pressure_only)
 # ADD_TEST(NAME single_pressure_uncoup COMMAND Test)
 # add_executable (test1 ${CMAKE_SOURCE_DIR}/test/test_single_pressure_uncoupled_4x4.cpp)
 # TARGET_LINK_LIBRARIES(test1 wings ${Boost_LIBRARIES})

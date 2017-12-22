@@ -449,7 +449,7 @@ namespace Data
     }
     { // well data
       prm.enter_subsection(keywords.section_wells);
-      std::cout << prm.get(keywords.well_parameters) << std::endl;
+      // std::cout << prm.get(keywords.well_parameters) << std::endl;
       assign_wells(prm.get(keywords.well_parameters));
       assign_schedule(prm.get(keywords.well_schedule));
       prm.leave_subsection();
@@ -511,7 +511,10 @@ namespace Data
                                    const FE_DGQ<dim>&     fe)
   {
     for (unsigned int i=0; i<wells.size(); i++)
+    {
+      // std::cout << "well " << i << std::endl;
       wells[i].locate(dof_handler, fe);
+    }
   } // eom
 
   template <int dim>
