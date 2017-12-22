@@ -282,7 +282,8 @@ namespace Wellbore
               const double eps = DefaultValues::small_number*cell->diameter();
               const bool well_closer_to_cell =
                 n.norm() <= (p1-d).norm() + eps &&
-                  (cell->active_cell_index() < cell->neighbor(f)->active_cell_index());
+                // (p0.norm() < p1.norm());
+                (cell->active_cell_index() < cell->neighbor(f)->active_cell_index());
 
               // if (face_aligned_with_well)
               // {
