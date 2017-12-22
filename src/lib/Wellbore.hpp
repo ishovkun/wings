@@ -10,6 +10,7 @@
 
 #include <DefaultValues.cc>
 #include <Schedule.cc>
+#include <Math.hpp>
 
 
 namespace Wellbore
@@ -57,6 +58,15 @@ namespace Wellbore
                        Tensor<1,dim> &h) const;
 
     int    find_cell(const CellIterator<dim> & cell) const;
+    bool neighbor_is_farther(const Tensor<1,dim> &cell_to_wellbore,
+                              const Tensor<1,dim> &neighbor_to_wellbore,
+                              const unsigned int  cell_index,
+                              const unsigned int  neighbor_index,
+                              const double        tolerance) const;
+    bool aligned_with_face(const Tensor<1,dim> &cell_to_wellbore,
+                           const Tensor<1,dim> &face_normal) const;
+
+    // variables
     std::vector< Point<dim> > locations;
     double                    radius;
     Schedule::WellControl     control;
@@ -123,6 +133,45 @@ namespace Wellbore
 
 
   template <int dim>
+  inline bool Wellbore<dim>::
+  neighbor_is_farther(const Tensor<1,dim> &cell_to_wellbore,
+                      const Tensor<1,dim> &neighbor_to_wellbore,
+                      const unsigned int  cell_index,
+                      const unsigned int  neighbor_index,
+                      const double        tolerance) const
+  {
+    const bool well_closer_to_cell =
+        cell_to_wellbore.norm() <= neighbor_to_wellbore.norm() + tolerance;
+    const bool neighbor_closer_to_cell =
+        cell_to_wellbore.norm() + tolerance >= neighbor_to_wellbore.norm();
+    if (well_closer_to_cell && !neighbor_closer_to_cell)
+      return true;
+    else if (well_closer_to_cell && neighbor_closer_to_cell)
+    {
+      if (neighbor_index > cell_index)
+        return true;
+      else
+        return false;
+    }
+    else
+      return false;
+  }  // eom
+
+  template <int dim>
+  inline bool Wellbore<dim>::
+  aligned_with_face(const Tensor<1,dim> &cell_to_wellbore,
+                    const Tensor<1,dim> &face_normal) const
+  {
+    const Tensor<1,dim> n = Math::normalize(cell_to_wellbore);
+    const bool result =
+        abs(scalar_product(n, face_normal))/n.norm() >
+        cos(DefaultValues::small_angle);
+
+    return result;
+  }  // eom
+
+
+  template <int dim>
   void Wellbore<dim>::locate(const DoFHandler<dim>& dof_handler,
                              const FE_DGQ<dim>&     fe)
   {
@@ -160,6 +209,8 @@ namespace Wellbore
     QGauss<dim-1>     face_quadrature_formula(1);
     FEFaceValues<dim> fe_face_values(fe, face_quadrature_formula,
                                      update_normal_vectors);
+    FESubfaceValues<dim> fe_subface_values(fe, face_quadrature_formula,
+                                           update_normal_vectors);
 
     cells.clear();
 
@@ -217,6 +268,8 @@ namespace Wellbore
           // distance from cell center to the line
           d = x0 + a*scalar_product(p0-x0, a);
           n = d - p0;
+          // if (n.norm != 0.0)
+          //   n /= n.norm();
 
           // std::cout << "a " << a << std::endl;
           // std::cout << "d " << d << std::endl;
@@ -264,62 +317,56 @@ namespace Wellbore
             start = d;
 
           // check if segment aligned with faces and select the closest cell
+          // tolerance
+          const double eps = DefaultValues::small_number*cell->diameter();
           bool skip_cell = false;
           // std::cout << "testing cell " << cell->center() << " for alignment" << std::endl;
           for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
-          {
-            unsigned int j = cell->neighbor_index(f);
-            unsigned int no_neighbor_index = -1;
-            if(j != no_neighbor_index) // if this neighbor exists
+            if (!cell->at_boundary(f))
             {
-              fe_face_values.reinit(cell, f);
-              nf = fe_face_values.normal_vector(0); // 0 is gauss point
-              p1 = cell->neighbor(f)->center();
-
-              const bool face_aligned_with_well =
-                abs(scalar_product(n, nf))/n.norm() > cos(DefaultValues::small_angle);
-
-              const double eps = DefaultValues::small_number*cell->diameter();
-              const bool well_closer_to_cell =
-                n.norm() <= (p1-d).norm() + eps &&
-                // (p0.norm() < p1.norm());
-                (cell->active_cell_index() < cell->neighbor(f)->active_cell_index());
-
-              // if (face_aligned_with_well)
-              // {
-              //   std::cout << "Aligned with face " << j << std::endl;
-              //   std::cout << "Dist to cell " << (n.norm()) << std::endl;
-              //   std::cout << "Dist to neighbor " << (p1-d).norm() << std::endl;
-              //   std::cout << "cell ind " << cell->active_cell_index() << std::endl;
-              //   std::cout << "neighbor ind " << cell->neighbor(f)->active_cell_index() << std::endl;
-              //   std::cout << "condition_1 " << (n.norm() <= (p1-d).norm()) << std::endl;
-              // }
-
-              // if (!well_closer_to_cell)
-              //   std::cout << "Closer to " << p1 << std::endl;
-
-              if (face_aligned_with_well && !well_closer_to_cell)
+              // std::cout << "Testing face " << f << std::endl;
+              if((cell->neighbor(f)->level() == cell->level() &&
+                 cell->neighbor(f)->has_children() == false) ||
+                 cell->neighbor_is_coarser(f))
               {
-                skip_cell = true;
-                break;
-              }
+                fe_face_values.reinit(cell, f);
+                nf = fe_face_values.normal_vector(0); // 0 is gauss point
+                p1 = cell->neighbor(f)->center();
+                const bool face_aligned_with_well =
+                    aligned_with_face(n, nf);
+                const bool well_closer_to_cell =
+                    neighbor_is_farther(n, p1-d, cell->active_cell_index(),
+                                        cell->neighbor(f)->active_cell_index(),
+                                        eps);
+                if (face_aligned_with_well && !well_closer_to_cell)
+                {
+                  skip_cell = true;
+                  break;
+                }
+              } // end same level case or neighbor is coarser case
+              else if ((cell->neighbor(f)->level() == cell->level()) &&
+                       (cell->neighbor(f)->has_children() == true))
+                for (unsigned int subface=0;
+                     subface<cell->face(f)->n_children(); ++subface)
+                {
+                  fe_subface_values.reinit(cell, f, subface);
+                  nf = fe_subface_values.normal_vector(0); // 0 is gauss point
+                  const auto & neighbor_child
+                      = cell->neighbor_child_on_subface(f, subface);
+                  p1 = neighbor_child->center();
+                  const bool face_aligned_with_well =
+                      aligned_with_face(n, nf);
+                  const bool well_closer_to_cell =
+                      neighbor_is_farther(n, p1-d, cell->active_cell_index(),
+                                          neighbor_child->active_cell_index(),
+                                          eps);
+                  if (face_aligned_with_well && !well_closer_to_cell)
+                  {
+                    skip_cell = true;
+                  }
+                } // end neighbor has children
 
-            } // end if neighbor exists
-          } // end face loop
-
-          // This segment will just have a very small length
-          // If closest point near a vertex
-          // iterate vertices
-          // std::cout << "d " << d << std::endl;
-          // for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell; ++v)
-          // {
-          //   std::cout << "v " << cell->vertex(v) << std::endl;
-
-          //   if ((cell->vertex(v) - d).norm() <
-          //       cell->diameter()*DefaultValues::small_number_geometry)
-          //     skip_cell = true;
-          // }
-
+            } // end face loop
 
           if (skip_cell)
           {
@@ -535,13 +582,13 @@ namespace Wellbore
       get_permeability->vector_value(cells[i]->center(), perm);
       productivity[0] = compute_productivity
         (perm[1], perm[2], h[i][1], h[i][2],
-         segment_length[i]*segment_direction[i][0]);
+         segment_length[i]*abs(segment_direction[i][0]));
       productivity[1] = compute_productivity
         (perm[0], perm[2], h[i][0], h[i][2],
-         segment_length[i]*segment_direction[i][1]);
+         segment_length[i]*abs(segment_direction[i][1]));
       productivity[2] = compute_productivity
         (perm[0], perm[1], h[i][0], h[i][1],
-         segment_length[i]*segment_direction[i][2]);
+         segment_length[i]*abs(segment_direction[i][2]));
       productivities.push_back(productivity.norm());
       // std::cout << "J: " << productivity << std::endl;
       // const auto & cell =
@@ -562,6 +609,12 @@ namespace Wellbore
       (std::pow(k2/k1, 0.25) + std::pow(k1/k2, 0.25));
     double trans =
       2*M_PI*std::sqrt(k1*k2)*length/(std::log(r/radius) + control.skin);
+    // std::cout << "pieceman, rwell " << r << "\t" << radius << std::endl << std::flush;
+    // std::cout << "log " << std::log(r/radius) << std::endl << std::flush;
+    // std::cout << "trans " << trans << std::endl << std::flush;
+    // std::cout << "other "<< 2*M_PI*std::sqrt(k1*k2)*length << std::endl;
+    AssertThrow(trans >= 0,
+                ExcMessage("productivity <0, probably Cell size is too small, pieceman formula not valid"));
     return trans;
   }  // eom
 
@@ -572,8 +625,8 @@ namespace Wellbore
     /*
       Returns a pair of entries of J and Q vectors
      */
-    Assert(control.type == Schedule::WellControlType::flow_control_total,
-           ExcNotImplemented());
+
+    AssertThrow(cells.size() > 0, ExcMessage("Need to locate wells first"));
 
     const int segment = find_cell(cell);
     if (segment == -1)
@@ -584,7 +637,7 @@ namespace Wellbore
       return std::make_pair(productivities[segment],
                             control.value*productivities[segment]);
     }
-    else // if (control.type == Schedule::WellControlType::flow_control_total)
+    else if (control.type == Schedule::WellControlType::flow_control_total)
     {
       // compute sum of productivities to normalize flow in a segment
       double sum_productivities = 0;
@@ -601,8 +654,12 @@ namespace Wellbore
       else
         return std::make_pair(0.0, 0.0);
     }
+    else
+    {
+      AssertThrow(false, ExcNotImplemented());
+    }
 
-    //   return 0;
+    return std::make_pair(0.0, 0.0) ;
   }  // eom
 
 }  // end of namespace

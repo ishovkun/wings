@@ -78,7 +78,7 @@ namespace FluidSolvers
                    const Data::DataBase<dim> &data_);
     ~PressureSolver();
 
-    void setup_system();
+    void setup_dofs();
     void assemble_system(CellValues::CellValuesBase<dim> &cell_data,
                          CellValues::CellValuesBase<dim> &neighbor_data,
                          const double time_step);
@@ -140,7 +140,7 @@ namespace FluidSolvers
 
 
   template <int dim>
-  void PressureSolver<dim>::setup_system()
+  void PressureSolver<dim>::setup_dofs()
   {
     dof_handler.distribute_dofs(fe);
     DynamicSparsityPattern dsp(dof_handler.n_dofs());

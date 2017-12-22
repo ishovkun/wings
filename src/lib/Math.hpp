@@ -27,4 +27,25 @@ namespace Math
   {
     return 0.5*(x1+x2);
   }  // eom
+
+
+  double sum(const std::vector<double> & v)
+  {
+    AssertThrow(v.size()> 0, ExcEmptyObject());
+    double result = 0;
+    for (unsigned int i=0; i<v.size(); i++)
+      result += v[i];
+    return result;
+  }  // eom
+
+
+  template <int dim>
+  Tensor<1,dim> normalize(const Tensor<1,dim> &t)
+  {
+    Tensor<1,dim> normalized = t;
+    if (normalized.norm() != 0.0)
+      normalized/= normalized.norm();
+
+    return normalized;
+  }   // eom
 }

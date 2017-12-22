@@ -529,7 +529,7 @@ namespace Data
   {
     for (unsigned int i=0; i<wells.size(); i++)
     {
-      // std::cout << "well " << i << std::endl;
+      std::cout << "well " << i << std::endl;
       wells[i].locate(dof_handler, fe);
     }
   } // eom

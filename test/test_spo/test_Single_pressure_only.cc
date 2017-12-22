@@ -24,17 +24,17 @@
 #include <Parsers.hpp>
 #include <CellValues.hpp>
 
-namespace Wings
+namespace WingTest
 {
   using namespace dealii;
 
 
   template <int dim>
-  class WingsPressure
+  class TestSPO
   {
   public:
-    WingsPressure(std::string);
-    // ~WingsPressure();
+    TestSPO(std::string);
+    // ~TestSPO();
     void read_mesh();
     void run();
 
@@ -47,7 +47,7 @@ namespace Wings
 
 
   template <int dim>
-  WingsPressure<dim>::WingsPressure(std::string input_file_name_)
+  TestSPO<dim>::TestSPO(std::string input_file_name_)
     :
     pressure_solver(triangulation, data),
     input_file(input_file_name_)
@@ -55,7 +55,7 @@ namespace Wings
 
 
   template <int dim>
-  void WingsPressure<dim>::read_mesh()
+  void TestSPO<dim>::read_mesh()
   {
     GridIn<dim> gridin;
     gridin.attach_triangulation(triangulation);
@@ -68,12 +68,12 @@ namespace Wings
 
 
   template <int dim>
-  void WingsPressure<dim>::run()
+  void TestSPO<dim>::run()
   {
     data.read_input(input_file);
     // data.print_input();
     read_mesh();
-    pressure_solver.setup_system();
+    pressure_solver.setup_dofs();
 
     auto & well_A = data.wells[0];
     auto & well_B = data.wells[1];
@@ -250,7 +250,7 @@ int main()
     using namespace dealii;
     dealii::deallog.depth_console (0);
     std::string input_file_name = SOURCE_DIR "/../data/test4x4-homog.prm";
-    Wings::WingsPressure<3> problem(input_file_name);
+    WingTest::TestSPO<3> problem(input_file_name);
     problem.run();
     return 0;
 }
