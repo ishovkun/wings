@@ -61,9 +61,9 @@ namespace Wings
   {
     GridIn<dim> gridin;
     gridin.attach_triangulation(triangulation);
-    std::cout << "Reading mesh file "
-              << data.mesh_file.string()
-              << std::endl;
+    // std::cout << "Reading mesh file "
+    //           << data.mesh_file.string()
+    //           << std::endl;
     std::ifstream f(data.mesh_file.string());
 
     // typename GridIn<dim>::Format format = GridIn<dim>::ucd;
@@ -100,7 +100,8 @@ namespace Wings
   template <int dim>
   void WingsPressure<dim>::run()
   {
-    data.read_input(input_file, /* verbosity = */ 1);
+    data.read_input(input_file, /* verbosity = */ 0);
+    // data.read_input(input_file, /* verbosity = */ 1);
     // data.print_input();
     read_mesh();
     refine_mesh();
@@ -109,7 +110,7 @@ namespace Wings
 
     auto & well_A = data.wells[0];
     auto & well_B = data.wells[1];
-    auto & well_C = data.wells[2];
+    // auto & well_C = data.wells[2];
 
     // // true values that should be given by solution
     // // data
@@ -187,21 +188,21 @@ namespace Wings
       cell_values(data), neighbor_values(data);
     pressure_solver.assemble_system(cell_values, neighbor_values, time_step);
 
-    for (auto & id : data.get_well_ids())
-    {
-      std::cout << "well_id " << id << std::endl;
-      auto & well = data.wells[id];
+    // for (auto & id : data.get_well_ids())
+    // {
+    //   std::cout << "well_id " << id << std::endl;
+    //   auto & well = data.wells[id];
 
-      std::cout << "Real locations"  << std::endl;
-      for (auto & loc : well.get_locations())
-        std::cout << loc << std::endl;
+    //   std::cout << "Real locations"  << std::endl;
+    //   for (auto & loc : well.get_locations())
+    //     std::cout << loc << std::endl;
 
-      std::cout << "Assigned locations"  << std::endl;
-      for (auto & cell : well.get_cells())
-        std::cout << cell->center() << std::endl;
+    //   std::cout << "Assigned locations"  << std::endl;
+    //   for (auto & cell : well.get_cells())
+    //     std::cout << cell->center() << std::endl;
 
-      std::cout << std::endl;
-    }
+    //   std::cout << std::endl;
+    // }
 
     // // A test for properly placing wells into cells
     const auto & cells_B = well_B.get_cells();
@@ -239,9 +240,9 @@ namespace Wings
     //                               /*zero_string = */ " ",
     //                               // /*denominator = */ time_step/B);
     //                               /*denominator = */ 1./T_coarse_coarse);
-    std::cout << "T_cc = " << T_coarse_coarse << std::endl;
-    std::cout << "T_ff/T_cc = " << T_fine_fine/T_coarse_coarse << std::endl;
-    std::cout << "T_fc/T_cc = " << T_fine_coarse/T_coarse_coarse << std::endl;
+    // std::cout << "T_cc = " << T_coarse_coarse << std::endl;
+    // std::cout << "T_ff/T_cc = " << T_fine_fine/T_coarse_coarse << std::endl;
+    // std::cout << "T_fc/T_cc = " << T_fine_coarse/T_coarse_coarse << std::endl;
 
     const double eps = DefaultValues::small_number;
     const double eps_geo = DefaultValues::small_number_geometry;
@@ -397,21 +398,54 @@ namespace Wings
     for (auto &i : is)
       AssertThrow(abs(rhs_vector[i]) < eps, ExcMessage("wrong rhs "));
 
-    // const double pressure_B = well_B.get_control().value;
+    // 8 coarse cell with wellbore
+    // *well_B_control.value()
+
+    const double pressure_B = well_B.get_control().value;
     // this guy exhists only in fine cells
     const double g_vector_entry = data.density_sc_water()/B_w/B_w*data.gravity() *
         T_fine_fine * (h/2);
+    // 8
+    rhs_an = pressure_B * J_index_B_coarse;
+    AssertThrow(abs(rhs_vector[8] - rhs_an)/abs(rhs_an) < eps,
+                ExcMessage("rhs entry 8 is wrong"));
     // 15
     rhs_an = -g_vector_entry;
-    std::cout<< "rhs an = "<< rhs_an << std::endl;
-    std::cout<< "rhs num = "<< rhs_vector[15] << std::endl;
+    // std::cout<< "rhs an = "<< rhs_an << std::endl;
+    // std::cout<< "rhs num = "<< rhs_vector[15] << std::endl;
     AssertThrow(abs(rhs_vector[15] - rhs_an)/abs(rhs_an) < eps,
                     ExcMessage("rhs entry 15 is wrong"));
+    // 16
+    rhs_an = -g_vector_entry + J_index_B_fine*pressure_B;
+    AssertThrow(abs(rhs_vector[16] - rhs_an)/abs(rhs_an) < eps,
+                ExcMessage("rhs entry 16 is wrong"));
+    // 17
+    rhs_an = +g_vector_entry;
+    AssertThrow(abs(rhs_vector[17] - rhs_an)/abs(rhs_an) < eps,
+                ExcMessage("rhs entry 17 is wrong"));
+    // 18
+    rhs_an = +g_vector_entry;
+    AssertThrow(abs(rhs_vector[18] - rhs_an)/abs(rhs_an) < eps,
+                ExcMessage("rhs entry 18 is wrong"));
+    // 19
+    rhs_an = -g_vector_entry;
+    AssertThrow(abs(rhs_vector[19] - rhs_an)/abs(rhs_an) < eps,
+                ExcMessage("rhs entry 19 is wrong"));
+    // 20
+    rhs_an = -g_vector_entry;
+    AssertThrow(abs(rhs_vector[20] - rhs_an)/abs(rhs_an) < eps,
+                ExcMessage("rhs entry 20 is wrong"));
+    // 21
+    rhs_an = +g_vector_entry;
+    AssertThrow(abs(rhs_vector[21] - rhs_an)/abs(rhs_an) < eps,
+                ExcMessage("rhs entry 21 is wrong"));
+    // 22
+    rhs_an = +g_vector_entry;
+    AssertThrow(abs(rhs_vector[22] - rhs_an)/abs(rhs_an) < eps,
+                ExcMessage("rhs entry 22 is wrong"));
 
-    // const double rhs_0 = B/time_step*pressure_solver.solution[0];
-    // AssertThrow(abs(rhs_vector[0] - rhs_0)/rhs_0<DefaultValues::small_number,
-    //             ExcMessage("rhs entry 0 is wrong"));
-
+    // -----------------------------------------------------------------------
+    pressure_solver.solve();
     // const int n_pressure_iter = pressure_solver.solve();
     // std::cout << "Pressure solver " << n_pressure_iter << " steps" << std::endl;
 

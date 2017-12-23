@@ -196,7 +196,7 @@ namespace FluidSolvers
     {
       cell->get_dof_indices(dof_indices);
       unsigned int i = dof_indices[0];
-       std::cout << "i = " << i << "\t" << cell->center() << std::endl;
+       // std::cout << "i = " << i << "\t" << cell->center() << std::endl;
       fe_values.reinit(cell);
       fe_values.get_function_values(solution, p_old_values);
       // std::cout << "cell: " << i << std::endl;
@@ -222,12 +222,6 @@ namespace FluidSolvers
 
       double matrix_ii = B_ii/time_step + J_i;
       double rhs_i = B_ii/time_step*p_old + Q_i;
-      if (i == 15)
-      {
-        std::cout << "rhs 15 begin " << rhs_i << std::endl;
-        std::cout << "J index " << J_i/1e-9 << std::endl;
-        std::cout << "center " << cell->center() << std::endl;
-      }
 
       unsigned int j = 0;
       for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
@@ -249,8 +243,6 @@ namespace FluidSolvers
             cell_values.update_face_values(neighbor_values, dx_ij, normal, dS);
             matrix_ii += cell_values.T_face;
             rhs_i += cell_values.G_face;
-            if (i == 15)
-              std::cout << "G 15 " << j <<"\t" << cell_values.G_face << std::endl;
             system_matrix.add(i, j, -cell_values.T_face);
           }
           else if ((cell->neighbor(f)->level() == cell->level()) &&
@@ -287,8 +279,6 @@ namespace FluidSolvers
 
         } // end if face not at boundary
       }  // end face loop
-      if (i == 15)
-        std::cout << "rhs 15 end " << rhs_i << std::endl;
 
       system_matrix.add(i, i, matrix_ii);
       rhs_vector[i] += rhs_i;

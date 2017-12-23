@@ -80,7 +80,8 @@ TARGET_LINK_LIBRARIES(wings-pressure wings ${Boost_LIBRARIES})
 # DEAL_II_INVOKE_AUTOPILOT()
 
 ENABLE_TESTING()
-ADD_SUBDIRECTORY(test/test_spo)
+ADD_SUBDIRECTORY(test/test_p)  # single pressure uncoupled with rate well
+ADD_SUBDIRECTORY(test/test_pr) # single pressure uncoupled with local refinement with bhp well
 # ADD_SUBDIRECTORY(test)
 # ADD_TEST(NAME single_pressure_uncoup COMMAND Test)
 # add_executable (test1 ${CMAKE_SOURCE_DIR}/test/test_single_pressure_uncoupled_4x4.cpp)
