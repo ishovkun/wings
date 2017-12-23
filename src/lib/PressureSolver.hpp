@@ -1,6 +1,8 @@
 #pragma once
 
-#include <deal.II/grid/tria.h>
+// #include <deal.II/base/conditional_ostream.h>
+#include <deal.II/distributed/tria.h>
+
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/fe/fe_dgq.h>
 
@@ -33,8 +35,7 @@
 // #include <deal.II/meshworker/simple.h>
 // #include <deal.II/meshworker/loop.h>
 
-// #include <deal.II/base/utilities.h>
-// #include <deal.II/base/timer.h>
+#include <deal.II/base/utilities.h>
 // #include <deal.II/base/function.h>
 // #include <deal.II/base/tensor.h>
 
@@ -48,7 +49,7 @@
 // #include <deal.II/lac/trilinos_block_vector.h>
 
 // DOF stuff
-// #include <deal.II/distributed/tria.h>
+#include <deal.II/distributed/tria.h>
 // #include <deal.II/dofs/dof_handler.h>
 // #include <deal.II/dofs/dof_renumbering.h>
 // #include <deal.II/dofs/dof_accessor.h>
@@ -74,8 +75,12 @@ namespace FluidSolvers
   class PressureSolver
   {
   public:
-    PressureSolver(const Triangulation<dim>  &triangulation,
-                   const Data::DataBase<dim> &data_);
+    // PressureSolver(const Triangulation<dim>  &triangulation,
+    //                const Data::DataBase<dim> &data_);
+    PressureSolver(MPI_Comm                                  &mpi_communicator_,
+                   parallel::distributed::Triangulation<dim> &triangulation_,
+                   const Data::DataBase<dim>                 &data_,
+                   ConditionalOStream                        &pcout_);
     ~PressureSolver();
 
     void setup_dofs();
@@ -83,33 +88,23 @@ namespace FluidSolvers
                          CellValues::CellValuesBase<dim> &neighbor_data,
                          const double time_step);
     unsigned int solve();
-    // void print_system_matrix(const double denominator=1.0) const;
+    // accessing private members
     const SparseMatrix<double>& get_system_matrix();
-    const Vector<double>& get_rhs_vector();
-
+    const Vector<double>&       get_rhs_vector();
     const DoFHandler<dim> &     get_dof_handler();
     const FE_DGQ<dim> &         get_fe();
 
   private:
-    // double get_transmissibility(const Vector<double> &perm,
-    //                             const double         visc,
-    //                             const double         volume_factor,
-    //                             const Tensor<1,dim>  &normal_vector,
-    //                             const Tensor<1,dim>  &dx,
-    //                             const double         dS) const;
-    // double get_cell_mass_matrix(const double cell_volume,
-    //                             const double volume_factor,
-    //                             const double porosity,
-    //                             const double compressibility) const;
-  private:
-    DoFHandler<dim>            dof_handler;
-    FE_DGQ<dim>                fe;
-    const Data::DataBase<dim>  &data;
+    MPI_Comm                                  &mpi_communicator;
+    parallel::distributed::Triangulation<dim> &triangulation;
+    DoFHandler<dim>                           dof_handler;
+    FE_DGQ<dim>                               fe;
+    const Data::DataBase<dim>                 &data;
+    ConditionalOStream                        &pcout;
 
     // Matrices and vectors
-    SparsityPattern      sparsity_pattern;
-    SparseMatrix<double> system_matrix;
-    // Vector<double>       right_hand_side;
+    SparsityPattern                           sparsity_pattern;
+    SparseMatrix<double>                      system_matrix;
 
     // SparsityPattern
     // typedef MeshWorker::DoFInfo<dim> DoFInfo;
@@ -123,12 +118,18 @@ namespace FluidSolvers
 
 
   template <int dim>
-  PressureSolver<dim>::PressureSolver(const Triangulation<dim>  &triangulation,
-                                      const Data::DataBase<dim> &data_)
+  PressureSolver<dim>::
+  PressureSolver(MPI_Comm                                  &mpi_communicator_,
+                 parallel::distributed::Triangulation<dim> &triangulation_,
+                 const Data::DataBase<dim>                 &data_,
+                 ConditionalOStream                        &pcout_)
     :
-    dof_handler(triangulation),
-    fe(0),                          // since we want finite volumes
-    data(data_)
+    mpi_communicator(mpi_communicator_),
+    triangulation(triangulation_),
+    dof_handler(triangulation_),
+    fe(0), // since we want finite volumes
+    data(data_),
+    pcout(pcout_)
   {}  // eom
 
 
@@ -146,8 +147,8 @@ namespace FluidSolvers
     DynamicSparsityPattern dsp(dof_handler.n_dofs());
     DoFTools::make_flux_sparsity_pattern (dof_handler, dsp);
     sparsity_pattern.copy_from(dsp);
-    std::ofstream out ("sparsity_pattern1.svg");
-    sparsity_pattern.print_svg (out);
+    // std::ofstream out ("sparsity_pattern1.svg");
+    // sparsity_pattern.print_svg (out);
 
     system_matrix.reinit(sparsity_pattern);
     solution.reinit(dof_handler.n_dofs());
