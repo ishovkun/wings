@@ -399,7 +399,7 @@ namespace Wings
 
     // const double pressure_B = well_B.get_control().value;
     // this guy exhists only in fine cells
-    const double g_vector_entry = data.density_sc_water()*B_w*data.gravity() *
+    const double g_vector_entry = data.density_sc_water()/B_w/B_w*data.gravity() *
         T_fine_fine * (h/2);
     // 15
     rhs_an = -g_vector_entry;
