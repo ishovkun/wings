@@ -387,7 +387,7 @@ namespace Wings
     // -----------------------------------------------------------------------
     // RHS vector
     const auto & rhs_vector = pressure_solver.get_rhs_vector();
-    rhs_vector.print(std::cout, 3, true, false);
+    // rhs_vector.print(std::cout, 3, true, false);
     double rhs_an;
 
     // indices that should be zero

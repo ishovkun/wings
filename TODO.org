@@ -30,3 +30,4 @@
 *** I am calculating face transmissibilities twice!
 *** Pieceman formula valid only for r << r_pieceman
     add check as a runtime parameter!!!!
+*** G vector: should I additionally multiply by cell normal?

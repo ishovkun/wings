@@ -102,7 +102,7 @@ namespace CellValues
           }
       }
 
-    G_face = data.density_sc_water()/B_w_face*data.gravity()*T_face*dx[2];
+    G_face = data.density_sc_water()/B_w_face*data.gravity()*T_face*dx[2]*face_normal[2];
 
     // return T;
 

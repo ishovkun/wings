@@ -249,6 +249,8 @@ namespace FluidSolvers
             cell_values.update_face_values(neighbor_values, dx_ij, normal, dS);
             matrix_ii += cell_values.T_face;
             rhs_i += cell_values.G_face;
+            if (i == 15)
+              std::cout << "G 15 " << j <<"\t" << cell_values.G_face << std::endl;
             system_matrix.add(i, j, -cell_values.T_face);
           }
           else if ((cell->neighbor(f)->level() == cell->level()) &&
