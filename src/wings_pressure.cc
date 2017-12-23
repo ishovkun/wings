@@ -120,7 +120,9 @@ namespace Wings
     const double cw = data.compressibility_water();
     const double h = 1;
     // Compute transmissibility and mass matrix entries
-    const double T = 1./mu/B_w*(k/h)*h*h;
+    const double T_coarse_coarse = 1./mu/B_w*(k/h)*h*h;
+    const double T_fine_fine = 1./mu/B_w*(2*k/h)*h*h/4;
+    const double T_fine_coarse = 1./mu/B_w*(k/(h/2 +h/4))*h*h/4;
     const double B = h*h*h/B_w*phi*cw;
     // // Well cell centers
     // const Point<3> cell_A_t = Point<3>(1.5, 0.5, 0.0);
@@ -183,6 +185,11 @@ namespace Wings
 
     data.update_well_controls(time);
 
+    const auto & well_A_control = well_A.get_control();
+    AssertThrow(well_A_control.value == 0.0,
+                ExcMessage("Wrong control of well A"));
+    AssertThrow(well_A_control.type == Schedule::WellControlType::flow_control_total,
+                ExcMessage("Wrong control of well A"));
     const auto & well_B_control = well_B.get_control();
     AssertThrow(well_B_control.type == Schedule::WellControlType::pressure_control,
                 ExcMessage("Wrong control of well B"));
@@ -191,21 +198,21 @@ namespace Wings
       cell_values(data), neighbor_values(data);
     pressure_solver.assemble_system(cell_values, neighbor_values, time_step);
 
-    // for (auto & id : data.get_well_ids())
-    // {
-    //   std::cout << "well_id " << id << std::endl;
-    //   auto & well = data.wells[id];
+    for (auto & id : data.get_well_ids())
+    {
+      std::cout << "well_id " << id << std::endl;
+      auto & well = data.wells[id];
 
-    //   std::cout << "Real locations"  << std::endl;
-    //   for (auto & loc : well.get_locations())
-    //     std::cout << loc << std::endl;
+      std::cout << "Real locations"  << std::endl;
+      for (auto & loc : well.get_locations())
+        std::cout << loc << std::endl;
 
-    //   std::cout << "Assigned locations"  << std::endl;
-    //   for (auto & cell : well.get_cells())
-    //     std::cout << cell->center() << std::endl;
+      std::cout << "Assigned locations"  << std::endl;
+      for (auto & cell : well.get_cells())
+        std::cout << cell->center() << std::endl;
 
-    //   std::cout << std::endl;
-    // }
+      std::cout << std::endl;
+    }
 
     // // A test for properly placing wells into cells
     const auto & cells_B = well_B.get_cells();
@@ -240,9 +247,85 @@ namespace Wings
                                   /*scientific = */ false,
                                   /*width = */ 0,
                                   /*zero_string = */ " ",
-                                  /*denominator = */ time_step/B);
+                                  // /*denominator = */ time_step/B);
+                                  /*denominator = */ 1./T_coarse_coarse);
+    std::cout << "T_cc = " << T_coarse_coarse << std::endl;
+    std::cout << "T_ff/T_cc = " << T_fine_fine/T_coarse_coarse << std::endl;
+    std::cout << "T_fc/T_cc = " << T_fine_coarse/T_coarse_coarse << std::endl;
 
-    // // // Testing A(0, 0) - two neighbors
+    const double eps = DefaultValues::small_number;
+    // Test coarse_coarse transmissibilities
+    std::vector<int> is = {0, 1, 2, 4, 7, 8, 9, 11, 12, 13};
+    std::vector<double> js;
+    for (auto & i : is)
+    {
+      double A_ij = system_matrix(i, i+1);
+      AssertThrow(abs(A_ij + T_coarse_coarse)/T_coarse_coarse < eps, ExcMessage("wrong"));
+    }
+    is = {1, 2, 3, 5, 8, 9, 10, 12, 13, 14};
+    for (auto & i : is)
+    {
+      double A_ij = system_matrix(i, i-1);
+      AssertThrow(abs(A_ij + T_coarse_coarse)/T_coarse_coarse < eps, ExcMessage("wrong"));
+    }
+    is = {0, 1, 7, 8, 9, 10};
+    for (auto & i : is)
+    {
+      double A_ij = system_matrix(i, i+4);
+      AssertThrow(abs(A_ij + T_coarse_coarse)/T_coarse_coarse < eps, ExcMessage("wrong"));
+    }
+
+    // Test fine fine entries
+    is = {15, 15, 15, 16, 16, 16, 17, 17, 17, 18, 18, 18, 19, 19, 19, 20, 20, 20, 21, 21, 21};
+    js = {16, 17, 19, 15, 18, 20, 15, 18, 21, 16, 17, 22, 15, 20, 21, 16, 19, 22, 17, 19, 22};
+    for (unsigned int pp=0; pp < is.size(); pp++)
+    {
+      double A_ij = system_matrix(is[pp], js[pp]);
+      AssertThrow(abs(A_ij + T_fine_fine)/T_fine_fine < eps, ExcMessage("wrong"));
+    }
+
+    // Test fine coarse entries
+    is = {2,  2,  2,  2,  5,  5,  5,  5,  6,  6,  6,  6,  9,  9,  9,  9,  15, 15, 16, 16};
+    js = {15, 17, 19, 21, 15, 16, 17, 18, 19, 20, 21, 22, 16, 18, 20, 22, 2,  5,  5,  9};
+    for (unsigned int pp=0; pp < is.size(); pp++)
+    {
+      double A_ij = system_matrix(is[pp], js[pp]);
+      AssertThrow(abs(A_ij + T_fine_coarse)/T_fine_coarse < eps, ExcMessage("wrong"));
+    }
+
+    // system_matrix.print(std::cout, false, /*diagonal_first*/ true);
+    // Test diagonal
+    double A_ii_an, A_ii;
+    // (0, 0)
+    A_ii_an = B/time_step + 2*T_coarse_coarse;
+    A_ii = system_matrix(0, 0);
+    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 0_0"));
+    // (1, 1)
+    A_ii_an = B/time_step + 3*T_coarse_coarse;
+    A_ii = system_matrix(1, 1);
+    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 1_1"));
+    // (2, 2)
+    A_ii_an = B/time_step + 2*T_coarse_coarse + 4*T_fine_coarse;
+    A_ii = system_matrix(2, 2);
+    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 2_2"));
+    // (3, 3)
+    A_ii_an = B/time_step + 2*T_coarse_coarse;
+    A_ii = system_matrix(3, 3);
+    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 3_3"));
+    // (4, 4)
+    A_ii_an = B/time_step + 3*T_coarse_coarse;
+    A_ii = system_matrix(4, 4);
+    std::cout << "a44 " << A_ii << std::endl;
+    std::cout << "a44_an " << A_ii_an << std::endl;
+    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 4_4"));
+    // (5, 5)
+    A_ii_an = B/time_step + 3*T_coarse_coarse + 4*T_fine_coarse;
+    A_ii = system_matrix(5, 5);
+    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 5_5"));
+
+    // system_matrix.print(std::cout);
+
+    // // Testing A(0, 0) - two neighbors
     // A_ij = system_matrix(0, 0);
     // A_ij_an = B/time_step + 2*T;
     // AssertThrow(abs(A_ij - A_ij_an)/abs(A_ij_an)<DefaultValues::small_number,

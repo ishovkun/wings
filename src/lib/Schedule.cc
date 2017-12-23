@@ -22,7 +22,7 @@ namespace Schedule
 
   struct WellControl
   {
-    WellControlType type;
+    WellControlType type = WellControlType::flow_control_total;
     double value = 0;
     double skin = 0;
   };
@@ -73,6 +73,8 @@ namespace Schedule
     AssertThrow(times.size() > 0, dealii::ExcMessage("Schedule is empty"));
 
     WellControl control;
+    control.value = 0;
+    control.type = WellControlType::flow_control_total;
 
     for (unsigned int i=0; i<times.size(); ++i)
     {

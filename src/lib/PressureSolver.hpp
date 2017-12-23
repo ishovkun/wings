@@ -196,6 +196,7 @@ namespace FluidSolvers
     {
       cell->get_dof_indices(dof_indices);
       unsigned int i = dof_indices[0];
+      //  std::cout << "i = " << i << "\t" << cell->center() << std::endl;
       fe_values.reinit(cell);
       fe_values.get_function_values(solution, p_old_values);
       // std::cout << "cell: " << i << std::endl;
@@ -221,14 +222,16 @@ namespace FluidSolvers
 
       double matrix_ii = B_ii/time_step + J_i;
       double rhs_i = B_ii/time_step*p_old + Q_i;
+      if (i == 4)
+      {
+        std::cout << "matrix ii 4 begin " << matrix_ii/1e-9 << std::endl;
+        std::cout << "J index " << J_i/1e-9 << std::endl;
+        std::cout << "center " << cell->center() << std::endl;
+      }
 
       unsigned int j = 0;
-      double dS;
-      dx_ij = 0;
       for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
       {
-        // T_ij = 0;
-        dS = 0;
         if (cell->at_boundary(f) == false)
         {
           if((cell->neighbor(f)->level() == cell->level() &&
@@ -239,7 +242,7 @@ namespace FluidSolvers
             fe_face_values.reinit(cell, f);
             normal = fe_face_values.normal_vector(0); // 0 is gauss point
             j = dof_indices_neighbor[0];
-            dS = cell->face(f)->measure();  // face area
+            const double dS = cell->face(f)->measure();  // face area
             dx_ij = cell->neighbor(f)->center() - cell->center();
             neighbor_values.update(cell->neighbor(f));
             // assemble local matrix and distribute
@@ -262,7 +265,7 @@ namespace FluidSolvers
               fe_subface_values.reinit(cell, f, subface);
               normal = fe_subface_values.normal_vector(0); // 0 is gauss point
               neighbor_values.update(neighbor_child);
-              dS = fe_subface_values.JxW(0);
+              const double dS = fe_subface_values.JxW(0);
               dx_ij = neighbor_child->center() - cell->center();
               // assemble local matrix and distribute
               cell_values.update_face_values(neighbor_values, dx_ij, normal, dS);
@@ -282,6 +285,8 @@ namespace FluidSolvers
 
         } // end if face not at boundary
       }  // end face loop
+      if (i == 4)
+        std::cout << "matrix ii 4 end " << matrix_ii/1e-9 << std::endl;
       system_matrix.add(i, i, matrix_ii);
       rhs_vector[i] += rhs_i;
 

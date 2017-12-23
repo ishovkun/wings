@@ -4,16 +4,18 @@
     CLOSED: [2017-12-21 Thu 18:04]
 *** Upon reading mesh node coordinate needs to be multiplied by units
 ** Adaptive mesh refinement
-   Make PressureSolver work with refined mesh, see
-   https://www.dealii.org/8.4.1/doxygen/deal.II/classCellAccessor.html#acec7a480d2bcdd506a3350dd9ec3cfeb
-   Info on how to handle: https://www.dealii.org/8.4.0/doxygen/deal.II/step_46.html
+*** DONE Make PressureSolver and Wells work with refined mesh
+    CLOSED: [2017-12-22 Fri 18:36]
+    Info on how to handle: https://www.dealii.org/8.4.0/doxygen/deal.II/step_46.html
 ** 3D bitmap input
 *** DONE Write code for treating bitmap input
     CLOSED: [2017-12-21 Thu 18:02]
 *** Test 3D heterogeneous bitmap
 ** Parallelize
 *** Use trilinos parallel classes
-*** Properly extract fevalues and distribute into the stiffness matrix
+*** DONE Properly extract fevalues
+    CLOSED: [2017-12-22 Fri 18:37]
+*** TODO Properly distribute into the stiffness matrix
 *** Locate wellbore on cell interfaces between two processes
 
 
@@ -25,3 +27,4 @@
     CLOSED: [2017-12-21 Thu 18:03]
 *** DONE How to properly distribute flux between wells
     CLOSED: [2017-12-21 Thu 18:03]
+*** I am calculating face transmissibilities twice!

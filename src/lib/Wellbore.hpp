@@ -94,6 +94,9 @@ namespace Wellbore
     for (unsigned int i=1; i<locations.size(); i++)
       AssertThrow((locations[i] - locations[i-1]).norm() > 0,
                   ExcMessage("Duplicates in wellbore locations"));
+    // Init zero rate control just in case
+    control.type = Schedule::WellControlType::flow_control_total;
+    control.value = 0.0;
 
   } //  eom
 
