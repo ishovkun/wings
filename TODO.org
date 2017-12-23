@@ -28,3 +28,5 @@
 *** DONE How to properly distribute flux between wells
     CLOSED: [2017-12-21 Thu 18:03]
 *** I am calculating face transmissibilities twice!
+*** Pieceman formula valid only for r << r_pieceman
+    add check as a runtime parameter!!!!

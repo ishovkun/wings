@@ -124,6 +124,7 @@ namespace Wings
     const double T_fine_fine = 1./mu/B_w*(2*k/h)*h*h/4;
     const double T_fine_coarse = 1./mu/B_w*(k/(h/2 +h/4))*h*h/4;
     const double B = h*h*h/B_w*phi*cw;
+    const double B_fine = h*h*h/8/B_w*phi*cw;
     // // Well cell centers
     // const Point<3> cell_A_t = Point<3>(1.5, 0.5, 0.0);
     std::vector<Point<3>> cells_B_t(5);
@@ -133,23 +134,9 @@ namespace Wings
     cells_B_t[3] = Point<3>(1.75, 2.25, 0.25);
     cells_B_t[4] = Point<3>(1.25, 2.25, -0.25);
 
-
-
-    // // I don't like this entry since the well is parallel to the face
-    // // we'll see what the J index gives
-    // std::vector<Point<3>> cells_C_t(3);
-    // cells_C_t[0] = Point<3>(1.5, 0.5, 0);
-    // cells_C_t[1] = Point<3>(2.5, 0.5, 0);
-    // cells_C_t[2] = Point<3>(3.5, 0.5, 0);
     // // well A productivity
-    // const double well_A_length = h;
     const double well_B_length = h*std::sqrt(2.);
-    // const double well_C_length = 2*h;
-    // const double well_A_radius = well_A.get_radius();
     const double well_B_radius = well_B.get_radius();
-    // const double well_C_radius = well_C.get_radius();
-    // const double J_index_A =
-    //   2*M_PI*k*well_A_length / (std::log(pieceman_radius/well_A_radius));
 
     /* this is where it gets funky!!!!
        Since well B is partially in a large cell (h=1) and partially in a
@@ -157,9 +144,11 @@ namespace Wings
      */
     const double pieceman_radius_coarse = 0.28*std::sqrt(2*h*h)/2;
     const double pieceman_radius_fine = 0.28*std::sqrt(2*h/2*h/2)/2;
-    const double J_index_B =
-        2*M_PI*k*well_B_length/2/(std::log(pieceman_radius_coarse/well_B_radius)) +
+    const double J_index_B_coarse =
+        2*M_PI*k*well_B_length/2/(std::log(pieceman_radius_coarse/well_B_radius));
+    const double J_index_B_fine =
         2*M_PI*k*well_B_length/2/(std::log(pieceman_radius_fine/well_B_radius));
+    const double J_index_B = J_index_B_coarse + J_index_B_fine;
 
     // const double J_index_C =
     //     2*M_PI*k*well_C_length/ (std::log(pieceman_radius/well_C_radius));
@@ -240,20 +229,22 @@ namespace Wings
 
     // Wells A and C are the same as in the last test
 
-    // double A_ij, A_ij_an;
+    // -----------------------------------------------------------------------
+    // System matrix
     const auto & system_matrix = pressure_solver.get_system_matrix();
-    system_matrix.print_formatted(std::cout,
-                                  /* precision = */ 3,
-                                  /*scientific = */ false,
-                                  /*width = */ 0,
-                                  /*zero_string = */ " ",
-                                  // /*denominator = */ time_step/B);
-                                  /*denominator = */ 1./T_coarse_coarse);
+    // system_matrix.print_formatted(std::cout,
+    //                               /* precision = */ 3,
+    //                               /*scientific = */ false,
+    //                               /*width = */ 0,
+    //                               /*zero_string = */ " ",
+    //                               // /*denominator = */ time_step/B);
+    //                               /*denominator = */ 1./T_coarse_coarse);
     std::cout << "T_cc = " << T_coarse_coarse << std::endl;
     std::cout << "T_ff/T_cc = " << T_fine_fine/T_coarse_coarse << std::endl;
     std::cout << "T_fc/T_cc = " << T_fine_coarse/T_coarse_coarse << std::endl;
 
     const double eps = DefaultValues::small_number;
+    const double eps_geo = DefaultValues::small_number_geometry;
     // Test coarse_coarse transmissibilities
     std::vector<int> is = {0, 1, 2, 4, 7, 8, 9, 11, 12, 13};
     std::vector<double> js;
@@ -294,6 +285,7 @@ namespace Wings
     }
 
     // system_matrix.print(std::cout, false, /*diagonal_first*/ true);
+    // system_matrix.print(std::cout);
     // Test diagonal
     double A_ii_an, A_ii;
     // (0, 0)
@@ -315,43 +307,106 @@ namespace Wings
     // (4, 4)
     A_ii_an = B/time_step + 3*T_coarse_coarse;
     A_ii = system_matrix(4, 4);
-    std::cout << "a44 " << A_ii << std::endl;
-    std::cout << "a44_an " << A_ii_an << std::endl;
     AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 4_4"));
-    // (5, 5)
+    // (5, 5) Due to rounoff in well location there is addition from well B
+    // Tolerance is geometric!
     A_ii_an = B/time_step + 3*T_coarse_coarse + 4*T_fine_coarse;
     A_ii = system_matrix(5, 5);
-    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 5_5"));
+    // std::cout << "a55 " << A_ii << std::endl;
+    // std::cout << "a55_an " << A_ii_an << std::endl;
+    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps_geo, ExcMessage("wrong 5_5"));
+    // (6, 6)
+    A_ii_an = B/time_step + 2*T_coarse_coarse + 4*T_fine_coarse;
+    A_ii = system_matrix(6, 6);
+    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 6_6"));
+    // (7, 7)
+    A_ii_an = B/time_step + 3*T_coarse_coarse;
+    A_ii = system_matrix(7, 7);
+    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 7_7"));
+    // (8, 8)
+    A_ii_an = B/time_step + 4*T_coarse_coarse + J_index_B_coarse;
+    A_ii = system_matrix(8, 8);
+    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 8_8"));
+    // (9, 9)
+    A_ii_an = B/time_step + 3*T_coarse_coarse + 4*T_fine_coarse;
+    A_ii = system_matrix(9, 9);
+    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 9_9"));
+    // (10, 10)
+    A_ii_an = B/time_step + 3*T_coarse_coarse;
+    A_ii = system_matrix(10, 10);
+    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 10_10"));
+    // (11, 11)
+    A_ii_an = B/time_step + 2*T_coarse_coarse;
+    A_ii = system_matrix(11, 11);
+    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 11_11"));
+    // (12, 12)
+    A_ii_an = B/time_step + 3*T_coarse_coarse;
+    A_ii = system_matrix(12, 12);
+    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 12_12"));
+    // (13, 13)
+    A_ii_an = B/time_step + 3*T_coarse_coarse;
+    A_ii = system_matrix(13, 13);
+    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 13_13"));
+    // (14, 14)
+    A_ii_an = B/time_step + 2*T_coarse_coarse;
+    A_ii = system_matrix(14, 14);
+    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 14_14"));
+    // (15, 15) left_front refined cell at top
+    A_ii_an = B_fine/time_step + 2*T_fine_coarse + 3*T_fine_fine;
+    A_ii = system_matrix(15, 15);
+    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 15_15"));
+    // (16, 16) right-front refined cell at top
+    A_ii_an = B_fine/time_step + 2*T_fine_coarse + 3*T_fine_fine + J_index_B_fine;
+    A_ii = system_matrix(16, 16);
+    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 16_16"));
+    // (17, 17) left_front refined cell at bottom
+    A_ii_an = B_fine/time_step + 2*T_fine_coarse + 3*T_fine_fine;
+    A_ii = system_matrix(17, 17);
+    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 17_17"));
+    // (18, 18) left_front refined cell at bottom
+    A_ii_an = B_fine/time_step + 2*T_fine_coarse + 3*T_fine_fine;
+    A_ii = system_matrix(18, 18);
+    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 18_18"));
+    // (19, 19)
+    A_ii_an = B_fine/time_step + 2*T_fine_coarse + 3*T_fine_fine;
+    A_ii = system_matrix(19, 19);
+    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 19_19"));
+    // (20, 20)
+    A_ii_an = B_fine/time_step + 2*T_fine_coarse + 3*T_fine_fine;
+    A_ii = system_matrix(20, 20);
+    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 20_20"));
+    // (21, 21)
+    A_ii_an = B_fine/time_step + 2*T_fine_coarse + 3*T_fine_fine;
+    A_ii = system_matrix(21, 21);
+    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 21_21"));
+    // (22, 22)
+    A_ii_an = B_fine/time_step + 2*T_fine_coarse + 3*T_fine_fine;
+    A_ii = system_matrix(22, 22);
+    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 22_22"));
 
-    // system_matrix.print(std::cout);
+    // -----------------------------------------------------------------------
+    // RHS vector
+    const auto & rhs_vector = pressure_solver.get_rhs_vector();
+    rhs_vector.print(std::cout, 3, true, false);
+    double rhs_an;
 
-    // // Testing A(0, 0) - two neighbors
-    // A_ij = system_matrix(0, 0);
-    // A_ij_an = B/time_step + 2*T;
-    // AssertThrow(abs(A_ij - A_ij_an)/abs(A_ij_an)<DefaultValues::small_number,
-    //             ExcMessage("System matrix is wrong"));
-    // // Testing A(0, 1) = T
-    // A_ij = system_matrix(0, 1);
-    // A_ij_an = -T;
-    // AssertThrow(abs(A_ij - A_ij_an)/abs(A_ij_an)<1e-9,
-    //             ExcMessage("System matrix is wrong"));
-    // // Testing A(1, 1) - 3 neighbors
-    // A_ij = system_matrix(1, 1);
-    // A_ij_an = B/time_step + 3*T;
-    // AssertThrow(abs(A_ij - A_ij_an)/abs(A_ij_an)<1e-9,
-    //             ExcMessage("System matrix is wrong"));
-    // // Testing A(5, 5) - four neighbors
-    // A_ij = system_matrix(5, 5);
-    // A_ij_an = B/time_step + 4*T;
-    // AssertThrow(abs(A_ij - A_ij_an)/abs(A_ij_an)<1e-9,
-    //             ExcMessage("System matrix is wrong"));
+    // indices that should be zero
+    // indices 5 should be zero like geometric small value.
+    // we compare it with index in cell 8
+    is = {1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14};
+    for (auto &i : is)
+      AssertThrow(abs(rhs_vector[i]) < eps, ExcMessage("wrong rhs "));
 
-    // const auto & rhs_vector = pressure_solver.get_rhs_vector();
-    // // rhs_vector.print(std::cout, 3, true, false);
-    // const double rate_A = well_A.get_control().value;
-    // // std::cout << "Rate A = " << rate_A << std::endl;
-    // AssertThrow(abs(rhs_vector[4] - rate_A)/rate_A<DefaultValues::small_number,
-    //                 ExcMessage("rhs entry 4 is wrong"));
+    // const double pressure_B = well_B.get_control().value;
+    // this guy exhists only in fine cells
+    const double g_vector_entry = data.density_sc_water()*B_w*data.gravity() *
+        T_fine_fine * (h/2);
+    // 15
+    rhs_an = -g_vector_entry;
+    std::cout<< "rhs an = "<< rhs_an << std::endl;
+    std::cout<< "rhs num = "<< rhs_vector[15] << std::endl;
+    AssertThrow(abs(rhs_vector[15] - rhs_an)/abs(rhs_an) < eps,
+                    ExcMessage("rhs entry 15 is wrong"));
 
     // const double rhs_0 = B/time_step*pressure_solver.solution[0];
     // AssertThrow(abs(rhs_vector[0] - rhs_0)/rhs_0<DefaultValues::small_number,

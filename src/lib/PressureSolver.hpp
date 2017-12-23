@@ -196,7 +196,7 @@ namespace FluidSolvers
     {
       cell->get_dof_indices(dof_indices);
       unsigned int i = dof_indices[0];
-      //  std::cout << "i = " << i << "\t" << cell->center() << std::endl;
+       std::cout << "i = " << i << "\t" << cell->center() << std::endl;
       fe_values.reinit(cell);
       fe_values.get_function_values(solution, p_old_values);
       // std::cout << "cell: " << i << std::endl;
@@ -222,9 +222,9 @@ namespace FluidSolvers
 
       double matrix_ii = B_ii/time_step + J_i;
       double rhs_i = B_ii/time_step*p_old + Q_i;
-      if (i == 4)
+      if (i == 15)
       {
-        std::cout << "matrix ii 4 begin " << matrix_ii/1e-9 << std::endl;
+        std::cout << "rhs 15 begin " << rhs_i << std::endl;
         std::cout << "J index " << J_i/1e-9 << std::endl;
         std::cout << "center " << cell->center() << std::endl;
       }
@@ -285,8 +285,9 @@ namespace FluidSolvers
 
         } // end if face not at boundary
       }  // end face loop
-      if (i == 4)
-        std::cout << "matrix ii 4 end " << matrix_ii/1e-9 << std::endl;
+      if (i == 15)
+        std::cout << "rhs 15 end " << rhs_i << std::endl;
+
       system_matrix.add(i, i, matrix_ii);
       rhs_vector[i] += rhs_i;
 
