@@ -1,6 +1,6 @@
 #pragma once
 
-// #include <deal.II/base/conditional_ostream.h>
+#include <deal.II/base/conditional_ostream.h>
 #include <deal.II/distributed/tria.h>
 
 #include <deal.II/dofs/dof_handler.h>
@@ -10,17 +10,16 @@
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/fe/fe_values.h>
 // vectors and matrices
-#include <deal.II/lac/vector.h>
-#include <deal.II/lac/sparse_matrix.h>
+// #include <deal.II/lac/vector.h>
+// #include <deal.II/lac/sparse_matrix.h>
 
 #include <deal.II/base/config.h>  // for numbers::is_nan
 
 // to print sparsity pattern, remove later
-#include <fstream>
+// #include <fstream>
 
 #include <deal.II/base/quadrature_lib.h>
 // #include <deal.II/base/function.h>
-// #include <deal.II/lac/dynamic_sparsity_pattern.h>
 // #include <deal.II/grid/grid_generator.h>
 // #include <deal.II/grid/grid_out.h>
 // #include <deal.II/grid/grid_refinement.h>
@@ -40,13 +39,11 @@
 // #include <deal.II/base/tensor.h>
 
 // Trilinos stuff
-// #include <deal.II/lac/generic_linear_algebra.h>
-// #include <deal.II/lac/solver_gmres.h>
-// #include <deal.II/lac/trilinos_solver.h>
-#include <deal.II/lac/solver_cg.h>
-#include <deal.II/lac/precondition.h>
-// #include <deal.II/lac/trilinos_block_sparse_matrix.h>
-// #include <deal.II/lac/trilinos_block_vector.h>
+#include <deal.II/lac/trilinos_vector.h>
+#include <deal.II/lac/generic_linear_algebra.h>
+#include <deal.II/lac/trilinos_sparse_matrix.h>
+#include <deal.II/lac/trilinos_solver.h>
+#include <deal.II/lac/trilinos_precondition.h>
 
 // DOF stuff
 #include <deal.II/distributed/tria.h>
@@ -89,10 +86,10 @@ namespace FluidSolvers
                          const double time_step);
     unsigned int solve();
     // accessing private members
-    const SparseMatrix<double>& get_system_matrix();
-    const Vector<double>&       get_rhs_vector();
-    const DoFHandler<dim> &     get_dof_handler();
-    const FE_DGQ<dim> &         get_fe();
+    const TrilinosWrappers::SparseMatrix& get_system_matrix();
+    const TrilinosWrappers::MPI::Vector&  get_rhs_vector();
+    const DoFHandler<dim> &               get_dof_handler();
+    const FE_DGQ<dim> &                   get_fe();
 
   private:
     MPI_Comm                                  &mpi_communicator;
@@ -103,17 +100,20 @@ namespace FluidSolvers
     ConditionalOStream                        &pcout;
 
     // Matrices and vectors
-    SparsityPattern                           sparsity_pattern;
-    SparseMatrix<double>                      system_matrix;
+    // TrilinosWrappers::SparsityPattern         sparsity_pattern;
+    TrilinosWrappers::SparseMatrix            system_matrix;
+    std::vector<IndexSet>                     owned_partitioning;
+		IndexSet                                  locally_owned_dofs;
+
 
     // SparsityPattern
     // typedef MeshWorker::DoFInfo<dim> DoFInfo;
     // typedef MeshWorker::IntegrationInfo<dim> CellInfo;
 
   public:
-    Vector<double>                solution, solution_old, rhs_vector;
-    // std::vector< Vector<double> > permeability;
-    // Vector<double>       perm;
+    TrilinosWrappers::MPI::Vector solution, old_solution, rhs_vector;
+    TrilinosWrappers::MPI::Vector relevant_solution;
+		IndexSet                      locally_relevant_dofs;
   };
 
 
@@ -144,16 +144,28 @@ namespace FluidSolvers
   void PressureSolver<dim>::setup_dofs()
   {
     dof_handler.distribute_dofs(fe);
-    DynamicSparsityPattern dsp(dof_handler.n_dofs());
-    DoFTools::make_flux_sparsity_pattern (dof_handler, dsp);
-    sparsity_pattern.copy_from(dsp);
-    // std::ofstream out ("sparsity_pattern1.svg");
-    // sparsity_pattern.print_svg (out);
+    locally_owned_dofs.clear();
+    locally_relevant_dofs.clear();
+    locally_owned_dofs = dof_handler.locally_owned_dofs();
+    DoFTools::extract_locally_relevant_dofs(dof_handler,
+                                            locally_relevant_dofs);
 
-    system_matrix.reinit(sparsity_pattern);
-    solution.reinit(dof_handler.n_dofs());
-    solution_old.reinit(dof_handler.n_dofs());
-    rhs_vector.reinit(dof_handler.n_dofs());
+    { // system matrix
+      system_matrix.clear();
+      TrilinosWrappers::SparsityPattern
+        sparsity_pattern(locally_owned_dofs, mpi_communicator);
+	    DoFTools::make_flux_sparsity_pattern(dof_handler,
+                                           sparsity_pattern);
+	    sparsity_pattern.compress();
+      system_matrix.reinit(sparsity_pattern);
+    }
+		{ // vectors
+      solution.reinit(locally_owned_dofs, mpi_communicator);
+      relevant_solution.reinit(locally_relevant_dofs, mpi_communicator);
+      old_solution.reinit(locally_relevant_dofs, mpi_communicator);
+      rhs_vector.reinit(locally_owned_dofs, locally_relevant_dofs,
+                        mpi_communicator, /* omit-zeros=*/ true);
+    }
   } // eom
 
 
@@ -199,7 +211,7 @@ namespace FluidSolvers
       unsigned int i = dof_indices[0];
        // std::cout << "i = " << i << "\t" << cell->center() << std::endl;
       fe_values.reinit(cell);
-      fe_values.get_function_values(solution, p_old_values);
+      fe_values.get_function_values(old_solution, p_old_values);
       // std::cout << "cell: " << i << std::endl;
       // double p_i = solution[i];
       // double p_old = solution_old[i];
@@ -298,9 +310,14 @@ namespace FluidSolvers
     if (tol == 0.0)
       tol = 1e-10;
     SolverControl solver_control(1000, tol);
-    SolverCG<> solver(solver_control);
-    PreconditionSSOR<> preconditioner;
-    preconditioner.initialize(system_matrix, 1.0);
+    TrilinosWrappers::SolverCG::AdditionalData additional_data_cg;
+    TrilinosWrappers::SolverCG
+      solver(solver_control, additional_data_cg);
+
+    // LA::MPI::PreconditionAMG preconditioner;
+    TrilinosWrappers::PreconditionAMG::AdditionalData additional_data_amg;
+    TrilinosWrappers::PreconditionAMG preconditioner;
+    preconditioner.initialize(system_matrix, additional_data_amg);
     solver.solve(system_matrix, solution, rhs_vector, preconditioner);
     return solver_control.last_step();
   }
@@ -314,7 +331,7 @@ namespace FluidSolvers
 
 
   template <int dim>
-  const SparseMatrix<double>&
+  const TrilinosWrappers::SparseMatrix&
   PressureSolver<dim>::get_system_matrix()
   {
     return system_matrix;
@@ -322,7 +339,7 @@ namespace FluidSolvers
 
 
   template <int dim>
-  const Vector<double>&
+  const TrilinosWrappers::MPI::Vector&
   PressureSolver<dim>::get_rhs_vector()
   {
     return rhs_vector;
