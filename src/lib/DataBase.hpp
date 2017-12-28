@@ -24,7 +24,8 @@ namespace Data
   class DataBase
   {
   public:
-    DataBase();
+    DataBase(MPI_Comm           &mpi_communicator_,
+             ConditionalOStream &pcout_);
     // ~DataBase();
     void read_input(const std::string&,
                     const int verbosity_=0);
@@ -70,6 +71,8 @@ namespace Data
 
     // ATTRIBUTES
   public:
+    MPI_Comm                               &mpi_communicator;
+    ConditionalOStream                     &pcout;
     int                                    initial_refinement_level,
                                            n_prerefinement_steps,
                                            n_adaptive_steps;
@@ -101,7 +104,11 @@ namespace Data
 
 
   template <int dim>
-  DataBase<dim>::DataBase()
+  DataBase<dim>::DataBase(MPI_Comm           &mpi_communicator_,
+                          ConditionalOStream &pcout_)
+    :
+    mpi_communicator(mpi_communicator_),
+    pcout(pcout_)
   {
     declare_parameters();
     verbosity = 0;
@@ -414,7 +421,7 @@ namespace Data
         locations.push_back(p);
       }
 
-      Wellbore::Wellbore<dim> w(locations, radius);
+      Wellbore::Wellbore<dim> w(locations, radius, mpi_communicator);
       this->wells.push_back(w);
 
       // check if well_id is in unique_well_ids and add if not

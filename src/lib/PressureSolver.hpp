@@ -206,98 +206,99 @@ namespace FluidSolvers
     rhs_vector = 0;
 
     for (; cell!=endc; ++cell)
-    {
-      cell->get_dof_indices(dof_indices);
-      unsigned int i = dof_indices[0];
-       // std::cout << "i = " << i << "\t" << cell->center() << std::endl;
-      fe_values.reinit(cell);
-      fe_values.get_function_values(old_solution, p_old_values);
-      // std::cout << "cell: " << i << std::endl;
-      // double p_i = solution[i];
-      // double p_old = solution_old[i];
-      double p_old = p_old_values[0];
-
-      cell_values.update(cell);
-
-      const double B_ii = cell_values.get_mass_matrix_entry();
-
-      const double J_i = cell_values.J;
-      const double Q_i = cell_values.Q;
-      // // Wells
-      // double Q_i = 0;
-      // double J_i = 0;
-      // for (auto & well : data.wells)
-      // {
-      //   Q_i += well.get_rate_water(cell);
-      //   J_i += well.get_productivity(cell);
-      // } // end well loop
-
-
-      double matrix_ii = B_ii/time_step + J_i;
-      double rhs_i = B_ii/time_step*p_old + Q_i;
-
-      unsigned int j = 0;
-      for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
+      if (cell->is_locally_owned())
       {
-        if (cell->at_boundary(f) == false)
-        {
-          if((cell->neighbor(f)->level() == cell->level() &&
-             cell->neighbor(f)->has_children() == false) ||
-             cell->neighbor_is_coarser(f))
+        cell->get_dof_indices(dof_indices);
+        unsigned int i = dof_indices[0];
+        // std::cout << "i = " << i << "\t" << cell->center() << std::endl;
+        fe_values.reinit(cell);
+        fe_values.get_function_values(old_solution, p_old_values);
+        // std::cout << "cell: " << i << std::endl;
+        // double p_i = solution[i];
+        // double p_old = solution_old[i];
+        double p_old = p_old_values[0];
+
+        cell_values.update(cell);
+
+        const double B_ii = cell_values.get_mass_matrix_entry();
+
+        const double J_i = cell_values.J;
+        const double Q_i = cell_values.Q;
+        // // Wells
+        // double Q_i = 0;
+        // double J_i = 0;
+        // for (auto & well : data.wells)
+        // {
+        //   Q_i += well.get_rate_water(cell);
+        //   J_i += well.get_productivity(cell);
+        // } // end well loop
+
+
+        double matrix_ii = B_ii/time_step + J_i;
+        double rhs_i = B_ii/time_step*p_old + Q_i;
+
+          unsigned int j = 0;
+          for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
           {
-            cell->neighbor(f)->get_dof_indices(dof_indices_neighbor);
-            fe_face_values.reinit(cell, f);
-            normal = fe_face_values.normal_vector(0); // 0 is gauss point
-            j = dof_indices_neighbor[0];
-            const double dS = cell->face(f)->measure();  // face area
-            dx_ij = cell->neighbor(f)->center() - cell->center();
-            neighbor_values.update(cell->neighbor(f));
-            // assemble local matrix and distribute
-            cell_values.update_face_values(neighbor_values, dx_ij, normal, dS);
-            matrix_ii += cell_values.T_face;
-            rhs_i += cell_values.G_face;
-            system_matrix.add(i, j, -cell_values.T_face);
-          }
-          else if ((cell->neighbor(f)->level() == cell->level()) &&
-                   (cell->neighbor(f)->has_children() == true))
-          {
-            for (unsigned int subface=0;
-                 subface<cell->face(f)->n_children(); ++subface)
+            if (cell->at_boundary(f) == false)
             {
-              // compute parameters
-              const auto & neighbor_child
-                  = cell->neighbor_child_on_subface(f, subface);
-              neighbor_child->get_dof_indices(dof_indices_neighbor);
-              j = dof_indices_neighbor[0];
-              fe_subface_values.reinit(cell, f, subface);
-              normal = fe_subface_values.normal_vector(0); // 0 is gauss point
-              neighbor_values.update(neighbor_child);
-              const double dS = fe_subface_values.JxW(0);
-              dx_ij = neighbor_child->center() - cell->center();
-              // assemble local matrix and distribute
-              cell_values.update_face_values(neighbor_values, dx_ij, normal, dS);
-              matrix_ii += cell_values.T_face;
-              rhs_i += cell_values.G_face;
-              system_matrix.add(i, j, -cell_values.T_face);
-            }
-          }
-          // else if (cell->neighbor_is_coarser(f))
-          // {
-          //   // compute dh on cell
-          //   // dx is not between cell centers i think
-          //   // get_cell_data(neighbor);
-          //   // compute_intercell_data();
-          //   dx_ij = cell->neighbor(f)->center() - cell->center();
-          // }
+              if((cell->neighbor(f)->level() == cell->level() &&
+                cell->neighbor(f)->has_children() == false) ||
+                cell->neighbor_is_coarser(f))
+              {
+                cell->neighbor(f)->get_dof_indices(dof_indices_neighbor);
+                fe_face_values.reinit(cell, f);
+                normal = fe_face_values.normal_vector(0); // 0 is gauss point
+                j = dof_indices_neighbor[0];
+                const double dS = cell->face(f)->measure();  // face area
+                dx_ij = cell->neighbor(f)->center() - cell->center();
+                neighbor_values.update(cell->neighbor(f));
+                // assemble local matrix and distribute
+                cell_values.update_face_values(neighbor_values, dx_ij, normal, dS);
+                matrix_ii += cell_values.T_face;
+                rhs_i += cell_values.G_face;
+                system_matrix.add(i, j, -cell_values.T_face);
+              }
+              else if ((cell->neighbor(f)->level() == cell->level()) &&
+                      (cell->neighbor(f)->has_children() == true))
+              {
+                for (unsigned int subface=0;
+                    subface<cell->face(f)->n_children(); ++subface)
+                {
+                  // compute parameters
+                  const auto & neighbor_child
+                      = cell->neighbor_child_on_subface(f, subface);
+                  neighbor_child->get_dof_indices(dof_indices_neighbor);
+                  j = dof_indices_neighbor[0];
+                  fe_subface_values.reinit(cell, f, subface);
+                  normal = fe_subface_values.normal_vector(0); // 0 is gauss point
+                  neighbor_values.update(neighbor_child);
+                  const double dS = fe_subface_values.JxW(0);
+                  dx_ij = neighbor_child->center() - cell->center();
+                  // assemble local matrix and distribute
+                  cell_values.update_face_values(neighbor_values, dx_ij, normal, dS);
+                  matrix_ii += cell_values.T_face;
+                  rhs_i += cell_values.G_face;
+                  system_matrix.add(i, j, -cell_values.T_face);
+                }
+              }
+              // else if (cell->neighbor_is_coarser(f))
+              // {
+              //   // compute dh on cell
+              //   // dx is not between cell centers i think
+              //   // get_cell_data(neighbor);
+              //   // compute_intercell_data();
+              //   dx_ij = cell->neighbor(f)->center() - cell->center();
+              // }
 
-        } // end if face not at boundary
-      }  // end face loop
+            } // end if face not at boundary
+          }  // end face loop
 
-      system_matrix.add(i, i, matrix_ii);
-      rhs_vector[i] += rhs_i;
+          system_matrix.add(i, i, matrix_ii);
+          rhs_vector[i] += rhs_i;
 
-      // std::cout << "------------------------------\n";
-    } // end cell loop
+          // std::cout << "------------------------------\n";
+        } // end cell loop
 
   } // eom
 

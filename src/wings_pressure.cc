@@ -33,11 +33,10 @@ namespace Wings
     MPI_Comm                                  mpi_communicator;
     parallel::distributed::Triangulation<dim> triangulation;
     ConditionalOStream                        pcout;
-    TimerOutput                               computing_timer;
-    FluidSolvers::PressureSolver<dim>         pressure_solver;
     Data::DataBase<dim>                       data;
+    FluidSolvers::PressureSolver<dim>         pressure_solver;
     std::string                               input_file;
-
+    TimerOutput                               computing_timer;
   };
 
 
@@ -46,13 +45,12 @@ namespace Wings
     :
     mpi_communicator(MPI_COMM_WORLD),
     triangulation(mpi_communicator),
-    pcout(std::cout,
-          (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)),
-    computing_timer(mpi_communicator, pcout,
-                    TimerOutput::summary,
-                    TimerOutput::wall_times),
+    pcout(std::cout, (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)),
+    data(mpi_communicator, pcout),
     pressure_solver(mpi_communicator, triangulation, data, pcout),
-    input_file(input_file_name_)
+    input_file(input_file_name_),
+    computing_timer(mpi_communicator, pcout,
+                    TimerOutput::summary, TimerOutput::wall_times)
   {}
 
 
@@ -78,12 +76,12 @@ namespace Wings
 
     for (;cell != endc; ++cell)
       if (!cell->is_artificial())
-      {
+        {
           if (
-                  abs(cell->center()[0] - 1.5) < DefaultValues::small_number
-                  &&
-                  abs(cell->center()[1] - 2.5) < DefaultValues::small_number
-              )
+                abs(cell->center()[0] - 1.5) < DefaultValues::small_number
+                &&
+                abs(cell->center()[1] - 2.5) < DefaultValues::small_number
+            )
           {
             cell->set_refine_flag();
             break;
@@ -108,6 +106,10 @@ namespace Wings
     // return;
     pressure_solver.setup_dofs();
 
+    auto & well_A = data.wells[0];
+    auto & well_B = data.wells[1];
+    // auto & well_C = data.wells[2];
+
     const auto & pressure_dof_handler = pressure_solver.get_dof_handler();
     const auto & pressure_fe = pressure_solver.get_fe();
     data.locate_wells(pressure_dof_handler, pressure_fe);
@@ -129,6 +131,43 @@ namespace Wings
       std::cout << std::endl;
     }
 
+    // // true values that should be given by solution
+    // // data
+    const double k = data.get_permeability->value(Point<dim>(1,1,1), 1);
+    const double phi = data.get_porosity->value(Point<dim>(1,1,1), 1);
+    const double mu = data.viscosity_water();
+    const double B_w = data.volume_factor_water();
+    const double cw = data.compressibility_water();
+    const double h = 1;
+    // Compute transmissibility and mass matrix entries
+    // const double T_coarse_coarse = 1./mu/B_w*(k/h)*h*h;
+    // const double T_fine_fine = 1./mu/B_w*(2*k/h)*h*h/4;
+    // const double T_fine_coarse = 1./mu/B_w*(k/(h/2 +h/4))*h*h/4;
+    // const double B = h*h*h/B_w*phi*cw;
+    // const double B_fine = h*h*h/8/B_w*phi*cw;
+    const double pieceman_radius_coarse = 0.28*std::sqrt(2*h*h)/2;
+    const double pieceman_radius_fine = 0.28*std::sqrt(2*h/2*h/2)/2;
+    const double well_B_length = h*std::sqrt(2.);
+    const double well_B_radius = well_B.get_radius();
+    const double J_index_B_coarse =
+      2*M_PI*k*well_B_length/2/(std::log(pieceman_radius_coarse/well_B_radius));
+    const double J_index_B_fine =
+      2*M_PI*k*well_B_length/2/(std::log(pieceman_radius_fine/well_B_radius));
+    const double J_index_B = J_index_B_coarse + J_index_B_fine;
+
+    const auto & j_ind_b = well_B.get_productivities();
+    double j_b_total = 0;
+    if (j_ind_b.size() > 0)
+      j_b_total = Math::sum(j_ind_b);
+    j_b_total = Utilities::MPI::sum(j_b_total, mpi_communicator);
+
+    // std::cout << "J_b true = " << J_index_B << "\t"
+    //           << "J_b = " << j_b_total
+    //           << std::endl;
+    AssertThrow(abs(J_index_B - j_b_total)/J_index_B <
+                DefaultValues::small_number_geometry*10,
+                ExcMessage("Wrong J index well B"));
+
     double time = 0;
     double time_step = data.get_time_step(time);
     // some init values
@@ -142,42 +181,15 @@ namespace Wings
       cell_values(data), neighbor_values(data);
     pressure_solver.assemble_system(cell_values, neighbor_values, time_step);
 
-    double A_ij, A_ij_an;
-    const auto & system_matrix = pressure_solver.get_system_matrix();
-
-    const double k = data.get_permeability->value(Point<dim>(1,1,1), 1);
-    const double phi = data.get_porosity->value(Point<dim>(1,1,1), 1);
-    const double mu = data.viscosity_water();
-    const double B_w = data.volume_factor_water();
-    const double cw = data.compressibility_water();
-    const double h = 1;
-    // // Compute transmissibility and mass matrix entries
-    const double T = 1./mu/B_w*(k/h)*h*h;
-    const double B = h*h*h/B_w*phi*cw;
-
-    // // Testing A(0, 0) - two neighbors
-    A_ij = system_matrix(0, 0);
-    A_ij_an = B/time_step + 2*T;
-    AssertThrow(abs(A_ij - A_ij_an)/abs(A_ij_an)<DefaultValues::small_number,
-                ExcMessage("System matrix is wrong"));
-    // Testing A(0, 1) = T
-    A_ij = system_matrix(0, 1);
-    A_ij_an = -T;
-    AssertThrow(abs(A_ij - A_ij_an)/abs(A_ij_an)<1e-9,
-                ExcMessage("System matrix is wrong"));
-    // Testing A(1, 1) - 3 neighbors
-    A_ij = system_matrix(1, 1);
-    A_ij_an = B/time_step + 3*T;
-    AssertThrow(abs(A_ij - A_ij_an)/abs(A_ij_an)<1e-9,
-                ExcMessage("System matrix is wrong"));
-    // Testing A(5, 5) - four neighbors
-    A_ij = system_matrix(5, 5);
-    A_ij_an = B/time_step + 4*T;
-    AssertThrow(abs(A_ij - A_ij_an)/abs(A_ij_an)<1e-9,
-                ExcMessage("System matrix is wrong"));
+    const auto & rhs_vector = pressure_solver.get_rhs_vector();
+    const double rate_A = well_A.get_control().value;
+    std::cout << "Rate A = " << rate_A << std::endl;
+    std::cout << "rhs_vector[4] = " << rhs_vector[4] << std::endl;
+    AssertThrow(abs(rhs_vector[4] - rate_A)/rate_A<DefaultValues::small_number,
+                ExcMessage("rhs entry 4 is wrong"));
 
     // // -----------------------------------------------------------------------
-    pressure_solver.solve();
+    // pressure_solver.solve();
     // const int n_pressure_iter = pressure_solver.solve();
     // std::cout << "Pressure solver " << n_pressure_iter << " steps" << std::endl;
 
