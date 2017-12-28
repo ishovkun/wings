@@ -103,7 +103,6 @@ namespace FluidSolvers
     // TrilinosWrappers::SparsityPattern         sparsity_pattern;
     TrilinosWrappers::SparseMatrix            system_matrix;
     std::vector<IndexSet>                     owned_partitioning;
-		IndexSet                                  locally_owned_dofs;
 
 
     // SparsityPattern
@@ -113,7 +112,7 @@ namespace FluidSolvers
   public:
     TrilinosWrappers::MPI::Vector solution, old_solution, rhs_vector;
     TrilinosWrappers::MPI::Vector relevant_solution;
-		IndexSet                      locally_relevant_dofs;
+		IndexSet                      locally_owned_dofs, locally_relevant_dofs;
   };
 
 
@@ -300,6 +299,8 @@ namespace FluidSolvers
           // std::cout << "------------------------------\n";
         } // end cell loop
 
+    system_matrix.compress(VectorOperation::add);
+    rhs_vector.compress(VectorOperation::add);
   } // eom
 
 
