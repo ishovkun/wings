@@ -1,0 +1,57 @@
+subsection Mesh
+
+Global refinement steps
+4 /
+
+Local refinement regions
+16, 24, 17.5, 22.5, 0 ,0 /
+
+Adaptive refinement steps
+4 /
+
+Mesh file
+domain.msh /
+
+#end
+# this is a comment
+
+subsection Well data
+
+Wells
+A, 0.1, (1.5, 0.5, 0.0) ;
+B, 0.01, (1.5, 2.5, 0.0; 2.5, 1.5, 0.0);
+C, 0.1, (1.5, 1.0, 0.0; 2.5, 1.0, 0.0; 3.5, 1.0, 0.0)
+/
+
+Schedule
+0, A, 0, 15, 0;
+1, A, 0, 0, 0;
+1, B, 4, 15, 0; /
+
+#end
+
+
+subsection Equation data
+
+Model                    SingleLiquid /
+Young modulus            1e8 /
+Poisson ratio            0.3 /
+Volume factor water      1 /
+Viscosity water          1e-3 /
+Density water            1000 /
+Compressibility water    5e-10 /
+Permeability
+include perm4x4_homog.dat /
+
+#end
+
+subsection Solver
+
+Time stepping        (0, 0.01); / # (1, 1); (4.5, 0.001); #(15, 5e-3) /
+Minimum time step    1e-5 /
+T max                100 /
+FSS tolerance        1e-8 /
+Max FSS steps        30 /
+
+#end
+

@@ -1,17 +1,20 @@
 # lib/CMakeLists.txt
 
 ADD_LIBRARY(wings SHARED
+  Simulator.hpp
+  Reader.hpp
+  KeywordReader.hpp
   CellValues.hpp
   PressureSolver.hpp
-  DataBase.hpp
+  Model.hpp
   BitMap.hpp
   Parsers.hpp
-  Units.cc
+  Units.h
   Tensors.hpp
-  Keywords.cc
+  Keywords.h
   Wellbore.hpp
-  Schedule.cc
-  DefaultValues.cc
+  Schedule.hpp
+  DefaultValues.h
   Math.hpp
 )
 

@@ -11,22 +11,26 @@
 #include <Wellbore.hpp>
 #include <Parsers.hpp>
 #include <BitMap.hpp>
-#include <Units.cc>
+#include <Units.h>
 #include <Tensors.hpp>
-#include <Keywords.cc>
+#include <Keywords.h>
 
 
-namespace Data
+namespace Model
 {
 	using namespace dealii;
 
+  enum ModelType {SingleLiquid, SingleGas, WaterOil, WaterGas, Blackoil,
+                  SingleLiquidElasticity, SingleGasElasticity,
+                  WaterOilElasticity, WaterGasElasticity, BlackoilElasticity};
+
   template <int dim>
-  class DataBase
+  class Model
   {
   public:
-    DataBase(MPI_Comm           &mpi_communicator_,
-             ConditionalOStream &pcout_);
-    // ~DataBase();
+    Model(MPI_Comm           &mpi_communicator_,
+          ConditionalOStream &pcout_);
+    // ~Model();
     void read_input(const std::string&,
                     const int verbosity_=0);
     void print_input();
@@ -104,7 +108,7 @@ namespace Data
 
 
   template <int dim>
-  DataBase<dim>::DataBase(MPI_Comm           &mpi_communicator_,
+  Model<dim>::Model(MPI_Comm           &mpi_communicator_,
                           ConditionalOStream &pcout_)
     :
     mpi_communicator(mpi_communicator_),
@@ -116,7 +120,7 @@ namespace Data
 
 
   template <int dim>
-  void DataBase<dim>::read_input(const std::string& file_name,
+  void Model<dim>::read_input(const std::string& file_name,
                                  const int verbosity_)
   {
     verbosity = verbosity_;
@@ -131,14 +135,14 @@ namespace Data
 
 
   template <int dim>
-  void DataBase<dim>::print_input()
+  void Model<dim>::print_input()
   {
     prm.print_parameters(std::cout, ParameterHandler::Text);
   }  // eom
 
 
   template <int dim>
-  double DataBase<dim>::compressibility_water() const
+  double Model<dim>::compressibility_water() const
   {
     return this->compressibility_w_constant;
   }  // eom
@@ -146,7 +150,7 @@ namespace Data
 
   template <int dim>
   inline
-  double DataBase<dim>::density_sc_water() const
+  double Model<dim>::density_sc_water() const
   {
     return this->density_sc_w_constant;
   }  // eom
@@ -154,28 +158,28 @@ namespace Data
 
   template <int dim>
   inline
-  double DataBase<dim>::gravity() const
+  double Model<dim>::gravity() const
   {
     return units.gravity();
   }  // eom
 
 
   template <int dim>
-  double DataBase<dim>::viscosity_water() const
+  double Model<dim>::viscosity_water() const
   {
     return this->viscosity_w_constant;
   }  // eom
 
 
   template <int dim>
-  double DataBase<dim>::volume_factor_water() const
+  double Model<dim>::volume_factor_water() const
   {
     return this->volume_factor_w_constant;
   }  // eom
 
 
   template <int dim>
-  void DataBase<dim>::parse_time_stepping()
+  void Model<dim>::parse_time_stepping()
   {
     // Parse time stepping table
     std::vector<Point<2> > tmp =
@@ -186,7 +190,7 @@ namespace Data
 
 
   template <int dim>
-  double DataBase<dim>::get_time_step(const double time) const
+  double Model<dim>::get_time_step(const double time) const
   /* get value of the time step from the time-stepping table */
   {
     double time_step = timestep_table.rbegin()->second;
@@ -203,7 +207,7 @@ namespace Data
 
 
   template <int dim>
-  void DataBase<dim>::declare_parameters()
+  void Model<dim>::declare_parameters()
   {
     { // Mesh
       prm.enter_subsection(keywords.section_mesh);
@@ -271,7 +275,7 @@ namespace Data
 
   template <int dim>
   Function<dim> *
-  DataBase<dim>::
+  Model<dim>::
   get_hetorogeneous_function_from_parameter(const std::string&   par_name,
                                             const Tensor<1,dim>& anisotropy)
   {
@@ -298,7 +302,7 @@ namespace Data
 
   template <int dim>
   boost::filesystem::path
-  DataBase<dim>::find_file_in_relative_path(const std::string fname)
+  Model<dim>::find_file_in_relative_path(const std::string fname)
   {
     if (verbosity > 0)
       std::cout << "Searching " << fname << std::endl;
@@ -312,14 +316,14 @@ namespace Data
 
 
   template <int dim>
-  int DataBase<dim>::get_well_id(const std::string& well_name) const
+  int Model<dim>::get_well_id(const std::string& well_name) const
   {
     return well_ids.find(well_name)->second;
   } // eom
 
 
   template <int dim>
-  std::vector<int> DataBase<dim>::get_well_ids() const
+  std::vector<int> Model<dim>::get_well_ids() const
   {
     std::vector<int> result;
     for(auto & id : well_ids)
@@ -329,7 +333,7 @@ namespace Data
 
 
   template <int dim>
-  void DataBase<dim>::assign_schedule(const std::string& text)
+  void Model<dim>::assign_schedule(const std::string& text)
   {
     /*
       Split first based on ";" - schedule entries
@@ -386,7 +390,7 @@ namespace Data
 
 
   template <int dim>
-  void DataBase<dim>::assign_wells(const std::string& text)
+  void Model<dim>::assign_wells(const std::string& text)
   {
     /*
       Keyword structure is as follows:
@@ -446,7 +450,7 @@ namespace Data
 
 
   template <int dim>
-  void DataBase<dim>::assign_parameters()
+  void Model<dim>::assign_parameters()
   {
     { // Mesh
       prm.enter_subsection(keywords.section_mesh);
@@ -523,7 +527,7 @@ namespace Data
 
 
   template <int dim>
-  void DataBase<dim>::update_well_controls(const double time)
+  void Model<dim>::update_well_controls(const double time)
   {
     for (unsigned int i=0; i<wells.size(); i++)
       wells[i].set_control(schedule.get_control(time, i));
@@ -531,7 +535,7 @@ namespace Data
 
 
   template <int dim>
-  void DataBase<dim>::locate_wells(const DoFHandler<dim>& dof_handler,
+  void Model<dim>::locate_wells(const DoFHandler<dim>& dof_handler,
                                    const FE_DGQ<dim>&     fe)
   {
     for (unsigned int i=0; i<wells.size(); i++)
@@ -542,7 +546,7 @@ namespace Data
   } // eom
 
   template <int dim>
-  void DataBase<dim>::update_well_productivities()
+  void Model<dim>::update_well_productivities()
   {
     for (auto & well : wells)
       well.update_productivity(this->get_permeability);

@@ -59,7 +59,7 @@ SET_TARGET_PROPERTIES (
 
 # set(CMAKE_BUILD_TYPE Debug)
 # targets
-ADD_EXECUTABLE(wings-pressure ${CMAKE_SOURCE_DIR}/src/wings_pressure.cc)
+ADD_EXECUTABLE(wings-pressure ${CMAKE_SOURCE_DIR}/src/wings.cc)
 DEAL_II_SETUP_TARGET(wings-pressure)
 
 ADD_CUSTOM_TARGET(debug

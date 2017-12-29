@@ -4,6 +4,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/spirit/include/qi.hpp>
+#include <regex>
 
 namespace Parsers {
 	using namespace dealii;
@@ -234,4 +235,42 @@ namespace Parsers {
       }
   }  // eof
 
+
+  void strip_comments(std::string &text,
+                      const std::string &begin_comment="#",
+                      const std::string &end_comment="\n")
+  {
+    std::regex re(begin_comment + "[^" + end_comment + "]*" + end_comment);
+    // std::cout << std::regex_replace(text, re, "");
+    text = std::regex_replace(text, re, "\n");
+  }
+
+
+  std::string find_substring(const std::string &text,
+                             const std::string &begin,
+                             const std::string &end)
+  {
+    std::string result;
+    // std::regex re(begin + "^(?!" + end + ").*");
+    std::regex re(begin+"[\\s\\S]+?"+end);
+    std::sregex_iterator
+      sec(text.begin(), text.end(), re),
+      sec_end;
+
+    AssertThrow(sec!=sec_end,
+                ExcMessage("no match found for\n " + begin+"\t"+end));
+
+    for (; sec!=sec_end; ++sec)
+    {
+      // std::cout << "shit" << "\n";
+      std::smatch match = *sec;
+      const auto match_str = match.str();
+      // std::cout << match.str() << "\n";
+      result += match_str.substr(begin.size(),
+                                 match_str.size()-end.size()-begin.size());
+    }
+    // std::cout << std::regex_replace(text, re, "");
+    // text = std::regex_replace(text, re, "\n");
+    return result;
+  }
 } // end of namespace

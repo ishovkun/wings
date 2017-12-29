@@ -9,8 +9,8 @@
 #include <deal.II/base/quadrature_lib.h>
 #include <math.h>
 
-#include <DefaultValues.cc>
-#include <Schedule.cc>
+#include <DefaultValues.h>
+#include <Schedule.hpp>
 #include <Math.hpp>
 
 
