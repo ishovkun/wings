@@ -34,8 +34,8 @@ Schedule
 subsection Equation data
 
 Model                    SingleLiquid /
-Young modulus            1e8 /
-Poisson ratio            0.3 /
+# Young modulus            1e8 /
+# Poisson ratio            0.3 /
 Volume factor water      1 /
 Viscosity water          1e-3 /
 Density water            1000 /

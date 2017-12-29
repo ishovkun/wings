@@ -27,13 +27,16 @@ namespace Model
   template <int dim>
   class Model
   {
+
+    // template<int dim> Model<dim>
+    // friend class Parsers::Reader;
   public:
     Model(MPI_Comm           &mpi_communicator_,
           ConditionalOStream &pcout_);
     // ~Model();
-    void read_input(const std::string&,
-                    const int verbosity_=0);
-    void print_input();
+    // void read_input(const std::string&,
+    //                 const int verbosity_=0);
+    // void print_input();
 
     // Functions of a coordinate
     Function<dim> *get_young_modulus,
@@ -59,7 +62,7 @@ namespace Model
     void update_well_productivities();
 
 
-  private:
+  protected:
     void declare_parameters();
     void assign_parameters();
     void compute_runtime_parameters();
@@ -78,7 +81,6 @@ namespace Model
     MPI_Comm                               &mpi_communicator;
     ConditionalOStream                     &pcout;
     int                                    initial_refinement_level,
-                                           n_prerefinement_steps,
                                            n_adaptive_steps;
     std::vector<std::pair<double,double>>  local_prerefinement_region;
     Units::Units                           units;
@@ -86,7 +88,7 @@ namespace Model
     boost::filesystem::path                mesh_file;
     std::vector< Wellbore::Wellbore<dim> > wells;
     Schedule::Schedule                     schedule;
-  private:
+  protected:
     std::string                            mesh_file_name, input_file_name;
     double                                 volume_factor_w_constant,
                                            viscosity_w_constant,
@@ -104,41 +106,52 @@ namespace Model
     std::map<std::string, int>             well_ids;
 
     int                                    verbosity;
+  public:
+    // set data
+    void set_volume_factor_w(const double x)
+    {volume_factor_w_constant = x;}
+    void set_compressibility_w(const double x)
+    {compressibility_w_constant = x;}
+    void set_viscosity_w(const double x)
+    {viscosity_w_constant = x;}
+    void set_density_sc_w(const double x)
+    {density_sc_w_constant = x;}
+
   };  // eom
 
 
   template <int dim>
   Model<dim>::Model(MPI_Comm           &mpi_communicator_,
-                          ConditionalOStream &pcout_)
+                    ConditionalOStream &pcout_)
     :
     mpi_communicator(mpi_communicator_),
     pcout(pcout_)
   {
-    declare_parameters();
+    // declare_parameters();
     verbosity = 0;
   }  // eom
 
 
-  template <int dim>
-  void Model<dim>::read_input(const std::string& file_name,
-                                 const int verbosity_)
-  {
-    verbosity = verbosity_;
-    if (verbosity > 0)
-      std::cout << "Reading " << file_name << std::endl;
-    input_file_name = file_name;
-    prm.parse_input(file_name);
-    assign_parameters();
-    // compute_runtime_parameters();
-    // check_input();
-  }  // eom
+  // template <int dim>
+  // void Model<dim>::read_input(const std::string& file_name,
+  //                                const int verbosity_)
+  // {
+  //   verbosity = verbosity_;
+  //   if (verbosity > 0)
+  //     std::cout << "Reading " << file_name << std::endl;
+  //   input_file_name = file_name;
+  //   prm.parse_input(file_name);
+  //   assign_parameters();
+  //   // compute_runtime_parameters();
+  //   // check_input();
+  // }  // eom
 
 
-  template <int dim>
-  void Model<dim>::print_input()
-  {
-    prm.print_parameters(std::cout, ParameterHandler::Text);
-  }  // eom
+  // template <int dim>
+  // void Model<dim>::print_input()
+  // {
+  //   prm.print_parameters(std::cout, ParameterHandler::Text);
+  // }  // eom
 
 
   template <int dim>
@@ -203,73 +216,6 @@ namespace Model
       }
 
     return time_step;
-  }  // eom
-
-
-  template <int dim>
-  void Model<dim>::declare_parameters()
-  {
-    { // Mesh
-      prm.enter_subsection(keywords.section_mesh);
-      prm.declare_entry(keywords.mesh_file,
-                        "", Patterns::Anything());
-      prm.declare_entry(keywords.global_refinement_steps,
-                        "0", Patterns::Integer(0, 100));
-      prm.declare_entry(keywords.adaptive_refinement_steps,
-                        "0", Patterns::Integer(0, 100));
-      prm.declare_entry(keywords.local_refinement_regions,
-                        "", Patterns::List(Patterns::Double()));
-      prm.leave_subsection();
-    }
-
-    { // wells
-      prm.enter_subsection(keywords.section_wells);
-      prm.declare_entry(keywords.well_parameters,
-                        "", Patterns::Anything());
-      prm.declare_entry(keywords.well_schedule,
-                        "", Patterns::Anything());
-      prm.leave_subsection();
-    }
-
-    { // equation data
-      prm.enter_subsection(keywords.section_equation_data);
-      // Constant parameters
-      prm.declare_entry(keywords.unit_system, "SI",
-                        Patterns::Selection("SI|Field"));
-      prm.declare_entry(keywords.young_modulus, "1e9",
-                        Patterns::Anything());
-      prm.declare_entry(keywords.poisson_ratio, "0.3",
-                        Patterns::Double(0, 0.5));
-      prm.declare_entry(keywords.volume_factor_water, "1",
-                        Patterns::Anything());
-      prm.declare_entry(keywords.viscosity_water, "1e-3",
-                        Patterns::Double());
-      prm.declare_entry(keywords.compressibility_water, "1e-8",
-                        Patterns::Double());
-      prm.declare_entry(keywords.density_sc_water, "1000",
-                        Patterns::Double());
-      prm.declare_entry(keywords.permeability, "1e-12",
-                        Patterns::Anything());
-      prm.declare_entry(keywords.porosity, "0.3",
-                        Patterns::Anything());
-      prm.leave_subsection();
-    }
-    { // Solver
-      prm.enter_subsection(keywords.section_solver);
-      prm.declare_entry(keywords.t_max, "1",
-                        Patterns::Double());
-      prm.declare_entry(keywords.time_stepping, "(0, 1e-3)",
-                        Patterns::Anything());
-      prm.declare_entry(keywords.minimum_time_step, "1e-9",
-                        Patterns::Double());
-      prm.declare_entry(keywords.fss_tolerance, "1e-9",
-                        Patterns::Double());
-      prm.declare_entry(keywords.max_fss_steps, "30",
-                        Patterns::Integer());
-      // prm.declare_entry("Newton tolerance", "1e-9", Patterns::Double());
-      // prm.declare_entry("Max Newton steps", "20", Patterns::Integer());
-      prm.leave_subsection();
-    }
   }  // eom
 
 
