@@ -32,6 +32,10 @@ namespace Parsers {
 
   protected:
     void read_file(const std::string& fname);
+    void assign_wells(const std::string   &kwd,
+                      const KeywordReader &kwd_reader);
+    void assign_schedule(const std::string   &kwd,
+                         const KeywordReader &kwd_reader);
 
     ConditionalOStream                     &pcout;
     Model::Model<3>                        &model;
@@ -120,66 +124,90 @@ namespace Parsers {
 
     } // end equation data
 
-
+    {  // equation data
+      kwd_reader.enter_subsection(kwds.section_wells);
+      assign_wells(kwds.well_parameters, kwd_reader);
+      assign_schedule(kwds.well_schedule, kwd_reader);
+    }
   } // eom
 
 
-  // void Reader::assign_wells(const std::string& text)
-  // {
-  //   /*
-  //     Keyword structure is as follows:
-  //     string well_name
-  //     double radius
-  //     comma-semicolon-separated list locations
-  //     example
-  //     [Well1, 0.1, 1, (1,1; 2,2)], [Well2, 0.1, 1, (1,1; 2,2)]
-  //   */
-  //   const auto & delim = std::pair<std::string,std::string>("[","]");
-  //   std::vector<std::string> split =
-  //     Parsers::split_bracket_group(text, delim);
+  void Reader::assign_wells(const std::string   &kwd,
+                            const KeywordReader &kwd_reader)
+  {
+    const auto well_list = kwd_reader.get_str_list(kwd, std::string(";"));
+    for (const auto & w : well_list)
+    { // loop over individual wells
+      // std::cout << w << std::endl;
+      std::vector<std::string> well_strs;
+      boost::split(well_strs, w, boost::is_any_of(","));
+      for (auto & entry : well_strs)
+        boost::trim(entry);
 
-  //   for (auto & item : split)
-  //   {
-  //     // std::cout << item << std::endl;
-  //     const auto & str_params = Parsers::split_ignore_brackets(item);
-  //     const std::string well_name = str_params[0];
-  //     const double radius = Parsers::convert<double>(str_params[1]);
-  //     // separate separate points
-  //     std::vector<std::string> point_strs;
-  //     std::vector< Point<dim> > locations;
-  //     boost::algorithm::split(point_strs, str_params[2], boost::is_any_of(";"));
-  //     for (auto & point_str : point_strs)
-  //     {
-  //       const auto & point = Parsers::parse_string_list<double>(point_str);
-  //       AssertThrow(point.size() == dim,
-  //                   ExcMessage("Dimensions don't match"));
-  //       Point<dim> p;
-  //       for (int d=0; d<dim; d++)
-  //         p[d] = point[d];
-  //       locations.push_back(p);
-  //     }
+      AssertThrow(well_strs.size()>=5,
+                  ExcMessage("Wrong entry in well "+well_strs[0]));
+      AssertThrow((well_strs.size()-2)%3 == 0,
+                  ExcMessage("Wrong entry in well "+well_strs[0]));
 
-  //     Wellbore::Wellbore<dim> w(locations, radius, mpi_communicator);
-  //     this->wells.push_back(w);
+      // name
+      const std::string name = well_strs[0];
+      // radius
+      const double r = Parsers::convert<double>(well_strs[1]);
+      // parse locations
+      unsigned int n_loc = (well_strs.size()-2) / 3;
+      const int dim = 3;
+      std::vector<Point<dim>> locations(n_loc);
+      int loc=0;
+      for (unsigned int i=2; i<well_strs.size(); i+=dim)
+      {
+        double x = Parsers::convert<double>(well_strs[i]);
+        double y = Parsers::convert<double>(well_strs[i+1]);
+        double z = Parsers::convert<double>(well_strs[i+2]);
+        locations[loc] = Point<dim>(x,y,z);
+        loc++;
+      }
 
-  //     // check if well_id is in unique_well_ids and add if not
-  //     if (well_ids.empty())
-  //       well_ids[well_name] = 0;
-  //     else
-  //     {
-  //       std::map<std::string, int>::iterator
-  //         it = well_ids.begin(),
-  //         end = well_ids.end();
+      model.add_well(name, r, locations);
 
-  //       for (; it!=end; it++)
-  //       {
-  //         AssertThrow(it->first != well_name, ExcMessage("Duplicates in wells"));
-  //       }
+    } // end well loop
+  }  // eom
 
-  //       const int id = well_ids.size();
-  //       well_ids[well_name] = id;
-  //     }
-  //   }
-  // }  // eom
+  void Reader::assign_schedule(const std::string   &kwd,
+                               const KeywordReader &kwd_reader)
+  {
+    const auto lines = kwd_reader.get_str_list(kwd, std::string(";"));
+    for (auto & line : lines)
+    {
+      // std::cout << line << std::endl;
+      std::vector<std::string> entries;
+      boost::algorithm::split(entries, line, boost::is_any_of(","));
+      // Handle case when the last entry in schedule ends with ";"
+      // Boost thinks that there is something after
+      if (entries.size() == 1 && entries[0].size() == 0)
+        break;
+      // Process entries
+      AssertThrow(entries.size() >= 4,
+                  ExcMessage("Wrong entry in schedule "+line));
 
+      Schedule::ScheduleEntry schedule_entry;
+      // get time
+      schedule_entry.time = Parsers::convert<double>(entries[0]);
+      // get well name and identifier
+      std::string well_name = entries[1];
+      // std::cout << "well name = " << well_name << std::endl;
+      boost::algorithm::trim(well_name);
+      schedule_entry.well_id = model.get_well_id(well_name);
+      // get control type
+      const int control_type_id = Parsers::convert<int>(entries[2]);
+      schedule_entry.control.type =
+        Schedule::well_control_type_indexing.find(control_type_id)->second;
+      // get control value
+      schedule_entry.control.value = Parsers::convert<double>(entries[3]);
+      // get skin
+      if (entries.size() > 4)
+          schedule_entry.control.skin = Parsers::convert<double>(entries[4]);
+
+      model.schedule.add_entry(schedule_entry);
+    } // end lines loop
+  } // eom
 } // end of namespace

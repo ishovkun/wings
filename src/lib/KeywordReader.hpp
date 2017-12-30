@@ -9,14 +9,16 @@ namespace Parsers
     KeywordReader(std::string &text_);
     void enter_subsection(const std::string& kwd);
     double get_double(const std::string & kwd,
-                      const double default_value);
-    double get_double(const std::string & kwd);
+                      const double default_value) const;
+    double get_double(const std::string & kwd) const;
     int get_int(const std::string & kwd,
-                const int default_value);
-    int get_int(const std::string & kwd);
+                const int default_value) const;
+    int get_int(const std::string & kwd) const;
     std::string get(const std::string &kwd,
-                    const std::string default_value);
-    std::string get(const std::string &kwd);
+                    const std::string default_value) const;
+    std::string get(const std::string &kwd) const;
+    std::vector<std::string> get_str_list(const std::string &kwd,
+                                          const std::string &delimiter) const;
 
   private:
     std::string text, active_text;
@@ -47,7 +49,7 @@ namespace Parsers
   } // eom
 
 
-  int KeywordReader::get_int(const std::string &kwd)
+  int KeywordReader::get_int(const std::string &kwd) const
   {
     std::string txt = get(kwd);
     return Parsers::convert<int>(txt);
@@ -55,7 +57,7 @@ namespace Parsers
 
 
   int KeywordReader::get_int(const std::string &kwd,
-                                const int default_value)
+                             const int default_value) const
   {
     try
     {
@@ -69,7 +71,7 @@ namespace Parsers
   } // eom
 
 
-  double KeywordReader::get_double(const std::string &kwd)
+  double KeywordReader::get_double(const std::string &kwd) const
   {
     std::string txt = get(kwd);
     return Parsers::convert<double>(txt);
@@ -77,7 +79,7 @@ namespace Parsers
 
 
   double KeywordReader::get_double(const std::string &kwd,
-                                   const double default_value)
+                                   const double default_value) const
   {
     try
     {
@@ -91,7 +93,7 @@ namespace Parsers
   } // eom
 
 
-  std::string KeywordReader::get(const std::string &kwd)
+  std::string KeywordReader::get(const std::string &kwd) const
   {
     std::string raw_result = Parsers::find_substring(active_text, kwd, kwd_close);
     boost::trim(raw_result);
@@ -100,7 +102,7 @@ namespace Parsers
 
 
   std::string KeywordReader::get(const std::string &kwd,
-                                 const std::string default_value)
+                                 const std::string default_value) const
   {
     try
     {
@@ -112,4 +114,16 @@ namespace Parsers
     }
     return default_value;
   } // eom
+
+
+  std::vector<std::string>
+  KeywordReader::get_str_list(const std::string &kwd,
+                              const std::string &delimiter) const
+  {
+    std::string raw_result = get(kwd);
+    std::vector<std::string> result;
+    boost::algorithm::split(result, raw_result, boost::is_any_of(delimiter));
+    return result;
+  }  // eom
+
 }

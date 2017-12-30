@@ -2,25 +2,28 @@ subsection Mesh
 
 Global refinement steps
 4 /
-
 Local refinement regions
 16, 24, 17.5, 22.5, 0 ,0 /
-
 Adaptive refinement steps
 4 /
-
 Mesh file
 domain.msh /
 
-#end
 # this is a comment
 
 subsection Well data
 
 Wells
-A, 0.1, (1.5, 0.5, 0.0) ;
-B, 0.01, (1.5, 2.5, 0.0; 2.5, 1.5, 0.0);
-C, 0.1, (1.5, 1.0, 0.0; 2.5, 1.0, 0.0; 3.5, 1.0, 0.0)
+# name r coords
+A, 0.1,
+1.5, 0.5, 0.0; # this defines a vertical well occupying one cell
+B, 0.01,
+1.5, 2.5, 0.0,
+2.5, 1.5, 0.0;
+C, 0.1,
+1.5, 1.0, 0.0,
+2.5, 1.0, 0.0,
+3.5, 1.0, 0.0
 /
 
 Schedule
@@ -33,17 +36,15 @@ Schedule
 
 subsection Equation data
 
-Model                    SingleLiquid /
-# Young modulus            1e8 /
-# Poisson ratio            0.3 /
-Volume factor water      1 /
-Viscosity water          1e-3 /
-Density water            1000 /
-Compressibility water    5e-10 /
+Model                 SingleLiquid /
+# Young modulus       1e8 /
+# Poisson ratio       0.3 /
+Volume factor water   1 /
+Viscosity water       1e-3 /
+Density water         1000 /
+Compressibility water 5e-10 /
 Permeability
 include perm4x4_homog.dat /
-
-#end
 
 subsection Solver
 

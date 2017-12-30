@@ -36,7 +36,7 @@ namespace Wings
     Model::Model<dim>                         model;
     // FluidSolvers::PressureSolver<dim>         pressure_solver;
     std::string                               input_file;
-    TimerOutput                               computing_timer;
+    // TimerOutput                               computing_timer;
   };
 
 
@@ -48,9 +48,9 @@ namespace Wings
     pcout(std::cout, (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)),
     model(mpi_communicator, pcout),
     // pressure_solver(mpi_communicator, triangulation, data, pcout),
-    input_file(input_file_name_),
-    computing_timer(mpi_communicator, pcout,
-                    TimerOutput::summary, TimerOutput::wall_times)
+    input_file(input_file_name_)
+    // ,computing_timer(mpi_communicator, pcout,
+    //                 TimerOutput::summary, TimerOutput::wall_times)
   {}
 
 
