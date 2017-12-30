@@ -11,6 +11,8 @@
 #include <deal.II/distributed/tria.h>
 
 // Custom modules
+#include <Model.hpp>
+#include <Reader.hpp>
 #include <Wellbore.hpp>
 #include <PressureSolver.hpp>
 #include <Parsers.hpp>
@@ -36,7 +38,7 @@ namespace Wings
     MPI_Comm                                  mpi_communicator;
     parallel::distributed::Triangulation<dim> triangulation;
     ConditionalOStream                        pcout;
-    Data::DataBase<dim>                       data;
+    Model::Model<dim>                         data;
     FluidSolvers::PressureSolver<dim>         pressure_solver;
     std::string                               input_file;
     // TimerOutput                               computing_timer;
@@ -99,10 +101,8 @@ namespace Wings
   template <int dim>
   void WingsPressure<dim>::run()
   {
-    data.read_input(input_file, /* verbosity = */ 0);
-    // data.read_input(input_file, /* verbosity = */ 1);
-    // data.print_input();
-    // std::cout << "reading mesh file " << data.mesh_file.string() << std::endl;
+    Parsers::Reader reader(pcout, data);
+    reader.read_input(input_file, /* verbosity= */0);
     read_mesh();
 
     refine_mesh();
@@ -172,7 +172,7 @@ namespace Wings
                 ExcMessage("Wrong J index well B"));
 
     double time = 1;
-    double time_step = data.get_time_step(time);
+    double time_step = data.min_time_step;
     // some init values
     pressure_solver.solution = 0;
     pressure_solver.solution[0] = 1;
@@ -289,7 +289,7 @@ int main(int argc, char *argv[])
     dealii::deallog.depth_console (0);
     Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
     // std::string input_file_name = Parsers::parse_command_line(argc, argv);
-    std::string input_file_name = SOURCE_DIR "/../data/test4x4-homog.prm";
+    std::string input_file_name = SOURCE_DIR "/../data/sf-4x4.data";
     Wings::WingsPressure<3> problem(input_file_name);
     problem.run();
     return 0;

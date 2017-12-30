@@ -259,7 +259,6 @@ int main(int argc, char *argv[])
     using namespace dealii;
     dealii::deallog.depth_console (0);
     Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
-    // std::string input_file_name = SOURCE_DIR "/../data/test4x4-homog.prm";
     std::string input_file_name = SOURCE_DIR "/../data/sf-4x4.data";
     WingTest::TestSPO<3> problem(input_file_name);
     problem.run();

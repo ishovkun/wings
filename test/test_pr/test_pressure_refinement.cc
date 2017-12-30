@@ -17,10 +17,13 @@
   - finally, the system is solved but the resulting pressure not checked
  */
 
+#include <deal.II/base/conditional_ostream.h>
 #include <deal.II/grid/grid_in.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
 // Custom modules
+#include <Model.hpp>
+#include <Reader.hpp>
 #include <Wellbore.hpp>
 #include <PressureSolver.hpp>
 #include <Parsers.hpp>
@@ -46,7 +49,7 @@ namespace Wings
     MPI_Comm                                  mpi_communicator;
     parallel::distributed::Triangulation<dim> triangulation;
     ConditionalOStream                        pcout;
-    Data::DataBase<dim>                       data;
+    Model::Model<dim>                         data;
     FluidSolvers::PressureSolver<dim>         pressure_solver;
     std::string                               input_file;
   };
@@ -109,9 +112,8 @@ namespace Wings
   template <int dim>
   void WingsPressure<dim>::run()
   {
-    data.read_input(input_file, /* verbosity = */ 0);
-    // data.read_input(input_file, /* verbosity = */ 1);
-    // data.print_input();
+    Parsers::Reader reader(pcout, data);
+    reader.read_input(input_file, /* verbosity= */0);
     read_mesh();
     refine_mesh();
     // return;
@@ -180,7 +182,7 @@ namespace Wings
     pressure_solver.old_solution = pressure_solver.solution;
 
     double time = 1;
-    double time_step = data.get_time_step(time);
+    double time_step = data.min_time_step;
 
     data.update_well_controls(time);
 
@@ -475,7 +477,7 @@ int main(int argc, char *argv[])
     using namespace dealii;
     dealii::deallog.depth_console (0);
     Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
-    std::string input_file_name = SOURCE_DIR "/../data/test4x4-homog.prm";
+    std::string input_file_name = SOURCE_DIR "/../data/sf-4x4.data";
     Wings::WingsPressure<3> problem(input_file_name);
     problem.run();
     return 0;
