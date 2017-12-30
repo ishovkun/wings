@@ -63,6 +63,19 @@ namespace Parsers {
 	}  // eom
 
 
+  template<int dim>
+  Tensor<1,dim> convert(const std::vector<double> v)
+  {
+    AssertThrow(v.size() == dim, ExcDimensionMismatch(v.size(), dim));
+
+    Tensor<1,dim> result;
+    for (int i=0; i<dim; ++i)
+      result[i] = v[i];
+
+    return result;
+  } // eom
+
+
   template <int dim>
   std::vector< Point<dim> > parse_point_list(const std::string &str)
   {
@@ -247,18 +260,20 @@ namespace Parsers {
 
 
   std::string find_substring(const std::string &text,
-                             const std::string &begin,
-                             const std::string &end)
+                             const std::string  &re_str,
+                             const unsigned int cut_prefix=0,
+                             const unsigned int cut_suffix=0)
   {
     std::string result;
     // std::regex re(begin + "^(?!" + end + ").*");
-    std::regex re(begin+"[\\s\\S]+?"+end);
+    // std::regex re(begin+"[\\s\\S]+?"+end);
+    std::regex re(re_str);
     std::sregex_iterator
       sec(text.begin(), text.end(), re),
       sec_end;
 
     AssertThrow(sec!=sec_end,
-                ExcMessage("no match found for\n " + begin+"\t"+end));
+                ExcMessage("no match found for\n " + re_str));
 
     for (; sec!=sec_end; ++sec)
     {
@@ -266,11 +281,22 @@ namespace Parsers {
       std::smatch match = *sec;
       const auto match_str = match.str();
       // std::cout << match.str() << "\n";
-      result += match_str.substr(begin.size(),
-                                 match_str.size()-end.size()-begin.size());
+      result += match_str.substr(cut_prefix,
+                                  match_str.size()-cut_suffix-cut_prefix);
     }
     // std::cout << std::regex_replace(text, re, "");
     // text = std::regex_replace(text, re, "\n");
     return result;
   }
+
+
+  std::string find_substring(const std::string &text,
+                             const std::string &begin,
+                             const std::string &end)
+  {
+    std::string re_str(begin+"[\\s\\S]+?"+end);
+    return find_substring(text, re_str, begin.size(), end.size());
+
+  } // eom
+
 } // end of namespace

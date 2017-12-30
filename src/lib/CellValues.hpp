@@ -1,6 +1,6 @@
 #pragma once
 
-#include <DataBase.hpp>
+#include <Model.hpp>
 #include <Math.hpp>
 // #include <DefaultValues.cc>
 
@@ -16,7 +16,7 @@ namespace CellValues
   class CellValuesBase
   {
   public:
-    CellValuesBase(const Data::DataBase<dim> &data_);
+    CellValuesBase(const Model::Model<dim> &model_);
     virtual void update(const CellIterator<dim> &cell);
     virtual double get_mass_matrix_entry() const;
     virtual void update_face_values(const CellValuesBase<dim> &neighbor_data,
@@ -28,16 +28,16 @@ namespace CellValues
    public:
     double Q, J, T_face, G_face;
    private:
-    const Data::DataBase<dim>  &data;
+    const Model::Model<dim>  &model;
     double phi, mu_w, B_w, C_w, cell_volume;
     Vector<double> k;
   };
 
 
   template <int dim>
-  CellValuesBase<dim>::CellValuesBase(const Data::DataBase<dim> &data_)
+  CellValuesBase<dim>::CellValuesBase(const Model::Model<dim> &model_)
     :
-    data(data_),
+    model(model_),
     k(dim)
   {}
 
@@ -46,16 +46,16 @@ namespace CellValues
   void
   CellValuesBase<dim>::update(const CellIterator<dim> &cell)
   {
-    data.get_permeability->vector_value(cell->center(), k);
-    mu_w = data.viscosity_water();
-    B_w = data.volume_factor_water();
-    phi = data.get_porosity->value(cell->center());
-    C_w = data.compressibility_water();
+    model.get_permeability->vector_value(cell->center(), k);
+    mu_w = model.viscosity_water();
+    B_w = model.volume_factor_water();
+    phi = model.get_porosity->value(cell->center());
+    C_w = model.compressibility_water();
     cell_volume = cell->measure();
     // calculate source term
     Q = 0;
     J = 0;
-    for (const auto & well : data.wells)
+    for (const auto & well : model.wells)
     {
       std::pair<double,double> J_and_Q = well.get_J_and_Q(cell);
       J += J_and_Q.first;
@@ -103,8 +103,8 @@ namespace CellValues
       }
 
     // G_face = data.density_sc_water()/B_w_face*data.gravity()*T_face*dx[2]*face_normal[2];
-    G_face = data.density_sc_water()/B_w_face/B_w_face/mu_w_face *
-      data.gravity()*k_face[2]*face_normal[2]*face_area;
+    G_face = model.density_sc_water()/B_w_face/B_w_face/mu_w_face *
+      model.gravity()*k_face[2]*face_normal[2]*face_area;
 
     // return T;
 

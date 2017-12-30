@@ -3,7 +3,7 @@
 ADD_LIBRARY(wings SHARED
   Simulator.hpp
   Reader.hpp
-  KeywordReader.hpp
+  SyntaxParser.hpp
   CellValues.hpp
   PressureSolver.hpp
   Model.hpp

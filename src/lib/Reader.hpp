@@ -15,7 +15,7 @@
 #include <Units.h>
 #include <Tensors.hpp>
 #include <Keywords.h>
-#include <KeywordReader.hpp>
+#include <SyntaxParser.hpp>
 #include <Model.hpp>
 
 
@@ -32,15 +32,20 @@ namespace Parsers {
 
   protected:
     void read_file(const std::string& fname);
-    void assign_wells(const std::string   &kwd,
-                      const KeywordReader &kwd_reader);
-    void assign_schedule(const std::string   &kwd,
-                         const KeywordReader &kwd_reader);
+    void assign_wells(const std::string  &kwd,
+                      const SyntaxParser &parser);
+    void assign_schedule(const std::string  &kwd,
+                         const SyntaxParser &parser);
+    Function<3> *
+    get_function(const std::string  &kwd,
+                 const Tensor<1,3>    &anisotropy,
+                 const SyntaxParser &parser);
 
     ConditionalOStream                     &pcout;
     Model::Model<3>                        &model;
     int                                    verbosity;
     std::string                            input_text;
+    std::string                            input_file_name;
   }; //
 
 
@@ -49,7 +54,8 @@ namespace Parsers {
     :
     pcout(pcout_),
     model(model_),
-    verbosity(0)
+    verbosity(0),
+    input_file_name("")
   {}  // eom
 
 
@@ -68,22 +74,27 @@ namespace Parsers {
                      const int verbosity_)
   {
     verbosity = verbosity_;
+    input_file_name = fname;
     read_file(fname);
     Parsers::strip_comments(input_text, "#");
     if (verbosity > 1)
       std::cout << input_text << std::endl;
     Keywords::Keywords kwds;
-    KeywordReader kwd_reader(input_text);
+    SyntaxParser parser(input_text);
     { // Mesh
-      kwd_reader.enter_subsection(kwds.section_mesh);
+      parser.enter_subsection(kwds.section_mesh);
       model.initial_refinement_level =
-        kwd_reader.get_int(kwds.global_refinement_steps, 0);
+        parser.get_int(kwds.global_refinement_steps, 0);
       model.n_adaptive_steps =
-        kwd_reader.get_int(kwds.adaptive_refinement_steps, 0);
+        parser.get_int(kwds.adaptive_refinement_steps, 0);
+      model.mesh_file =
+        boost::filesystem::path(fname).parent_path() /
+        parser.get(kwds.mesh_file);
+      // std::cout << model.mesh_file << std::endl;
     }
     {  // equation data
-      kwd_reader.enter_subsection(kwds.section_equation_data);
-      std::string model_type_str = kwd_reader.get(kwds.model_type);
+      parser.enter_subsection(kwds.section_equation_data);
+      std::string model_type_str = parser.get(kwds.model_type);
       // std::cout << model_type_str << std::endl;
 
       Model::ModelType model_type(Model::ModelType::SingleLiquid);
@@ -99,15 +110,29 @@ namespace Parsers {
       //   model_type = Model::ModelType::Blackoil;
       else
         AssertThrow(false, ExcMessage("Wrong entry in " + kwds.model_type));
-      // std::cout << "type w " << (model_type == Model::ModelType::SingleLiquid) << std::endl;
+
+      {// Permeability & porosity
+        const int dim = 3;
+        std::vector<double> default_anisotropy{1,1,1};
+        Tensor<1,dim> no_anisotropy = Parsers::convert<dim>(default_anisotropy);
+        Tensor<1,dim> anisotropy = Parsers::convert<dim>
+          (parser.get_double_list(kwds.permeability_anisotropy, ",",
+                                  default_anisotropy));
+        model.get_permeability =
+          get_function(kwds.permeability, anisotropy, parser);
+
+        model.get_porosity =
+          get_function(kwds.porosity, no_anisotropy, parser);
+      }
+
 
       if (model_type != Model::ModelType::SingleGas &&
           model_type != Model::ModelType::SingleGasElasticity)
       {
-        const double bw = kwd_reader.get_double(kwds.volume_factor_water, 1.0);
-        const double muw = kwd_reader.get_double(kwds.viscosity_water, 1e-3);
-        const double rhow = kwd_reader.get_double(kwds.density_sc_water, 1e+3);
-        const double cw = kwd_reader.get_double(kwds.compressibility_water, 5e-10);
+        const double bw = parser.get_double(kwds.volume_factor_water, 1.0);
+        const double muw = parser.get_double(kwds.viscosity_water, 1e-3);
+        const double rhow = parser.get_double(kwds.density_sc_water, 1e+3);
+        const double cw = parser.get_double(kwds.compressibility_water, 5e-10);
         model.set_viscosity_w(muw);
         model.set_compressibility_w(cw);
         model.set_density_sc_w(rhow);
@@ -119,23 +144,64 @@ namespace Parsers {
           model_type == Model::ModelType::WaterOilElasticity ||
           model_type == Model::ModelType::BlackoilElasticity)
       {
-        kwd_reader.get(kwds.volume_factor_oil);
+        parser.get(kwds.volume_factor_oil);
       }
 
     } // end equation data
 
     {  // equation data
-      kwd_reader.enter_subsection(kwds.section_wells);
-      assign_wells(kwds.well_parameters, kwd_reader);
-      assign_schedule(kwds.well_schedule, kwd_reader);
+      parser.enter_subsection(kwds.section_wells);
+      assign_wells(kwds.well_parameters, parser);
+      assign_schedule(kwds.well_schedule, parser);
+    }
+    {  // solver
+      parser.enter_subsection(kwds.section_solver);
+      model.min_time_step =
+        parser.get_double(kwds.minimum_time_step, 1e-10);
     }
   } // eom
 
 
-  void Reader::assign_wells(const std::string   &kwd,
-                            const KeywordReader &kwd_reader)
+  Function<3> *
+  Reader::get_function(const std::string  &kwd,
+                       const Tensor<1,3>  &anisotropy,
+                       const SyntaxParser &parser)
   {
-    const auto well_list = kwd_reader.get_str_list(kwd, std::string(";"));
+    const int dim = 3;
+    const auto kwd_list =
+      parser.get_str_list(kwd, std::string("\t "));
+
+    std::string entry = kwd_list[0];
+
+    if (entry == "bitmap" && kwd_list.size() == 2)
+    { // create bitmap function
+      if (verbosity > 0)
+        std::cout << "Searching " << kwd_list[1] << std::endl;
+
+      boost::filesystem::path data_file =
+        boost::filesystem::path(input_file_name).parent_path() / kwd_list[1];
+
+      return new BitMap::BitMapFunction<dim>(data_file.string(),
+                                             anisotropy);
+    }
+    else if (Parsers::is_number(entry) && kwd_list.size() == 1)
+    { // create constant function
+      std::vector<double> quantity;
+      for (int c=0; c<dim; c++)
+        quantity.push_back(boost::lexical_cast<double>(entry)*anisotropy[c]);
+      return new ConstantFunction<dim>(quantity);
+    }
+    else
+      AssertThrow(false, ExcNotImplemented());
+
+    return new ConstantFunction<dim>(0);
+  } // eom
+
+
+  void Reader::assign_wells(const std::string  &kwd,
+                            const SyntaxParser &parser)
+  {
+    const auto well_list = parser.get_str_list(kwd, std::string(";"));
     for (const auto & w : well_list)
     { // loop over individual wells
       // std::cout << w << std::endl;
@@ -172,10 +238,10 @@ namespace Parsers {
     } // end well loop
   }  // eom
 
-  void Reader::assign_schedule(const std::string   &kwd,
-                               const KeywordReader &kwd_reader)
+  void Reader::assign_schedule(const std::string  &kwd,
+                               const SyntaxParser &parser)
   {
-    const auto lines = kwd_reader.get_str_list(kwd, std::string(";"));
+    const auto lines = parser.get_str_list(kwd, std::string(";"));
     for (auto & line : lines)
     {
       // std::cout << line << std::endl;

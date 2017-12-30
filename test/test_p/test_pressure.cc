@@ -19,6 +19,8 @@
 #include <deal.II/grid/grid_in.h>
 // Custom modules
 #include <Wellbore.hpp>
+#include <Model.hpp>
+#include <Reader.hpp>
 #include <PressureSolver.hpp>
 #include <Parsers.hpp>
 #include <CellValues.hpp>
@@ -41,7 +43,7 @@ namespace WingTest
     MPI_Comm                                  mpi_communicator;
     parallel::distributed::Triangulation<dim> triangulation;
     ConditionalOStream                        pcout;
-    Data::DataBase<dim>                       data;
+    Model::Model<dim>                         data;
     FluidSolvers::PressureSolver<dim>         pressure_solver;
     std::string                               input_file;
   };
@@ -75,7 +77,8 @@ namespace WingTest
   template <int dim>
   void TestSPO<dim>::run()
   {
-    data.read_input(input_file);
+    Parsers::Reader reader(pcout, data);
+    reader.read_input(input_file, /* verbosity= */0);
     // data.print_input();
     read_mesh();
     pressure_solver.setup_dofs();
@@ -139,7 +142,7 @@ namespace WingTest
     pressure_solver.old_solution = pressure_solver.solution;
 
     double time = 0;
-    double time_step = data.get_time_step(time);
+    double time_step = data.min_time_step;
 
     data.update_well_controls(time);
 
@@ -256,7 +259,8 @@ int main(int argc, char *argv[])
     using namespace dealii;
     dealii::deallog.depth_console (0);
     Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
-    std::string input_file_name = SOURCE_DIR "/../data/test4x4-homog.prm";
+    // std::string input_file_name = SOURCE_DIR "/../data/test4x4-homog.prm";
+    std::string input_file_name = SOURCE_DIR "/../data/sf-4x4.data";
     WingTest::TestSPO<3> problem(input_file_name);
     problem.run();
     return 0;

@@ -47,7 +47,7 @@ namespace Keywords
       compressibility_oil = "Compressibility oil",
       compressibility_gas = "Compressibility gas",
       permeability = "Permeability",
-      permeability_anisotropy = "Permeability anisotropy",
+      permeability_anisotropy = "Perm anisotropy",
       porosity = "Porosity",
     section_solver = "Solver",
       t_max = "T max",

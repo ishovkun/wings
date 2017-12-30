@@ -59,7 +59,7 @@
 // #include <deal.II/lac/sparsity_tools.h>
 
 // Custom modules
-#include <DataBase.hpp>
+#include <Model.hpp>
 #include <Wellbore.hpp>
 #include <CellValues.hpp>
 
@@ -76,7 +76,7 @@ namespace FluidSolvers
     //                const Data::DataBase<dim> &data_);
     PressureSolver(MPI_Comm                                  &mpi_communicator_,
                    parallel::distributed::Triangulation<dim> &triangulation_,
-                   const Data::DataBase<dim>                 &data_,
+                   const Model::Model<dim>                   &model_,
                    ConditionalOStream                        &pcout_);
     ~PressureSolver();
 
@@ -96,7 +96,7 @@ namespace FluidSolvers
     parallel::distributed::Triangulation<dim> &triangulation;
     DoFHandler<dim>                           dof_handler;
     FE_DGQ<dim>                               fe;
-    const Data::DataBase<dim>                 &data;
+const Model::Model<dim>                 &model;
     ConditionalOStream                        &pcout;
 
     // Matrices and vectors
@@ -120,14 +120,14 @@ namespace FluidSolvers
   PressureSolver<dim>::
   PressureSolver(MPI_Comm                                  &mpi_communicator_,
                  parallel::distributed::Triangulation<dim> &triangulation_,
-                 const Data::DataBase<dim>                 &data_,
+                   const Model::Model<dim>                 &model_,
                  ConditionalOStream                        &pcout_)
     :
     mpi_communicator(mpi_communicator_),
     triangulation(triangulation_),
     dof_handler(triangulation_),
     fe(0), // since we want finite volumes
-    data(data_),
+    model(model_),
     pcout(pcout_)
   {}  // eom
 

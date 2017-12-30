@@ -33,7 +33,11 @@ namespace Model
   public:
     Model(MPI_Comm           &mpi_communicator_,
           ConditionalOStream &pcout_);
-    // ~Model();
+    ~Model();
+  private:
+    MPI_Comm                               &mpi_communicator;
+    ConditionalOStream                     &pcout;
+  public:
     // void read_input(const std::string&,
     //                 const int verbosity_=0);
     // void print_input();
@@ -53,6 +57,19 @@ namespace Model
     // double get_viscosity(const double pressure) const;
     // double get_volume_factor(const double pressure) const;
     // double get_compressibility(const double pressure) const;
+    // set data methods
+    void set_volume_factor_w(const double x)
+    {volume_factor_w_constant = x;}
+    void set_compressibility_w(const double x)
+    {compressibility_w_constant = x;}
+    void set_viscosity_w(const double x)
+    {viscosity_w_constant = x;}
+    void set_density_sc_w(const double x)
+    {density_sc_w_constant = x;}
+    void add_well(const std::string name,
+                  const double radius,
+                  const std::vector< Point<dim> > &locations);
+
 
     double get_time_step(const double time) const;
     std::vector<int> get_well_ids() const;
@@ -75,8 +92,6 @@ namespace Model
 
     // ATTRIBUTES
   public:
-    MPI_Comm                               &mpi_communicator;
-    ConditionalOStream                     &pcout;
     int                                    initial_refinement_level,
                                            n_adaptive_steps;
     std::vector<std::pair<double,double>>  local_prerefinement_region;
@@ -94,29 +109,17 @@ namespace Model
                                            porosity,
                                            young_modulus,
                                            poisson_ratio_constant;
+  public:
     double                                 fss_tolerance,
                                            min_time_step,
                                            t_max;
     int                                    max_fss_steps;
+  private:
     ParameterHandler                       prm;
     std::map<double, double>               timestep_table;
     std::map<std::string, int>             well_ids;
 
     int                                    verbosity;
-  public:
-    // set data
-    void set_volume_factor_w(const double x)
-    {volume_factor_w_constant = x;}
-    void set_compressibility_w(const double x)
-    {compressibility_w_constant = x;}
-    void set_viscosity_w(const double x)
-    {viscosity_w_constant = x;}
-    void set_density_sc_w(const double x)
-    {density_sc_w_constant = x;}
-    void add_well(const std::string name,
-                  const double radius,
-                  const std::vector< Point<dim> > &locations);
-
   };  // eom
 
 
@@ -125,13 +128,25 @@ namespace Model
                     ConditionalOStream &pcout_)
     :
     mpi_communicator(mpi_communicator_),
-    pcout(pcout_)
+    pcout(pcout_),
+    get_young_modulus(NULL),
+    get_poisson_ratio(NULL),
+    get_permeability(NULL),
+    get_porosity(NULL)
   {
     // declare_parameters();
     verbosity = 0;
+    units.set_system(Units::si_units);
   }  // eom
 
 
+  template <int dim>
+  Model<dim>::~Model()
+  {
+    delete get_young_modulus;
+    delete get_permeability;
+    delete get_porosity;
+  }
   // template <int dim>
   // void Model<dim>::read_input(const std::string& file_name,
   //                                const int verbosity_)
@@ -191,74 +206,32 @@ namespace Model
   }  // eom
 
 
-  template <int dim>
-  void Model<dim>::parse_time_stepping()
-  {
-    // Parse time stepping table
-    std::vector<Point<2> > tmp =
-      Parsers::parse_point_list<2>(prm.get(keywords.time_stepping));
-    for (const auto &row : tmp)
-      this->timestep_table[row[0]] = row[1];
-  } // eom
+  // template <int dim>
+  // void Model<dim>::parse_time_stepping()
+  // {
+  //   // Parse time stepping table
+  //   std::vector<Point<2> > tmp =
+  //     Parsers::parse_point_list<2>(prm.get(keywords.time_stepping));
+  //   for (const auto &row : tmp)
+  //     this->timestep_table[row[0]] = row[1];
+  // } // eom
 
 
-  template <int dim>
-  double Model<dim>::get_time_step(const double time) const
-  /* get value of the time step from the time-stepping table */
-  {
-    double time_step = timestep_table.rbegin()->second;
-    for (const auto &it : timestep_table)
-      {
-        if (time >= it.first)
-          time_step = it.second;
-        else
-          break;
-      }
+  // template <int dim>
+  // double Model<dim>::get_time_step(const double time) const
+  // /* get value of the time step from the time-stepping table */
+  // {
+  //   double time_step = timestep_table.rbegin()->second;
+  //   for (const auto &it : timestep_table)
+  //     {
+  //       if (time >= it.first)
+  //         time_step = it.second;
+  //       else
+  //         break;
+  //     }
 
-    return time_step;
-  }  // eom
-
-
-  template <int dim>
-  Function<dim> *
-  Model<dim>::
-  get_hetorogeneous_function_from_parameter(const std::string&   par_name,
-                                            const Tensor<1,dim>& anisotropy)
-  {
-    const std::string entry = prm.get(par_name);
-    if (Parsers::is_number(entry))
-      {
-        std::vector<double> quantity;
-        for (int c=0; c<dim; c++)
-          quantity.push_back(boost::lexical_cast<double>(entry)*anisotropy[c]);
-        return new ConstantFunction<dim>(quantity);
-      }
-    else
-    {
-      if (verbosity > 0)
-        std::cout << "Searching " << par_name << std::endl;
-      boost::filesystem::path input_file_path(input_file_name);
-      boost::filesystem::path data_file =
-        input_file_path.parent_path() / entry;
-      return new BitMap::BitMapFunction<dim>(data_file.string(),
-                                             anisotropy);
-    }
-  }  // eom
-
-
-  template <int dim>
-  boost::filesystem::path
-  Model<dim>::find_file_in_relative_path(const std::string fname)
-  {
-    if (verbosity > 0)
-      std::cout << "Searching " << fname << std::endl;
-    boost::filesystem::path input_file_path(input_file_name);
-    boost::filesystem::path data_file =
-      input_file_path.parent_path() / fname;
-    if (verbosity > 0)
-    std::cout << "Found " << data_file << std::endl;
-    return data_file;
-  }  // eom
+  //   return time_step;
+  // }  // eom
 
 
   template <int dim>
@@ -304,81 +277,81 @@ namespace Model
   } // eom
 
 
-  template <int dim>
-  void Model<dim>::assign_parameters()
-  {
-    { // Mesh
-      prm.enter_subsection(keywords.section_mesh);
-      mesh_file_name = prm.get(keywords.mesh_file);
-      mesh_file =
-        find_file_in_relative_path(mesh_file_name);
-      // std::cout << "mesh_file "<< mesh_file << std::endl;
+  // template <int dim>
+  // void Model<dim>::assign_parameters()
+  // {
+  //   { // Mesh
+  //     prm.enter_subsection(keywords.section_mesh);
+  //     mesh_file_name = prm.get(keywords.mesh_file);
+  //     mesh_file =
+  //       find_file_in_relative_path(mesh_file_name);
+  //     // std::cout << "mesh_file "<< mesh_file << std::endl;
 
-      initial_refinement_level =
-        prm.get_integer(keywords.global_refinement_steps);
-      n_adaptive_steps = prm.get_integer(keywords.adaptive_refinement_steps);
+  //     initial_refinement_level =
+  //       prm.get_integer(keywords.global_refinement_steps);
+  //     n_adaptive_steps = prm.get_integer(keywords.adaptive_refinement_steps);
 
-      std::vector<double> tmp = Parsers:: parse_string_list<double>
-        (prm.get(keywords.local_refinement_regions));
-      local_prerefinement_region.resize(dim);
-      AssertThrow(tmp.size() == 2*dim,
-                  ExcMessage("Wrong entry in" +
-                             keywords.local_refinement_regions));
-      local_prerefinement_region[0].first = tmp[0];
-      local_prerefinement_region[0].second = tmp[1];
-      local_prerefinement_region[1].first = tmp[2];
-      local_prerefinement_region[1].second = tmp[3];
-      prm.leave_subsection();
-    }
-    { // well data
-      prm.enter_subsection(keywords.section_wells);
-      // std::cout << prm.get(keywords.well_parameters) << std::endl;
-      // assign_wells(prm.get(keywords.well_parameters));
-      // assign_schedule(prm.get(keywords.well_schedule));
-      prm.leave_subsection();
-    }
-    { // Equation data
-      prm.enter_subsection(keywords.section_equation_data);
-      if (prm.get(keywords.unit_system)=="SI")
-        units.set_system(Units::si_units);
-      else if (prm.get(keywords.unit_system)=="Field")
-        units.set_system(Units::field_units);
+  //     std::vector<double> tmp = Parsers:: parse_string_list<double>
+  //       (prm.get(keywords.local_refinement_regions));
+  //     local_prerefinement_region.resize(dim);
+  //     AssertThrow(tmp.size() == 2*dim,
+  //                 ExcMessage("Wrong entry in" +
+  //                            keywords.local_refinement_regions));
+  //     local_prerefinement_region[0].first = tmp[0];
+  //     local_prerefinement_region[0].second = tmp[1];
+  //     local_prerefinement_region[1].first = tmp[2];
+  //     local_prerefinement_region[1].second = tmp[3];
+  //     prm.leave_subsection();
+  //   }
+  //   { // well data
+  //     prm.enter_subsection(keywords.section_wells);
+  //     // std::cout << prm.get(keywords.well_parameters) << std::endl;
+  //     // assign_wells(prm.get(keywords.well_parameters));
+  //     // assign_schedule(prm.get(keywords.well_schedule));
+  //     prm.leave_subsection();
+  //   }
+  //   { // Equation data
+  //     prm.enter_subsection(keywords.section_equation_data);
+  //     if (prm.get(keywords.unit_system)=="SI")
+  //       units.set_system(Units::si_units);
+  //     else if (prm.get(keywords.unit_system)=="Field")
+  //       units.set_system(Units::field_units);
 
-      this->poisson_ratio_constant = prm.get_double(keywords.poisson_ratio);
-      this->volume_factor_w_constant = prm.get_double(keywords.volume_factor_water);
-      this->viscosity_w_constant =
-        prm.get_double(keywords.viscosity_water)*units.viscosity();
-      this->compressibility_w_constant =
-        prm.get_double(keywords.compressibility_water)*units.stiffness();
-      this->density_sc_w_constant =
-          prm.get_double(keywords.density_sc_water)*units.mass();
+  //     this->poisson_ratio_constant = prm.get_double(keywords.poisson_ratio);
+  //     this->volume_factor_w_constant = prm.get_double(keywords.volume_factor_water);
+  //     this->viscosity_w_constant =
+  //       prm.get_double(keywords.viscosity_water)*units.viscosity();
+  //     this->compressibility_w_constant =
+  //       prm.get_double(keywords.compressibility_water)*units.stiffness();
+  //     this->density_sc_w_constant =
+  //         prm.get_double(keywords.density_sc_water)*units.mass();
 
-      // coefficients that are either constant or mapped
-      Tensor<1,dim> perm_anisotropy = Tensors::get_unit_vector<dim>();
-      this->get_permeability =
-        get_hetorogeneous_function_from_parameter(keywords.permeability,
-                                                  perm_anisotropy);
+  //     // coefficients that are either constant or mapped
+  //     Tensor<1,dim> perm_anisotropy = Tensors::get_unit_vector<dim>();
+  //     this->get_permeability =
+  //       get_hetorogeneous_function_from_parameter(keywords.permeability,
+  //                                                 perm_anisotropy);
 
-      Tensor<1,dim> stiffness_anisotropy = Tensors::get_unit_vector<dim>();
-      this->get_young_modulus =
-        get_hetorogeneous_function_from_parameter(keywords.young_modulus,
-                                                  stiffness_anisotropy);
-      Tensor<1,dim> unit_vector = Tensors::get_unit_vector<dim>();
-      this->get_porosity =
-        get_hetorogeneous_function_from_parameter(keywords.porosity,
-                                                  unit_vector);
-      prm.leave_subsection();
-    }
-    { // Solver
-      prm.enter_subsection(keywords.section_solver);
-      this->t_max = prm.get_double(keywords.t_max);
-      this->min_time_step = prm.get_double(keywords.minimum_time_step);
-      this->fss_tolerance = prm.get_double(keywords.fss_tolerance);
-      this->max_fss_steps = prm.get_integer(keywords.max_fss_steps);
-      this->parse_time_stepping();
-      prm.leave_subsection();
-    }
-  }  // eom
+  //     Tensor<1,dim> stiffness_anisotropy = Tensors::get_unit_vector<dim>();
+  //     this->get_young_modulus =
+  //       get_hetorogeneous_function_from_parameter(keywords.young_modulus,
+  //                                                 stiffness_anisotropy);
+  //     Tensor<1,dim> unit_vector = Tensors::get_unit_vector<dim>();
+  //     this->get_porosity =
+  //       get_hetorogeneous_function_from_parameter(keywords.porosity,
+  //                                                 unit_vector);
+  //     prm.leave_subsection();
+  //   }
+  //   { // Solver
+  //     prm.enter_subsection(keywords.section_solver);
+  //     this->t_max = prm.get_double(keywords.t_max);
+  //     this->min_time_step = prm.get_double(keywords.minimum_time_step);
+  //     this->fss_tolerance = prm.get_double(keywords.fss_tolerance);
+  //     this->max_fss_steps = prm.get_integer(keywords.max_fss_steps);
+  //     this->parse_time_stepping();
+  //     prm.leave_subsection();
+  //   }
+  // }  // eom
 
 
   template <int dim>
@@ -399,6 +372,7 @@ namespace Model
       wells[i].locate(dof_handler, fe);
     }
   } // eom
+
 
   template <int dim>
   void Model<dim>::update_well_productivities()
