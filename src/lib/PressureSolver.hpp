@@ -2,42 +2,14 @@
 
 #include <deal.II/base/conditional_ostream.h>
 #include <deal.II/distributed/tria.h>
-
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/fe/fe_dgq.h>
-
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/fe/fe_values.h>
-// vectors and matrices
-// #include <deal.II/lac/vector.h>
-// #include <deal.II/lac/sparse_matrix.h>
-
 #include <deal.II/base/config.h>  // for numbers::is_nan
-
-// to print sparsity pattern, remove later
-// #include <fstream>
-
 #include <deal.II/base/quadrature_lib.h>
-// #include <deal.II/base/function.h>
-// #include <deal.II/grid/grid_generator.h>
-// #include <deal.II/grid/grid_out.h>
-// #include <deal.II/grid/grid_refinement.h>
-// #include <deal.II/grid/tria_accessor.h>
-// #include <deal.II/grid/tria_iterator.h>
-// #include <deal.II/dofs/dof_accessor.h>
-// #include <deal.II/numerics/data_out.h>
-// #include <deal.II/fe/mapping_q1.h>
-
-// #include <deal.II/meshworker/dof_info.h>
-// #include <deal.II/meshworker/integration_info.h>
-// #include <deal.II/meshworker/simple.h>
-// #include <deal.II/meshworker/loop.h>
-
 #include <deal.II/base/utilities.h>
-// #include <deal.II/base/function.h>
-// #include <deal.II/base/tensor.h>
-
 // Trilinos stuff
 #include <deal.II/lac/trilinos_vector.h>
 #include <deal.II/lac/generic_linear_algebra.h>
@@ -45,23 +17,11 @@
 #include <deal.II/lac/trilinos_solver.h>
 #include <deal.II/lac/trilinos_precondition.h>
 
-// DOF stuff
-#include <deal.II/distributed/tria.h>
-// #include <deal.II/dofs/dof_handler.h>
-// #include <deal.II/dofs/dof_renumbering.h>
-// #include <deal.II/dofs/dof_accessor.h>
-// #include <deal.II/dofs/dof_tools.h>
-
-// dealii fem modules
-// #include <deal.II/fe/fe_values.h>
-// #include <deal.II/numerics/vector_tools.h>
-// #include <deal.II/fe/fe_system.h>
-// #include <deal.II/lac/sparsity_tools.h>
-
 // Custom modules
 #include <Model.hpp>
 #include <Wellbore.hpp>
 #include <CellValues.hpp>
+#include <ExtraFEData.hpp>
 
 namespace FluidSolvers
 {
@@ -81,9 +41,10 @@ namespace FluidSolvers
     ~PressureSolver();
 
     void setup_dofs();
-    void assemble_system(CellValues::CellValuesBase<dim> &cell_data,
-                         CellValues::CellValuesBase<dim> &neighbor_data,
-                         const double time_step);
+    void assemble_system(CellValues::CellValuesBase<dim> &cell_values,
+                         CellValues::CellValuesBase<dim> &neighbor_values,
+                         const double                    time_step,
+                         ExtraFEData::ExtraFEData<dim>   &extra_data);
     unsigned int solve();
     // accessing private members
     const TrilinosWrappers::SparseMatrix& get_system_matrix();
@@ -96,7 +57,7 @@ namespace FluidSolvers
     parallel::distributed::Triangulation<dim> &triangulation;
     DoFHandler<dim>                           dof_handler;
     FE_DGQ<dim>                               fe;
-const Model::Model<dim>                 &model;
+    const Model::Model<dim>                   &model;
     ConditionalOStream                        &pcout;
 
     // Matrices and vectors
@@ -172,18 +133,22 @@ const Model::Model<dim>                 &model;
   void
   PressureSolver<dim>::assemble_system(CellValues::CellValuesBase<dim> &cell_values,
                                        CellValues::CellValuesBase<dim> &neighbor_values,
-                                       const double time_step)
+                                       const double                    time_step,
+                                       ExtraFEData::ExtraFEData<dim>   &extra_data)
   {
     // Only one integration point in FVM
     QGauss<dim>       quadrature_formula(1);
     QGauss<dim-1>     face_quadrature_formula(1);
 
     FEValues<dim> fe_values(fe, quadrature_formula, update_values);
-    FEValues<dim> fe_values_neighbor(fe, quadrature_formula,
-                                     update_values);
+    FEValues<dim> fe_values_neighbor(fe, quadrature_formula, update_values);
+    // fe_values for additional vectors
+    extra_data.make_fe_values();
+
+    // the following two objects only get geometry data
     FEFaceValues<dim> fe_face_values(fe, face_quadrature_formula,
                                      update_normal_vectors);
-    // We need subface values for subfaces since there is no
+    // We need JxW flag for subfaces since there is no
     // method to determine sub face area in triangulation class
     FESubfaceValues<dim> fe_subface_values(fe, face_quadrature_formula,
                                            update_normal_vectors |
@@ -194,8 +159,9 @@ const Model::Model<dim>                 &model;
       dof_indices(dofs_per_cell),
       dof_indices_neighbor(dofs_per_cell);
 
-    Tensor<1, dim>    dx_ij, normal;
-    std::vector<double>    p_old_values(quadrature_formula.size());
+    // objects to store local data
+    Tensor<1, dim>       dx_ij, normal;
+    std::vector<double>  p_old_values(quadrature_formula.size());
 
     typename DoFHandler<dim>::active_cell_iterator
       cell = dof_handler.begin_active(),
@@ -212,6 +178,12 @@ const Model::Model<dim>                 &model;
         // std::cout << "i = " << i << "\t" << cell->center() << std::endl;
         fe_values.reinit(cell);
         fe_values.get_function_values(old_solution, p_old_values);
+
+        // for (auto & p_fe_values_extra : vp_fe_values_extra)
+        // {
+        //   p_fe_values_extra->reinit(cell);
+        // }
+
         // std::cout << "cell: " << i << std::endl;
         // double p_i = solution[i];
         // double p_old = solution_old[i];
@@ -223,15 +195,6 @@ const Model::Model<dim>                 &model;
 
         const double J_i = cell_values.J;
         const double Q_i = cell_values.Q;
-        // // Wells
-        // double Q_i = 0;
-        // double J_i = 0;
-        // for (auto & well : data.wells)
-        // {
-        //   Q_i += well.get_rate_water(cell);
-        //   J_i += well.get_productivity(cell);
-        // } // end well loop
-
 
         double matrix_ii = B_ii/time_step + J_i;
         double rhs_i = B_ii/time_step*p_old + Q_i;
@@ -280,15 +243,7 @@ const Model::Model<dim>                 &model;
                   rhs_i += cell_values.G_face;
                   system_matrix.add(i, j, -cell_values.T_face);
                 }
-              }
-              // else if (cell->neighbor_is_coarser(f))
-              // {
-              //   // compute dh on cell
-              //   // dx is not between cell centers i think
-              //   // get_cell_data(neighbor);
-              //   // compute_intercell_data();
-              //   dx_ij = cell->neighbor(f)->center() - cell->center();
-              // }
+              } // end case neighbor is finer
 
             } // end if face not at boundary
           }  // end face loop

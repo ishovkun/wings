@@ -31,6 +31,7 @@ namespace CellValues
     const Model::Model<dim>  &model;
     double phi, mu_w, B_w, C_w, cell_volume;
     Vector<double> k;
+    std::vector<double> pvt_values;
   };
 
 
@@ -38,7 +39,8 @@ namespace CellValues
   CellValuesBase<dim>::CellValuesBase(const Model::Model<dim> &model_)
     :
     model(model_),
-    k(dim)
+    k(dim),
+    pvt_values(model.n_pvt_water_columns)
   {}
 
 
@@ -47,10 +49,14 @@ namespace CellValues
   CellValuesBase<dim>::update(const CellIterator<dim> &cell)
   {
     model.get_permeability->vector_value(cell->center(), k);
-    mu_w = model.viscosity_water();
-    B_w = model.volume_factor_water();
+    model.get_pvt_water(0.0, pvt_values);
+    B_w = pvt_values[0];
+    C_w = pvt_values[1];
+    mu_w = pvt_values[2];
+    // mu_w = model.viscosity_water();
+    // B_w = model.volume_factor_water();
     phi = model.get_porosity->value(cell->center());
-    C_w = model.compressibility_water();
+    // C_w = model.compressibility_water();
     cell_volume = cell->measure();
     // calculate source term
     Q = 0;

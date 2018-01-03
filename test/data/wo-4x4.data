@@ -1,0 +1,61 @@
+subsection Mesh
+
+Global refinement steps    4 /
+Adaptive refinement steps  4 /
+Mesh file                  domain.msh /
+# Local refinement regions 16, 24, 17.5, 22.5, 0 ,0 /
+
+subsection Well data
+
+Wells
+# name r coords
+A, 0.1,
+1.5, 0.5, 0.0; # this defines a vertical well occupying one cell
+B, 0.01,
+1.5, 2.5, 0.0,
+2.5, 1.5, 0.0;
+C, 0.1,
+1.5, 1.0, 0.0,
+2.5, 1.0, 0.0,
+3.5, 1.0, 0.0
+/
+
+Schedule
+0, A, 0, 15, 0;
+1, A, 0, 0, 0;
+1, B, 4, 15, 0;
+/
+
+subsection Equation data
+
+Model                   WaterOil /
+Permeability            bitmap perm4x4_homog.dat /
+Porosity                0.3 /
+Perm anisotropy         1, 1, 1 /
+
+Volume factor water     1 /
+Viscosity water         1e-3 /
+Compressibility water   5e-10 /
+
+Density water           1000 /
+Density oil             800 /
+
+PVT water
+# p Bw   Cw     mu_w R_wg
+10, 1.0, 5e-10, 1e-3, 0 /
+
+PVT oil
+# p Bo   Co    mu_o  R_s
+01, 1.0, 1e-8, 1e-3, 0.0;
+10, 1.0, 1e-8, 1e-3, 0.0;
+20, 1.0, 1e-8, 1e-3, 0.0;
+30, 1.0, 1e-8, 1e-3, 0.0;
+/
+
+subsection Solver
+Minimum time step    1e-5 /
+T max                100 /
+FSS tolerance        1e-8 /
+Max FSS steps        30 /
+
+

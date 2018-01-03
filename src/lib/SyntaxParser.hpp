@@ -1,4 +1,6 @@
 #pragma once
+#include <deal.II/lac/full_matrix.h>
+
 #include <Parsers.hpp>
 
 namespace Parsers
@@ -27,6 +29,11 @@ namespace Parsers
     get_double_list(const std::string &kwd,
                     const std::string &delimiter,
                     std::vector<double> &default_value) const;
+    FullMatrix<double>
+    get_matrix(const std::string  &kwd,
+               const std::string  &delimiter_col,
+               const std::string  &delimiter_row) const;
+
 
   private:
     std::string text, active_text;
@@ -139,13 +146,22 @@ namespace Parsers
                              const std::string &delimiter) const
   {
     std::string raw_result = get(kwd);
-    // // cut whitespace stuff
-    // boost::trim_if(raw_result, boost::is_any_of("\t "));
+    // cut whitespace stuff
+    boost::trim_if(raw_result, boost::is_any_of("\t \n"));
     std::vector<std::string> result;
     boost::algorithm::split(result, raw_result,
                             boost::is_any_of(delimiter),
-                            // this cuts empty strings
                             boost::token_compress_on);
+    // trim and remove empty
+    int count=0;
+    for (auto & item: result)
+    {
+      boost::trim(item);
+      if (std::all_of(item.begin(),item.end(),isspace))
+        result.erase(result.begin()+count);
+      count++;
+    }
+
     return result;
   }  // eom
 
@@ -181,4 +197,33 @@ namespace Parsers
     };
   } // eom
 
+
+  FullMatrix<double>
+  SyntaxParser::get_matrix(const std::string  &kwd,
+                           const std::string  &delimiter_row,
+                           const std::string  &delimiter_col) const
+  {
+    std::vector<std::string> rows = get_str_list(kwd, delimiter_row);
+    const unsigned int n_rows = rows.size();
+    std::vector<std::string> tmp;
+    boost::algorithm::split(tmp, rows[0],
+                            boost::is_any_of(delimiter_col),
+                            boost::token_compress_on);
+    const unsigned int n_cols = tmp.size();
+    FullMatrix<double> result(n_rows, n_cols);
+    for (unsigned int i=0; i<n_rows; ++i)
+    {
+      boost::algorithm::split(tmp, rows[i],
+                              boost::is_any_of(delimiter_col),
+                              boost::token_compress_on);
+      AssertThrow(tmp.size() == n_cols,
+                  ExcDimensionMismatch(tmp.size(), n_cols));
+      for (unsigned int j=0; j<n_cols; ++j)
+      {
+        result(i, j) = Parsers::convert<double>(tmp[j]);
+      }
+    }
+
+    return result;
+  } // eom
 }

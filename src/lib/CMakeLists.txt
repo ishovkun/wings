@@ -6,6 +6,8 @@ ADD_LIBRARY(wings SHARED
   SyntaxParser.hpp
   CellValues.hpp
   PressureSolver.hpp
+  ExtraFEData.hpp
+  SaturationSolverExplicit.hpp
   Model.hpp
   BitMap.hpp
   Parsers.hpp
@@ -15,6 +17,7 @@ ADD_LIBRARY(wings SHARED
   Wellbore.hpp
   Schedule.hpp
   DefaultValues.h
+  LookupTable.hpp
   Math.hpp
 )
 

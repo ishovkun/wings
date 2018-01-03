@@ -14,6 +14,7 @@
 #include <Units.h>
 #include <Tensors.hpp>
 #include <Keywords.h>
+#include <LookupTable.hpp>
 
 
 namespace Model
@@ -23,6 +24,12 @@ namespace Model
   enum ModelType {SingleLiquid, SingleGas, WaterOil, WaterGas, Blackoil,
                   SingleLiquidElasticity, SingleGasElasticity,
                   WaterOilElasticity, WaterGasElasticity, BlackoilElasticity};
+  enum PVTType {Constant, Table, Correlation};
+
+  struct ModelConfig
+  {
+    PVTType pvt_oil, pvt_water, pvt_gas;
+  };
 
   template <int dim>
   class Model
@@ -47,51 +54,44 @@ namespace Model
                   *get_poisson_ratio,
                   *get_permeability,
                   *get_porosity;
+                  // *get_porosity;
+
     // Methods getting constant values
-    double viscosity_water() const;
-    double volume_factor_water() const;
-    double compressibility_water() const;
     double density_sc_water() const;
     double gravity() const;
-    // Methods getting pressure-dependent values
-    // double get_viscosity(const double pressure) const;
-    // double get_volume_factor(const double pressure) const;
-    // double get_compressibility(const double pressure) const;
-    // set data methods
-    void set_volume_factor_w(const double x)
-    {volume_factor_w_constant = x;}
-    void set_compressibility_w(const double x)
-    {compressibility_w_constant = x;}
-    void set_viscosity_w(const double x)
-    {viscosity_w_constant = x;}
+
+    // adding data
+    void set_pvt_water(Interpolation::LookupTable &table);
+    void set_pvt_oil(Interpolation::LookupTable &table);
+    void set_pvt_gas(Interpolation::LookupTable &table);
     void set_density_sc_w(const double x)
     {density_sc_w_constant = x;}
     void add_well(const std::string name,
                   const double radius,
                   const std::vector< Point<dim> > &locations);
 
-
+    // querying data
+    void get_pvt_oil(const double        pressure,
+                     std::vector<double> &dst) const;
+    void get_pvt_water(const double        pressure,
+                       std::vector<double> &dst) const;
+    void get_pvt_gas(const double        pressure,
+                     std::vector<double> &dst) const;
     double get_time_step(const double time) const;
     std::vector<int> get_well_ids() const;
     int get_well_id(const std::string& well_name) const;
+    // update methods
     void update_well_controls(const double time);
     void locate_wells(const DoFHandler<dim>& dof_handler,
                       const FE_DGQ<dim>&     fe);
     void update_well_productivities();
-
-  protected:
-    void declare_parameters();
-    void assign_parameters();
     void compute_runtime_parameters();
-    void check_input();
-    Function<dim>*
-    get_hetorogeneous_function_from_parameter(const std::string&   par_name,
-                                              const Tensor<1,dim>& anisotropy);
-    boost::filesystem::path find_file_in_relative_path(const std::string fname);
-    void parse_time_stepping();
 
     // ATTRIBUTES
   public:
+    const unsigned int                     n_pvt_water_columns = 5;
+    const unsigned int                     n_pvt_oil_columns = 5;
+    const unsigned int                     n_pvt_gas_columns = 5;
     int                                    initial_refinement_level,
                                            n_adaptive_steps;
     std::vector<std::pair<double,double>>  local_prerefinement_region;
@@ -100,20 +100,20 @@ namespace Model
     boost::filesystem::path                mesh_file;
     std::vector< Wellbore::Wellbore<dim> > wells;
     Schedule::Schedule                     schedule;
-  protected:
-    std::string                            mesh_file_name, input_file_name;
-    double                                 volume_factor_w_constant,
-                                           viscosity_w_constant,
-                                           compressibility_w_constant,
-                                           density_sc_w_constant,
-                                           porosity,
-                                           young_modulus,
-                                           poisson_ratio_constant;
-  public:
     double                                 fss_tolerance,
                                            min_time_step,
                                            t_max;
     int                                    max_fss_steps;
+    ModelConfig                            config;
+  protected:
+    std::string                            mesh_file_name, input_file_name;
+    double                                 density_sc_w_constant,
+                                           porosity,
+                                           young_modulus,
+                                           poisson_ratio_constant;
+    Interpolation::LookupTable             pvt_table_water,
+                                           pvt_table_oil,
+                                           pvt_table_gas;
   private:
     ParameterHandler                       prm;
     std::map<double, double>               timestep_table;
@@ -147,33 +147,6 @@ namespace Model
     delete get_permeability;
     delete get_porosity;
   }
-  // template <int dim>
-  // void Model<dim>::read_input(const std::string& file_name,
-  //                                const int verbosity_)
-  // {
-  //   verbosity = verbosity_;
-  //   if (verbosity > 0)
-  //     std::cout << "Reading " << file_name << std::endl;
-  //   input_file_name = file_name;
-  //   prm.parse_input(file_name);
-  //   assign_parameters();
-  //   // compute_runtime_parameters();
-  //   // check_input();
-  // }  // eom
-
-
-  // template <int dim>
-  // void Model<dim>::print_input()
-  // {
-  //   prm.print_parameters(std::cout, ParameterHandler::Text);
-  // }  // eom
-
-
-  template <int dim>
-  double Model<dim>::compressibility_water() const
-  {
-    return this->compressibility_w_constant;
-  }  // eom
 
 
   template <int dim>
@@ -189,20 +162,6 @@ namespace Model
   double Model<dim>::gravity() const
   {
     return units.gravity();
-  }  // eom
-
-
-  template <int dim>
-  double Model<dim>::viscosity_water() const
-  {
-    return this->viscosity_w_constant;
-  }  // eom
-
-
-  template <int dim>
-  double Model<dim>::volume_factor_water() const
-  {
-    return this->volume_factor_w_constant;
   }  // eom
 
 
@@ -379,5 +338,37 @@ namespace Model
   {
     for (auto & well : wells)
       well.update_productivity(this->get_permeability);
+  }  // eom
+
+
+  template <int dim>
+  void Model<dim>::set_pvt_water(Interpolation::LookupTable &table)
+  {
+    pvt_table_water = table;
+  }  // eom
+
+
+  template <int dim>
+  void Model<dim>::set_pvt_oil(Interpolation::LookupTable &table)
+  {
+    pvt_table_oil = table;
+  }  // eom
+
+
+  template <int dim>
+  void Model<dim>::get_pvt_water(const double        pressure,
+                                 std::vector<double> &dst) const
+  {
+    AssertThrow(dst.size() == 5, ExcDimensionMismatch(dst.size(), 5));
+    pvt_table_water.get_values(pressure, dst);
+  }  // eom
+
+
+  template <int dim>
+  void Model<dim>::get_pvt_oil(const double        pressure,
+                               std::vector<double> &dst) const
+  {
+    AssertThrow(dst.size() == 5, ExcDimensionMismatch(dst.size(), 5));
+    pvt_table_oil.get_values(pressure, dst);
   }  // eom
 }  // end of namespace

@@ -17,6 +17,7 @@
 #include <Keywords.h>
 #include <SyntaxParser.hpp>
 #include <Model.hpp>
+#include <LookupTable.hpp>
 
 
 namespace Parsers {
@@ -125,31 +126,30 @@ namespace Parsers {
           get_function(kwds.porosity, no_anisotropy, parser);
       }
 
-
-      if (model_type != Model::ModelType::SingleGas &&
-          model_type != Model::ModelType::SingleGasElasticity)
+      // if (model_type == Model::SingleLiquid ||
+      //     model_type == Model::ModelType::WaterOil)
       {
-        const double bw = parser.get_double(kwds.volume_factor_water, 1.0);
-        const double muw = parser.get_double(kwds.viscosity_water, 1e-3);
-        const double rhow = parser.get_double(kwds.density_sc_water, 1e+3);
-        const double cw = parser.get_double(kwds.compressibility_water, 5e-10);
-        model.set_viscosity_w(muw);
-        model.set_compressibility_w(cw);
-        model.set_density_sc_w(rhow);
-        model.set_volume_factor_w(bw);
+        const auto & tmp = parser.get_matrix(kwds.pvt_water, ";", ",");
+        // tmp.print_formatted(std::cout);
+        AssertThrow(tmp.n() == model.n_pvt_water_columns,
+                    ExcDimensionMismatch(tmp.n(), model.n_pvt_water_columns));
+        Interpolation::LookupTable pvt_water_table(tmp);
+        model.set_pvt_water(pvt_water_table);
       }
 
-      if (model_type == Model::ModelType::WaterOil ||
-          model_type == Model::ModelType::Blackoil ||
-          model_type == Model::ModelType::WaterOilElasticity ||
-          model_type == Model::ModelType::BlackoilElasticity)
+      if (model_type != Model::SingleLiquid &&
+          model_type != Model::WaterGas)
       {
-        parser.get(kwds.volume_factor_oil);
+        const auto & tmp = parser.get_matrix(kwds.pvt_oil, ";", ",");
+        // deadoil: p Bo Co mu_o
+        AssertThrow(tmp.n() == model.n_pvt_oil_columns,
+                    ExcDimensionMismatch(tmp.n(), model.n_pvt_oil_columns));
+        Interpolation::LookupTable pvt_oil_table(tmp);
       }
 
     } // end equation data
 
-    {  // equation data
+    {  // wells
       parser.enter_subsection(kwds.section_wells);
       assign_wells(kwds.well_parameters, parser);
       assign_schedule(kwds.well_schedule, parser);
