@@ -112,6 +112,8 @@ namespace Parsers {
       else
         AssertThrow(false, ExcMessage("Wrong entry in " + kwds.model_type));
 
+      model.set_model_type(model_type);
+
       {// Permeability & porosity
         const int dim = 3;
         std::vector<double> default_anisotropy{1,1,1};

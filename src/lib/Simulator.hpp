@@ -136,10 +136,26 @@ namespace Wings
     // extra_data.make_fe_values(quadrature_formula);
 
     double time_step = model.min_time_step;
-    CellValues::CellValuesBase<dim>
-        cell_values(model), neighbor_values(model);
-    pressure_solver.assemble_system(cell_values, neighbor_values, time_step,
-                                    extra_data);
+    CellValues::CellValuesBase<dim> cell_values_sf(model),
+                                    neighbor_values_sf(model);
+    CellValues::CellValuesMP<dim> cell_values_mp(model),
+                                  neighbor_values_mp(model);
+    // pointer to cell values that are gonna be used
+    CellValues::CellValuesBase<dim>* p_cell_values = NULL;
+    CellValues::CellValuesBase<dim>* p_neighbor_values = NULL;
+    if (model.type == Model::ModelType::SingleLiquid)
+    {
+      p_cell_values = &cell_values_sf;
+      p_neighbor_values = &neighbor_values_sf;
+    }
+    else
+    {
+      p_cell_values = &cell_values_mp;
+      p_neighbor_values = &neighbor_values_mp;
+    }
+
+    pressure_solver.assemble_system(*p_cell_values, *p_neighbor_values,
+                                    time_step, extra_data);
   } // eom
 
 } // end of namespace

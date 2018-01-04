@@ -24,7 +24,11 @@ namespace Model
   enum ModelType {SingleLiquid, SingleGas, WaterOil, WaterGas, Blackoil,
                   SingleLiquidElasticity, SingleGasElasticity,
                   WaterOilElasticity, WaterGasElasticity, BlackoilElasticity};
+
   enum PVTType {Constant, Table, Correlation};
+
+  enum Phase {Water, Oil, Gas};
+
 
   struct ModelConfig
   {
@@ -56,11 +60,8 @@ namespace Model
                   *get_porosity;
                   // *get_porosity;
 
-    // Methods getting constant values
-    double density_sc_water() const;
-    double gravity() const;
-
     // adding data
+    void set_model_type(ModelType type);
     void set_pvt_water(Interpolation::LookupTable &table);
     void set_pvt_oil(Interpolation::LookupTable &table);
     void set_pvt_gas(Interpolation::LookupTable &table);
@@ -71,6 +72,9 @@ namespace Model
                   const std::vector< Point<dim> > &locations);
 
     // querying data
+    bool has_phase(Phase &phase) const;
+    double density_sc_water() const;
+    double gravity() const;
     void get_pvt_oil(const double        pressure,
                      std::vector<double> &dst) const;
     void get_pvt_water(const double        pressure,
@@ -80,6 +84,7 @@ namespace Model
     double get_time_step(const double time) const;
     std::vector<int> get_well_ids() const;
     int get_well_id(const std::string& well_name) const;
+
     // update methods
     void update_well_controls(const double time);
     void locate_wells(const DoFHandler<dim>& dof_handler,
@@ -104,6 +109,8 @@ namespace Model
                                            min_time_step,
                                            t_max;
     int                                    max_fss_steps;
+
+    ModelType                              type;
     ModelConfig                            config;
   protected:
     std::string                            mesh_file_name, input_file_name;
@@ -114,8 +121,8 @@ namespace Model
     Interpolation::LookupTable             pvt_table_water,
                                            pvt_table_oil,
                                            pvt_table_gas;
+    std::vector<Phase>                     phases;
   private:
-    ParameterHandler                       prm;
     std::map<double, double>               timestep_table;
     std::map<std::string, int>             well_ids;
 
@@ -359,7 +366,8 @@ namespace Model
   void Model<dim>::get_pvt_water(const double        pressure,
                                  std::vector<double> &dst) const
   {
-    AssertThrow(dst.size() == 5, ExcDimensionMismatch(dst.size(), 5));
+    AssertThrow(dst.size() == n_pvt_water_columns-1,
+                ExcDimensionMismatch(dst.size(), n_pvt_water_columns-1));
     pvt_table_water.get_values(pressure, dst);
   }  // eom
 
@@ -368,7 +376,41 @@ namespace Model
   void Model<dim>::get_pvt_oil(const double        pressure,
                                std::vector<double> &dst) const
   {
-    AssertThrow(dst.size() == 5, ExcDimensionMismatch(dst.size(), 5));
+    AssertThrow(dst.size() == n_pvt_oil_columns-1,
+                ExcDimensionMismatch(dst.size(), n_pvt_oil_columns-1));
     pvt_table_oil.get_values(pressure, dst);
   }  // eom
+
+
+
+template <int dim>
+void Model<dim>::set_model_type(ModelType model_type)
+{
+  phases.clear();
+  type = model_type;
+
+  if (model_type == ModelType::SingleLiquid)
+    phases.push_back(Phase::Water);
+  else if (model_type == WaterOil)
+  {
+    phases.push_back(Phase::Water);
+    phases.push_back(Phase::Oil);
+  }
+  else
+    AssertThrow(false, ExcNotImplemented());
+}
+
+
+
+template <int dim>
+inline
+bool Model<dim>::has_phase(Phase &phase) const
+{
+  for (const auto & p : phases)
+    if (p == phase)
+      return true;
+
+  return false;
+}
+
 }  // end of namespace

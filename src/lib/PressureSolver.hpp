@@ -143,7 +143,7 @@ namespace FluidSolvers
     FEValues<dim> fe_values(fe, quadrature_formula, update_values);
     FEValues<dim> fe_values_neighbor(fe, quadrature_formula, update_values);
     // fe_values for additional vectors
-    extra_data.make_fe_values();
+    extra_data.make_fe_values(quadrature_formula);
 
     // the following two objects only get geometry data
     FEFaceValues<dim> fe_face_values(fe, face_quadrature_formula,
@@ -166,11 +166,13 @@ namespace FluidSolvers
     typename DoFHandler<dim>::active_cell_iterator
       cell = dof_handler.begin_active(),
       endc = dof_handler.end();
+    extra_data.cells_begin();
 
     system_matrix = 0;
     rhs_vector = 0;
 
     for (; cell!=endc; ++cell)
+    {
       if (cell->is_locally_owned())
       {
         cell->get_dof_indices(dof_indices);
@@ -179,17 +181,15 @@ namespace FluidSolvers
         fe_values.reinit(cell);
         fe_values.get_function_values(old_solution, p_old_values);
 
-        // for (auto & p_fe_values_extra : vp_fe_values_extra)
-        // {
-        //   p_fe_values_extra->reinit(cell);
-        // }
+        extra_data.reinit();
+        extra_data.update_fe_values();
 
         // std::cout << "cell: " << i << std::endl;
         // double p_i = solution[i];
-        // double p_old = solution_old[i];
         double p_old = p_old_values[0];
 
-        cell_values.update(cell);
+        cell_values.update(cell, p_old, extra_data.get_values(0));
+        // cell_values.update(cell, p_old);
 
         const double B_ii = cell_values.get_mass_matrix_entry();
 
@@ -214,7 +214,7 @@ namespace FluidSolvers
                 j = dof_indices_neighbor[0];
                 const double dS = cell->face(f)->measure();  // face area
                 dx_ij = cell->neighbor(f)->center() - cell->center();
-                neighbor_values.update(cell->neighbor(f));
+                neighbor_values.update(cell->neighbor(f), p_old);
                 // assemble local matrix and distribute
                 cell_values.update_face_values(neighbor_values, dx_ij, normal, dS);
                 matrix_ii += cell_values.T_face;
@@ -234,7 +234,7 @@ namespace FluidSolvers
                   j = dof_indices_neighbor[0];
                   fe_subface_values.reinit(cell, f, subface);
                   normal = fe_subface_values.normal_vector(0); // 0 is gauss point
-                  neighbor_values.update(neighbor_child);
+                  neighbor_values.update(neighbor_child, p_old);
                   const double dS = fe_subface_values.JxW(0);
                   dx_ij = neighbor_child->center() - cell->center();
                   // assemble local matrix and distribute
@@ -252,8 +252,9 @@ namespace FluidSolvers
           rhs_vector[i] += rhs_i;
 
           // std::cout << "------------------------------\n";
-        } // end cell loop
-
+        } // end local cells
+      extra_data.increment_cells();
+    } // end cells loop
     system_matrix.compress(VectorOperation::add);
     rhs_vector.compress(VectorOperation::add);
   } // eom
