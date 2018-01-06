@@ -15,6 +15,7 @@
 #include <Tensors.hpp>
 #include <Keywords.h>
 #include <LookupTable.hpp>
+#include <RelativePermeability.hpp>
 
 
 namespace Model
@@ -65,15 +66,23 @@ namespace Model
     void set_pvt_water(Interpolation::LookupTable &table);
     void set_pvt_oil(Interpolation::LookupTable &table);
     void set_pvt_gas(Interpolation::LookupTable &table);
-    void set_density_sc_w(const double x)
-    {density_sc_w_constant = x;}
+    void set_rel_perm(const double Sw_crit,
+                      const double So_rw,
+                      const double k_rw0,
+                      const double k_ro0,
+                      const double nw,
+                      const double no);
+    void set_density_sc_w(const double x) {density_sc_w_constant = x;}
+    void set_density_sc_o(const double x) {density_sc_o_constant = x;}
     void add_well(const std::string name,
                   const double radius,
                   const std::vector< Point<dim> > &locations);
 
     // querying data
-    bool has_phase(Phase &phase) const;
+    bool has_phase(const Phase &phase) const;
+    unsigned int n_phases() const;
     double density_sc_water() const;
+    double density_sc_oil() const;
     double gravity() const;
     void get_pvt_oil(const double        pressure,
                      std::vector<double> &dst) const;
@@ -83,6 +92,8 @@ namespace Model
                      std::vector<double> &dst) const;
     double get_time_step(const double time) const;
     std::vector<int> get_well_ids() const;
+    void get_relative_permeability(const double Sw,
+                                   std::vector<double> &dst) const;
     int get_well_id(const std::string& well_name) const;
 
     // update methods
@@ -115,12 +126,14 @@ namespace Model
   protected:
     std::string                            mesh_file_name, input_file_name;
     double                                 density_sc_w_constant,
+                                           density_sc_o_constant,
                                            porosity,
                                            young_modulus,
                                            poisson_ratio_constant;
     Interpolation::LookupTable             pvt_table_water,
                                            pvt_table_oil,
                                            pvt_table_gas;
+    ConstitutiveModel::RelativePermeability rel_perm;
     std::vector<Phase>                     phases;
   private:
     std::map<double, double>               timestep_table;
@@ -162,6 +175,16 @@ namespace Model
   {
     return this->density_sc_w_constant;
   }  // eom
+
+
+
+  template <int dim>
+  inline
+  double Model<dim>::density_sc_oil() const
+  {
+    return this->density_sc_o_constant;
+  }  // eom
+
 
 
   template <int dim>
@@ -404,13 +427,45 @@ void Model<dim>::set_model_type(ModelType model_type)
 
 template <int dim>
 inline
-bool Model<dim>::has_phase(Phase &phase) const
+bool Model<dim>::has_phase(const Phase &phase) const
 {
   for (const auto & p : phases)
     if (p == phase)
       return true;
 
   return false;
+}  // eom
+
+
+
+template <int dim>
+inline
+unsigned int Model<dim>::n_phases() const
+{
+  return phases.size();
+}  // eom
+
+
+template <int dim>
+inline
+void Model<dim>::set_rel_perm(const double Sw_crit,
+                              const double So_rw,
+                              const double k_rw0,
+                              const double k_ro0,
+                              const double nw,
+                              const double no)
+{
+  rel_perm.set_data(Sw_crit, So_rw, k_rw0, k_ro0, nw, no);
+}  // eom
+
+
+
+template <int dim>
+inline
+void Model<dim>::get_relative_permeability(const double Sw,
+                                           std::vector<double> &dst) const
+{
+  rel_perm.get_values(Sw, dst);
 }
 
 }  // end of namespace

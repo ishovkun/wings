@@ -6,6 +6,7 @@ ADD_LIBRARY(wings SHARED
   SyntaxParser.hpp
   CellValues.hpp
   PressureSolver.hpp
+  RelativePermeability.hpp
   ExtraFEData.hpp
   SaturationSolverExplicit.hpp
   Model.hpp

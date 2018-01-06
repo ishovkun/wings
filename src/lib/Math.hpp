@@ -29,6 +29,20 @@ namespace Math
   }  // eom
 
 
+
+  inline
+  double upwind(const double x1,
+                const double x2,
+                const double potential1,
+                const double potential2)
+  {
+    if (potential1 >= potential2)
+      return x1;
+    else return x2;
+  }  // eom
+
+
+
   double sum(const std::vector<double> & v)
   {
     AssertThrow(v.size()> 0, ExcEmptyObject());

@@ -130,6 +130,7 @@ namespace Parsers {
 
       // if (model_type == Model::SingleLiquid ||
       //     model_type == Model::ModelType::WaterOil)
+      if (model.has_phase(Model::Phase::Water))
       {
         const auto & tmp = parser.get_matrix(kwds.pvt_water, ";", ",");
         // tmp.print_formatted(std::cout);
@@ -137,6 +138,9 @@ namespace Parsers {
                     ExcDimensionMismatch(tmp.n(), model.n_pvt_water_columns));
         Interpolation::LookupTable pvt_water_table(tmp);
         model.set_pvt_water(pvt_water_table);
+        // density
+        const double rho_w = parser.get_double(kwds.density_sc_water);
+        model.set_density_sc_w(rho_w);
       }
 
       if (model_type != Model::SingleLiquid &&
@@ -147,7 +151,24 @@ namespace Parsers {
         AssertThrow(tmp.n() == model.n_pvt_oil_columns,
                     ExcDimensionMismatch(tmp.n(), model.n_pvt_oil_columns));
         Interpolation::LookupTable pvt_oil_table(tmp);
-      }
+        model.set_pvt_oil(pvt_oil_table);
+
+        const double rho_o = parser.get_double(kwds.density_sc_oil);
+        model.set_density_sc_o(rho_o);
+
+        // Relative permeability
+        const auto & rel_perm_water =
+            parser.get_double_list(kwds.rel_perm_water, ",");
+        const auto & rel_perm_oil =
+            parser.get_double_list(kwds.rel_perm_oil, ",");
+        AssertThrow(rel_perm_water.size() == 3,
+                    ExcDimensionMismatch(rel_perm_water.size(), 3));
+        AssertThrow(rel_perm_oil.size() == 3,
+                    ExcDimensionMismatch(rel_perm_oil.size(), 3));
+        model.set_rel_perm(rel_perm_water[0], rel_perm_oil[0],
+                           rel_perm_water[1], rel_perm_oil[1],
+                           rel_perm_water[2], rel_perm_oil[2]);
+      }  // end two-phase case
 
     } // end equation data
 
