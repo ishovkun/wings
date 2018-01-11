@@ -119,7 +119,7 @@ namespace Parsers {
         std::vector<double> default_anisotropy{1,1,1};
         Tensor<1,dim> no_anisotropy = Parsers::convert<dim>(default_anisotropy);
         Tensor<1,dim> anisotropy = Parsers::convert<dim>
-          (parser.get_double_list(kwds.permeability_anisotropy, ",",
+            (parser.get_double_list(kwds.permeability_anisotropy, ",",
                                   default_anisotropy));
         model.get_permeability =
           get_function(kwds.permeability, anisotropy, parser);

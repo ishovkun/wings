@@ -154,8 +154,11 @@ namespace Wings
       p_neighbor_values = &neighbor_values_mp;
     }
 
-    pressure_solver.assemble_system(*p_cell_values, *p_neighbor_values,
-                                    time_step, extra_data);
+    data.locate_wells();
+    data.update_well_productivities();
+
+    // pressure_solver.assemble_system(*p_cell_values, *p_neighbor_values,
+    //                                 time_step, extra_data);
   } // eom
 
 } // end of namespace

@@ -40,7 +40,7 @@ PVT water
 # p Bw   Cw     mu_w R_wg
 10, 1.0, 5e-10, 1e-3, 0 /
 
-PVT oil
+pvt oil
 # p Bo   Co    mu_o  R_s
 01, 1.0, 1e-8, 1e-3, 0.0;
 10, 1.0, 1e-8, 1e-3, 0.0;
@@ -61,5 +61,3 @@ Minimum time step    1e-5 /
 T max                100 /
 FSS tolerance        1e-8 /
 Max FSS steps        30 /
-
-

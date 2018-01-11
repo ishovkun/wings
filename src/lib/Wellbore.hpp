@@ -58,7 +58,7 @@ namespace Wellbore
                        const CellIterator<dim> &cell,
                        Tensor<1,dim> &h) const;
 
-    int    find_cell(const CellIterator<dim> & cell) const;
+    int  find_cell(const CellIterator<dim> & cell) const;
     bool neighbor_is_farther(const Tensor<1,dim> &cell_to_wellbore,
                               const Tensor<1,dim> &neighbor_to_wellbore,
                               const unsigned int  cell_index,
@@ -102,7 +102,6 @@ namespace Wellbore
     // Init zero rate control just in case
     control.type = Schedule::WellControlType::flow_control_total;
     control.value = 0.0;
-
   } //  eom
 
 
@@ -114,6 +113,7 @@ namespace Wellbore
   }  // eom
 
 
+
   template <int dim>
   inline
   const Schedule::WellControl &
@@ -121,6 +121,8 @@ namespace Wellbore
   {
     return this->control;
   }  // eom
+
+
 
   template <int dim>
   inline
@@ -138,6 +140,7 @@ namespace Wellbore
   {
     return cells;
   }  // eom
+
 
 
   template <int dim>
@@ -165,6 +168,8 @@ namespace Wellbore
       return false;
   }  // eom
 
+
+
   template <int dim>
   inline bool Wellbore<dim>::
   aligned_with_face(const Tensor<1,dim> &cell_to_wellbore,
@@ -179,9 +184,10 @@ namespace Wellbore
   }  // eom
 
 
+
   template <int dim>
   void Wellbore<dim>::locate(const DoFHandler<dim>& dof_handler,
-                             const FE_DGQ<dim>&     fe)
+                             const FE_DGQ<dim>    & fe)
   {
     /* Algorithm:
        I. if just one well location, add cell that contains the point.
@@ -293,10 +299,10 @@ namespace Wellbore
                 //         cell->point_inside(d + Point<dim>(0,0,-eps))
                 //       ))
                 if (!point_inside_cell(cell, d))
-                  {
-                    // std::cout << "No" << std::endl;
-                    continue;
-                  }
+                {
+                  // std::cout << "No" << std::endl;
+                  continue;
+                }
                 // check if d is between x1 and x0
                 // d = x0 + a*td
                 double td = scalar_product((p0 - x0), a);
@@ -310,10 +316,10 @@ namespace Wellbore
 
                 if((td < 0 || td > t1) && // distance vector outside segment
                    !(x0_inside || x1_inside)) //end-points
-                  {
-                    // std::cout << "No" << std::endl;
-                    continue;
-                  }
+                {
+                  // std::cout << "No" << std::endl;
+                  continue;
+                }
                 // std::cout << "Yes" << std::endl;
 
                 // initial point to seek segment length
