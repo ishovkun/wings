@@ -41,11 +41,12 @@ class Wellbore : public Function<dim>
   // set data methods
   void set_control(const Schedule::WellControl& control_);
   // access methods
-  double get_radius() const;
-  const Schedule::WellControl &get_control();
+  double                                  get_radius() const;
+  const Schedule::WellControl           & get_control();
   const  std::vector<CellIterator<dim>> & get_cells();
   const  std::vector< Point<dim> >      & get_locations();
-  std::vector<double> & get_productivities();
+  std::vector< std::vector<double> >    & get_productivities();
+
   // update methods
   void locate(const DoFHandler<dim>& dof_handler);
   std::pair<double,double> get_J_and_Q(const CellIterator<dim> & cell) const;
@@ -608,9 +609,9 @@ Wellbore<dim>:: get_productivities()
 
 template <int dim>
 void Wellbore<dim>::
-update_productivity(const Function<dim> &get_permeability,
-                    const Function<dim> &get_saturation,
-                    const RelativePermeability &rel_perm)
+update_productivity(const Function<dim>        &get_permeability,
+                    const Function<dim>        &get_saturation,
+                    const RelativePermeability &get_relative_permeability)
 {
   /*
     First get cell dimensions dx dy dz
@@ -618,8 +619,11 @@ update_productivity(const Function<dim> &get_permeability,
     Then compute transmissibilities.
     How do I normalize permeability when it's a tensor?
   */
-  Vector<double>    perm(dim);
-  Tensor<1,dim>     productivity;
+  Vector<double>      perm(dim);
+  Tensor<1,dim>       abs_productivity;
+  std::vector<double> productivity(n_phases);
+  std::vector<double> saturation(n_phases);
+  std::vector<double> rel_perm(n_phases);
 
   productivities.clear();
 
@@ -627,24 +631,32 @@ update_productivity(const Function<dim> &get_permeability,
   for (unsigned int i=0; i<cells.size(); i++)
   {
     get_permeability.vector_value(cells[i]->center(), perm);
-    productivity[0] = compute_productivity
+    abs_productivity[0] = compute_productivity
         (perm[1], perm[2], h[i][1], h[i][2],
          segment_length[i]*abs(segment_direction[i][0]));
-    productivity[1] = compute_productivity
+    abs_productivity[1] = compute_productivity
         (perm[0], perm[2], h[i][0], h[i][2],
          segment_length[i]*abs(segment_direction[i][1]));
-    productivity[2] = compute_productivity
+    abs_productivity[2] = compute_productivity
         (perm[0], perm[1], h[i][0], h[i][1],
          segment_length[i]*abs(segment_direction[i][2]));
-    productivities.push_back(productivity.norm());
-    // std::cout << "J: " << productivity << std::endl;
-    // const auto & cell =
+    const double j_ind = abs_productivity.norm();
+
+    // phase productivities
+    get_saturation.vector_value(cells[i]->center(), saturation);
+    get_relative_permeability.get_values(saturation, rel_perm);
+    for (int p=0; p<n_phases; ++p)
+      productivity[p] = rel_perm[p]*j_ind;
+
+    // productivities.push_back(productivity.norm());
+
   }  // end cell loop
+
   // get sum of productivities for normalization later on
-  total_productivity = 0;
-  for (unsigned int s=0; s<productivities.size(); s++)
-    total_productivity += productivities[s];
-  total_productivity = Utilities::MPI::sum(total_productivity, mpi_communicator);
+  // total_productivity = 0;
+  // for (unsigned int s=0; s<productivities.size(); s++)
+  //   total_productivity += productivities[s];
+  // total_productivity = Utilities::MPI::sum(total_productivity, mpi_communicator);
 }  // eom
 
 
@@ -694,8 +706,8 @@ std::pair<double,double> Wellbore<dim>::get_J_and_Q(const CellIterator<dim> & ce
 
   if (control.type == Schedule::WellControlType::pressure_control)
   {
-    return std::make_pair(productivities[segment],
-                          control.value*productivities[segment]);
+    // return std::make_pair(productivities[segment],
+    //                       control.value*productivities[segment]);
   }
   else if (control.type == Schedule::WellControlType::flow_control_total)
   {
@@ -709,13 +721,13 @@ std::pair<double,double> Wellbore<dim>::get_J_and_Q(const CellIterator<dim> & ce
     // const double normalized_flux =
     //     control.value*productivities[segment]/sum_productivities;
 
-    const double normalized_flux =
-        control.value*productivities[segment]/total_productivity;
+    // const double normalized_flux =
+    //     control.value*productivities[segment]/total_productivity;
 
-    if (total_productivity > 0)
-      return std::make_pair(0.0, normalized_flux);
-    else
-      return std::make_pair(0.0, 0.0);
+    // if (total_productivity > 0)
+    //   return std::make_pair(0.0, normalized_flux);
+    // else
+    //   return std::make_pair(0.0, 0.0);
   }
   else
   {

@@ -18,10 +18,10 @@ template <int dim, typename VectorType>
 class FEFunction : public Function<dim>
 {
  public:
-  FEFunction(const DoFHandler<dim>           &dof_handler,
-             const std::vector<VectorType>  &vectors);
+  FEFunction(const DoFHandler<dim>         &dof_handler,
+             const std::vector<VectorType> &vectors);
   void vector_value(const Point<dim>    &p,
-                    std::vector<double> &dst) const;
+                    Vector<double> &dst) const;
  private:
   const DoFHandler<dim>          &dof_handler;
   const std::vector<VectorType> vectors;
@@ -31,7 +31,7 @@ class FEFunction : public Function<dim>
 
 template <int dim, typename VectorType>
 FEFunction<dim, VectorType>::
-FEFunction(const DoFHandler<dim>          &dof_handler_,
+FEFunction(const DoFHandler<dim>         &dof_handler_,
            const std::vector<VectorType> &vectors_)
     :
     dof_handler(dof_handler_),
@@ -43,7 +43,7 @@ FEFunction(const DoFHandler<dim>          &dof_handler_,
 template <int dim, typename VectorType>
 void
 FEFunction<dim,VectorType>::vector_value(const Point<dim>    &p,
-                                         std::vector<double> &dst) const
+                                         Vector<double> &dst) const
 {
   /* Don't call this function before setup_dofs */
   AssertThrow(dof_handler.has_active_dofs(), ExcMessage("DofHandler is empty"));

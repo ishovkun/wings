@@ -14,9 +14,8 @@ class RelativePermeability
       const double k_ro0,
       const double nw,
       const double no);
-  void get_values(const double Sw,
-                  const double So,
-                  std::vector<double> &dst) const;
+  void get_values(const std::vector<double> &saturations,
+                  std::vector<double>       &dst) const;
 
  private:
   double Sw_crit, So_rw, k_rw0, k_ro0, nw, no;
@@ -43,12 +42,15 @@ void RelativePermeability::set_data(
 
 
 inline
-void RelativePermeability::get_values(const double Sw,
-                                      const double So,
-                                      std::vector<double> &dst) const
+void RelativePermeability::get_values(const std::vector<double> &saturation,
+                                      std::vector<double>       &dst) const
 {
+  AssertThrow(saturation.size() == 2,
+              dealii::ExcDimensionMismatch(saturation.size(), 2));
   AssertThrow(dst.size() == 2,
               dealii::ExcDimensionMismatch(dst.size(), 2));
+
+  const double Sw = saturation[0];
 
   // dimensionless saturation
   double Sw_d = (Sw - Sw_crit) / (1.0 - Sw_crit - So_rw);

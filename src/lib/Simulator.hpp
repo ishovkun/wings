@@ -163,7 +163,7 @@ namespace Wings
         saturation_function(pressure_solver.get_dof_handler(),
                             saturation_solver.relevant_solution);
     {// test saturation values
-      std::vector<double> tmp(2);
+      Vector<double> tmp(2);
       saturation_function.vector_value(Point<dim>{0,0,0}, tmp);
       pcout << "Sw " << tmp[0] << std::endl;
     }
