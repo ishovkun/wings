@@ -11,6 +11,7 @@
 // #include <Wellbore.hpp>
 #include <PressureSolver.hpp>
 #include <SaturationSolverExplicit.hpp>
+#include <FEFunction.hpp>
 // #include <CellValues.hpp>
 
 #include <ExtraFEData.hpp>
@@ -154,8 +155,19 @@ namespace Wings
       p_neighbor_values = &neighbor_values_mp;
     }
 
-    data.locate_wells();
-    data.update_well_productivities();
+    model.locate_wells(pressure_solver.get_dof_handler());
+    // std::vector<TrilinosWrappers::MPI::Vector*> saturation_solution =
+    //     {&satura};
+
+    FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
+        saturation_function(pressure_solver.get_dof_handler(),
+                            saturation_solver.relevant_solution);
+    {// test saturation values
+      std::vector<double> tmp(2);
+      saturation_function.vector_value(Point<dim>{0,0,0}, tmp);
+      pcout << "Sw " << tmp[0] << std::endl;
+    }
+    // data.update_well_productivities();
 
     // pressure_solver.assemble_system(*p_cell_values, *p_neighbor_values,
     //                                 time_step, extra_data);

@@ -264,7 +264,7 @@ CellValuesMP<dim>::update(const CellIterator<dim> &cell,
   c3e = 0;
 
 
-  model.get_relative_permeability(Sw, rel_perm);
+  model.get_relative_permeability(Sw, So, rel_perm);
   // const double c3e = 0;
   // //
   // // calculate source term

@@ -8,6 +8,7 @@ ADD_LIBRARY(wings SHARED
   PressureSolver.hpp
   RelativePermeability.hpp
   ExtraFEData.hpp
+  FEFunction.hpp
   SaturationSolverExplicit.hpp
   Model.hpp
   BitMap.hpp

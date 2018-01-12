@@ -93,13 +93,13 @@ namespace Model
     double get_time_step(const double time) const;
     std::vector<int> get_well_ids() const;
     void get_relative_permeability(const double Sw,
+                                   const double So,
                                    std::vector<double> &dst) const;
     int get_well_id(const std::string& well_name) const;
 
     // update methods
     void update_well_controls(const double time);
-    void locate_wells(const DoFHandler<dim>& dof_handler,
-                      const FE_DGQ<dim>&     fe);
+    void locate_wells(const DoFHandler<dim>& dof_handler);
     void update_well_productivities();
     void compute_runtime_parameters();
 
@@ -352,13 +352,12 @@ namespace Model
 
 
   template <int dim>
-  void Model<dim>::locate_wells(const DoFHandler<dim>& dof_handler,
-                                   const FE_DGQ<dim>&     fe)
+  void Model<dim>::locate_wells(const DoFHandler<dim>& dof_handler)
   {
     for (unsigned int i=0; i<wells.size(); i++)
     {
       // std::cout << "well " << i << std::endl;
-      wells[i].locate(dof_handler, fe);
+      wells[i].locate(dof_handler);
     }
   } // eom
 
@@ -463,8 +462,10 @@ void Model<dim>::set_rel_perm(const double Sw_crit,
 template <int dim>
 inline
 void Model<dim>::get_relative_permeability(const double Sw,
+                                           const double So,
                                            std::vector<double> &dst) const
 {
+  So;
   rel_perm.get_values(Sw, dst);
 }
 
