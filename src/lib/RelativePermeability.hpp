@@ -1,8 +1,8 @@
 #pragma once
 
-namespace ConstitutiveModel
+namespace Model
 {
-using namespace dealii;
+// using namespace dealii;
 
 class RelativePermeability
 {
@@ -15,6 +15,7 @@ class RelativePermeability
       const double nw,
       const double no);
   void get_values(const double Sw,
+                  const double So,
                   std::vector<double> &dst) const;
 
  private:
@@ -40,12 +41,14 @@ void RelativePermeability::set_data(
 } // eom
 
 
+
 inline
 void RelativePermeability::get_values(const double Sw,
+                                      const double So,
                                       std::vector<double> &dst) const
 {
   AssertThrow(dst.size() == 2,
-              ExcDimensionMismatch(dst.size(), 2));
+              dealii::ExcDimensionMismatch(dst.size(), 2));
 
   // dimensionless saturation
   double Sw_d = (Sw - Sw_crit) / (1.0 - Sw_crit - So_rw);

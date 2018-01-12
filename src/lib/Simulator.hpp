@@ -167,7 +167,8 @@ namespace Wings
       saturation_function.vector_value(Point<dim>{0,0,0}, tmp);
       pcout << "Sw " << tmp[0] << std::endl;
     }
-    // data.update_well_productivities();
+
+    model.update_well_productivities(saturation_function);
 
     // pressure_solver.assemble_system(*p_cell_values, *p_neighbor_values,
     //                                 time_step, extra_data);

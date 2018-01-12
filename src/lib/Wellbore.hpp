@@ -12,15 +12,22 @@
 #include <DefaultValues.h>
 #include <Schedule.hpp>
 #include <Math.hpp>
+#include <RelativePermeability.hpp>
 
 
-namespace Wellbore
+namespace Model
 {
 using namespace dealii;
 
 
 template <int dim>
 using CellIterator = typename DoFHandler<dim>::active_cell_iterator;
+
+// template <int dim>
+// using RelPermMemberFunc = typename
+//     (void RelativePermeability::*get_values)(const               double,
+//                                              const               double,
+//                                              std::vector<double> &dst));
 
 
 template <int dim>
@@ -29,19 +36,22 @@ class Wellbore : public Function<dim>
  public:
   Wellbore(const std::vector< Point<dim> >& locations_,
            const double                     radius_,
-           MPI_Comm                         &mpi_communicator_);
+           MPI_Comm                         &mpi_communicator_,
+           int                              n_phases=1);
+  // set data methods
   void set_control(const Schedule::WellControl& control_);
-  const Schedule::WellControl &get_control();
+  // access methods
   double get_radius() const;
-
-  void locate(const DoFHandler<dim>& dof_handler);
+  const Schedule::WellControl &get_control();
   const  std::vector<CellIterator<dim>> & get_cells();
   const  std::vector< Point<dim> >      & get_locations();
-  std::pair<double,double> get_J_and_Q(const CellIterator<dim> & cell) const;
-  void update_productivity(const Function<dim> &permeability,
-                           const Function<dim> &get_saturation,
-                           const void         (&get_rel_perm)(const double, const double, std::vector<double>&));
   std::vector<double> & get_productivities();
+  // update methods
+  void locate(const DoFHandler<dim>& dof_handler);
+  std::pair<double,double> get_J_and_Q(const CellIterator<dim> & cell) const;
+  void update_productivity(const Function<dim>        &permeability,
+                           const Function<dim>        &get_saturation,
+                           const RelativePermeability &rel_perm);
   static bool point_inside_cell(const CellIterator<dim> &cell,
                                 const Point<dim>        &p);
 
@@ -71,28 +81,31 @@ class Wellbore : public Function<dim>
                          const Tensor<1,dim> &face_normal) const;
 
   // variables
-  std::vector< Point<dim> > locations;
-  double                    radius;
-  MPI_Comm                  &mpi_communicator;
-  Schedule::WellControl     control;
-
-  const DoFHandler<dim>          *p_dof_handler;
-  std::vector<CellIterator<dim>> cells;
-  std::vector<double>            segment_length;
-  std::vector< Tensor<1,dim> >   segment_direction;
-  std::vector<double>            productivities;
-  double                         total_productivity;
+  std::vector< Point<dim> >          locations;
+  double                             radius;
+  MPI_Comm                           &mpi_communicator;
+  int                                n_phases;
+  Schedule::WellControl              control;
+  const DoFHandler<dim>              *p_dof_handler;
+  std::vector<CellIterator<dim>>     cells;
+  std::vector<double>                segment_length;
+  std::vector< Tensor<1,dim> >       segment_direction;
+  std::vector< std::vector<double> > productivities;
+  std::vector<double>                total_productivity;
 };  // eom
 
 
 template <int dim>
 Wellbore<dim>::Wellbore(const std::vector< Point<dim> >& locations_,
                         const double                     radius_,
-                        MPI_Comm                         &mpi_communicator_)
+                        MPI_Comm                         &mpi_communicator_,
+                        int                              n_phases_)
     :
     locations(locations_),
     radius(radius_),
-    mpi_communicator(mpi_communicator_)
+    mpi_communicator(mpi_communicator_),
+    n_phases(n_phases_),
+    total_productivity(n_phases)
 {
   AssertThrow(locations.size() > 0,
               ExcMessage("That ain't no a proper well"));
@@ -585,7 +598,7 @@ get_cell_sizes(const std::vector<CellIterator<dim>> &cells_) const
 
 
 template <int dim>
-std::vector<double> &
+std::vector< std::vector<double> > &
 Wellbore<dim>:: get_productivities()
 {
   return productivities;
@@ -597,7 +610,7 @@ template <int dim>
 void Wellbore<dim>::
 update_productivity(const Function<dim> &get_permeability,
                     const Function<dim> &get_saturation,
-                    const void         (&get_rel_perm)(const double, const double, std::vector<double>&))
+                    const RelativePermeability &rel_perm)
 {
   /*
     First get cell dimensions dx dy dz
@@ -607,10 +620,13 @@ update_productivity(const Function<dim> &get_permeability,
   */
   Vector<double>    perm(dim);
   Tensor<1,dim>     productivity;
+
+  productivities.clear();
+
   const std::vector< Tensor<1,dim> > h = get_cell_sizes(cells);
   for (unsigned int i=0; i<cells.size(); i++)
   {
-    get_permeability->vector_value(cells[i]->center(), perm);
+    get_permeability.vector_value(cells[i]->center(), perm);
     productivity[0] = compute_productivity
         (perm[1], perm[2], h[i][1], h[i][2],
          segment_length[i]*abs(segment_direction[i][0]));
