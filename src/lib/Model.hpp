@@ -92,8 +92,7 @@ class Model
                    std::vector<double> &dst) const;
   double get_time_step(const double time) const;
   std::vector<int> get_well_ids() const;
-  void get_relative_permeability(const double Sw,
-                                 const double So,
+  void get_relative_permeability(Vector<double>      &saturation,
                                  std::vector<double> &dst) const;
   int get_well_id(const std::string& well_name) const;
 
@@ -251,7 +250,7 @@ void Model<dim>::add_well(const std::string name,
                           const double radius,
                           const std::vector< Point<dim> > &locations)
 {
-  Wellbore<dim> w(locations, radius, mpi_communicator);
+  Wellbore<dim> w(locations, radius, mpi_communicator, n_phases());
   this->wells.push_back(w);
 
   // check if well_id is in unique_well_ids and add if not
@@ -475,11 +474,10 @@ void Model<dim>::set_rel_perm(const double Sw_crit,
 
 template <int dim>
 inline
-void Model<dim>::get_relative_permeability(const double        Sw,
-                                           const double        So,
+void Model<dim>::get_relative_permeability(Vector<double>      &saturation,
                                            std::vector<double> &dst) const
 {
-  rel_perm.get_values(Sw, So, dst);
+  rel_perm.get_values(saturation, dst);
 }
 
 }  // end of namespace

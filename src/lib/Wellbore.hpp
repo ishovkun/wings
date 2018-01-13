@@ -49,7 +49,8 @@ class Wellbore : public Function<dim>
 
   // update methods
   void locate(const DoFHandler<dim>& dof_handler);
-  std::pair<double,double> get_J_and_Q(const CellIterator<dim> & cell) const;
+  std::pair<double,double> get_J_and_Q(const CellIterator<dim> & cell,
+                                       const unsigned int        phase = 0) const;
   void update_productivity(const Function<dim>        &permeability,
                            const Function<dim>        &get_saturation,
                            const RelativePermeability &rel_perm);
@@ -92,7 +93,7 @@ class Wellbore : public Function<dim>
   std::vector<double>                segment_length;
   std::vector< Tensor<1,dim> >       segment_direction;
   std::vector< std::vector<double> > productivities;
-  std::vector<double>                total_productivity;
+  Vector<double>                     total_productivity;
 };  // eom
 
 
@@ -620,9 +621,9 @@ update_productivity(const Function<dim>        &get_permeability,
     How do I normalize permeability when it's a tensor?
   */
   Vector<double>      perm(dim);
+  Vector<double>      saturation(n_phases);
   Tensor<1,dim>       abs_productivity;
   std::vector<double> productivity(n_phases);
-  std::vector<double> saturation(n_phases);
   std::vector<double> rel_perm(n_phases);
 
   productivities.clear();
@@ -640,6 +641,7 @@ update_productivity(const Function<dim>        &get_permeability,
     abs_productivity[2] = compute_productivity
         (perm[0], perm[1], h[i][0], h[i][1],
          segment_length[i]*abs(segment_direction[i][2]));
+
     const double j_ind = abs_productivity.norm();
 
     // phase productivities
@@ -648,20 +650,25 @@ update_productivity(const Function<dim>        &get_permeability,
     for (int p=0; p<n_phases; ++p)
       productivity[p] = rel_perm[p]*j_ind;
 
-    // productivities.push_back(productivity.norm());
+    productivities.push_back(productivity);
 
   }  // end cell loop
 
   // get sum of productivities for normalization later on
-  // total_productivity = 0;
-  // for (unsigned int s=0; s<productivities.size(); s++)
-  //   total_productivity += productivities[s];
-  // total_productivity = Utilities::MPI::sum(total_productivity, mpi_communicator);
+  for (auto & p : total_productivity) p = 0;    // first set to zero
+  // sum
+  for (unsigned int i=0; i<cells.size(); i++)
+    for (unsigned int p=0; p<total_productivity.size(); p++)
+      total_productivity[p] += productivities[i][p];
+  // sum over mpi
+  for (unsigned int p=0; p<total_productivity.size(); p++)
+    total_productivity[p] = Utilities::MPI::sum(total_productivity[p], mpi_communicator);
 }  // eom
 
 
 
 template <int dim>
+inline
 double Wellbore<dim>::compute_productivity(const double k1,
                                            const double k2,
                                            const double dx1,
@@ -686,7 +693,9 @@ double Wellbore<dim>::compute_productivity(const double k1,
 
 
 template <int dim>
-std::pair<double,double> Wellbore<dim>::get_J_and_Q(const CellIterator<dim> & cell) const
+std::pair<double,double>
+Wellbore<dim>::get_J_and_Q(const CellIterator<dim> & cell,
+                           const unsigned int phase) const
 {
   /*
     Returns a pair of entries of J and Q vectors
@@ -706,28 +715,22 @@ std::pair<double,double> Wellbore<dim>::get_J_and_Q(const CellIterator<dim> & ce
 
   if (control.type == Schedule::WellControlType::pressure_control)
   {
-    // return std::make_pair(productivities[segment],
-    //                       control.value*productivities[segment]);
+    return std::make_pair(productivities[segment][phase],
+                          control.value*productivities[segment][phase]);
   }
   else if (control.type == Schedule::WellControlType::flow_control_total)
   {
-    // compute sum of productivities to normalize flow in a segment
-    // double sum_productivities = 0;
-    // for (unsigned int s=0; s<productivities.size(); s++)
-    //   sum_productivities += productivities[s];
+    // compute sum of productivities per phase to normalize flow in a segment
+    // l1_norm cause they all should be positive
+    const double sum_phase_productivities = total_productivity.l1_norm();
 
-    // sum_productivities = Utilities::MPI::sum(sum_productivities, mpi_communicator);
+    const double normalized_flux =
+        control.value*productivities[segment][phase]/sum_phase_productivities;
 
-    // const double normalized_flux =
-    //     control.value*productivities[segment]/sum_productivities;
-
-    // const double normalized_flux =
-    //     control.value*productivities[segment]/total_productivity;
-
-    // if (total_productivity > 0)
-    //   return std::make_pair(0.0, normalized_flux);
-    // else
-    //   return std::make_pair(0.0, 0.0);
+    if (sum_phase_productivities > 0)
+      return std::make_pair(0.0, normalized_flux);
+    else
+      return std::make_pair(0.0, 0.0);
   }
   else
   {

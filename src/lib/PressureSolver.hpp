@@ -211,11 +211,14 @@ PressureSolver<dim>::assemble_system(CellValues::CellValuesBase<dim> &cell_value
           {
             cell->neighbor(f)->get_dof_indices(dof_indices_neighbor);
             fe_face_values.reinit(cell, f);
+            const double p_old_neighbor = 0;
             normal = fe_face_values.normal_vector(0); // 0 is gauss point
             j = dof_indices_neighbor[0];
             const double dS = cell->face(f)->measure();  // face area
             dx_ij = cell->neighbor(f)->center() - cell->center();
-            neighbor_values.update(cell->neighbor(f), p_old);
+            // neighbor_values.update(cell->neighbor(f), p_old);
+            // neighbor_values.update(cell->neighbor(f), p_old_neighbor,
+            //                        extra_data.get_values(0));
             // assemble local matrix and distribute
             cell_values.update_face_values(neighbor_values, dx_ij, normal, dS);
             matrix_ii += cell_values.T_face;
@@ -231,11 +234,13 @@ PressureSolver<dim>::assemble_system(CellValues::CellValuesBase<dim> &cell_value
               // compute parameters
               const auto & neighbor_child
                   = cell->neighbor_child_on_subface(f, subface);
+              const double p_old_neighbor = 0;
               neighbor_child->get_dof_indices(dof_indices_neighbor);
               j = dof_indices_neighbor[0];
               fe_subface_values.reinit(cell, f, subface);
               normal = fe_subface_values.normal_vector(0); // 0 is gauss point
-              neighbor_values.update(neighbor_child, p_old);
+              // neighbor_values.update(neighbor_child, p_old_neighbor,
+              //                        extra_data.get_values(0));
               const double dS = fe_subface_values.JxW(0);
               dx_ij = neighbor_child->center() - cell->center();
               // assemble local matrix and distribute

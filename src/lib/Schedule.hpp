@@ -8,17 +8,17 @@
 
 namespace Schedule
 {
-  enum WellControlType {pressure_control, flow_control_total, flow_control_water,
-                        flow_control_oil, flow_control_gas};
+  enum WellControlType {pressure_control, flow_control_total, flow_control_phase_1,
+                        flow_control_phase_2, flow_control_phase_3};
 
   const std::map<int, WellControlType> well_control_type_indexing =
-    {
-      {0, WellControlType::flow_control_total},
-      {1, WellControlType::flow_control_water},
-      {2, WellControlType::flow_control_oil},
-      {3, WellControlType::flow_control_gas},
-      {4, WellControlType::pressure_control}
-    };
+  {
+    {0, WellControlType::flow_control_total},
+    {1, WellControlType::pressure_control},
+    {2, WellControlType::flow_control_phase_1},
+    {3, WellControlType::flow_control_phase_2},
+    {4, WellControlType::flow_control_phase_3}
+  };
 
   struct WellControl
   {
@@ -53,6 +53,17 @@ namespace Schedule
 
   void Schedule::add_entry(const ScheduleEntry& entry)
   {
+    if (entry.control.type == WellControlType::flow_control_total)
+    {
+      AssertThrow(entry.control.value >= 0,
+                  dealii::ExcMessage("total flow control wellbores are only producers"));
+    }
+    else if (entry.control.type == WellControlType::pressure_control)
+    { /*do_nothing() */ }
+    else
+      AssertThrow(entry.control.value <= 0,
+                  dealii::ExcMessage("total flow control wellbores are only producers"));
+
     /* Add schedule entry to the vectors */
     times.push_back(entry.time);
     well_ids.push_back(entry.well_id);

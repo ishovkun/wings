@@ -20,7 +20,8 @@ namespace CellValues
     // update all values and wells
     virtual void update(const CellIterator<dim> &cell,
                         const double pressure,
-                        const std::vector<double> &extra_values);
+                        const std::vector<double> &extra_values,
+                        const bool update_well=1);
     // light version of the previous function - dosn't update wells
     // and values from extra_values
     virtual void update(const CellIterator<dim> &cell,
@@ -35,11 +36,11 @@ namespace CellValues
    public:
     double Q, J, T_face, G_face;
    protected:
-    const Model::Model<dim>  &model;
-    double phi, mu_w, B_w, C_w, cell_volume;
-    Point<dim> cell_coord;
-    Vector<double> k;
-    std::vector<double> pvt_values_water;
+    const Model::Model<dim> &model;
+    double                   phi, mu_w, B_w, C_w, cell_volume;
+    Point<dim>               cell_coord;
+    Vector<double>           k;
+    std::vector<double>      pvt_values_water;
   };
 
 
@@ -57,7 +58,8 @@ namespace CellValues
   void
   CellValuesBase<dim>::update(const CellIterator<dim> &cell,
                               const double pressure,
-                              const std::vector<double> &extra_values)
+                              const std::vector<double> &extra_values,
+                              const bool update_well)
   {
     AssertThrow(extra_values.size() == 0,
                 ExcDimensionMismatch(extra_values.size(), 0));
@@ -74,12 +76,13 @@ namespace CellValues
     // calculate source term
     Q = 0;
     J = 0;
-    for (const auto & well : model.wells)
-    {
-      std::pair<double,double> J_and_Q = well.get_J_and_Q(cell);
-      J += J_and_Q.first;
-      Q += J_and_Q.second;
-    }
+    if (update_well)
+      for (const auto & well : model.wells)
+      {
+        std::pair<double,double> J_and_Q = well.get_J_and_Q(cell);
+        J += J_and_Q.first;
+        Q += J_and_Q.second;
+      }
   } // eom
 
 
@@ -141,7 +144,7 @@ namespace CellValues
 
     // G_face = data.density_sc_water()/B_w_face*data.gravity()*T_face*dx[2]*face_normal[2];
     G_face = model.density_sc_water()/B_w_face/B_w_face/mu_w_face *
-      model.gravity()*k_face[2]*face_normal[2]*face_area;
+        model.gravity()*k_face[2]*face_normal[2]*face_area;
 
     // return T;
 
@@ -156,9 +159,8 @@ namespace CellValues
     CellValuesMP(const Model::Model<dim> &model_);
     virtual void update(const CellIterator<dim> &cell,
                         const double pressure,
-                        const std::vector<double> &extra_values);
-    virtual void update(const CellIterator<dim> &cell,
-                        const double pressure);
+                        const std::vector<double> &extra_values,
+                        const bool update_well=1);
     virtual void update_face_values(const CellValuesMP<dim> &neighbor_data,
                                     const Tensor<1,dim>     &dx,
                                     const Tensor<1,dim>     &face_normal,
@@ -177,6 +179,9 @@ namespace CellValues
       c2o, c2p, c2e,
       c3g, c3o, c3w, c3p, c3e;
     std::vector<double> rel_perm;
+    Vector<double>      vector_J_phase;
+    Vector<double>      vector_Q_phase;
+    Vector<double>      saturation;
   };
 
 
@@ -187,7 +192,10 @@ CellValuesMP<dim>::CellValuesMP(const Model::Model<dim> &model_)
     CellValuesBase<dim>::CellValuesBase(model_),
     pvt_values_oil(model_.n_pvt_oil_columns - 1), // cause p not really an entry
     pvt_values_gas(model_.n_pvt_gas_columns - 1), // cause p not really an entry
-    rel_perm(model_.n_phases())
+    rel_perm(model_.n_phases()),
+    vector_J_phase(model_.n_phases()),
+    vector_Q_phase(model_.n_phases()),
+    saturation(model_.n_phases())
 {}
 
 
@@ -196,7 +204,8 @@ template <int dim>
 void
 CellValuesMP<dim>::update(const CellIterator<dim> &cell,
                           const double pressure,
-                          const std::vector<double> &extra_values)
+                          const std::vector<double> &extra_values,
+                          const bool update_well)
 {
   const auto & model = this->model;
   AssertThrow(extra_values.size() == model.n_phases()-1,
@@ -257,34 +266,41 @@ CellValuesMP<dim>::update(const CellIterator<dim> &cell,
   // c3g = this->phi / B_g * this->cell_volume;
   // c3o = Rgo*c2o;
   // c3w = Rgw*c1w;
+
   c3g = 0;
   c3o = 0;
   c3w = 0;
   c3p = 0;
   c3e = 0;
 
+  saturation[0] = Sw;
+  saturation[1] = So;
+  model.get_relative_permeability(saturation, rel_perm);
 
-  model.get_relative_permeability(Sw, So, rel_perm);
-  // const double c3e = 0;
-  // //
-  // // calculate source term
-  // Q = 0;
-  // J = 0;
-  // for (const auto & well : model.wells)
-  // {
-  //   std::pair<double,double> J_and_Q = well.get_J_and_Q(cell);
-  //   J += J_and_Q.first;
-  //   Q += J_and_Q.second;
-  // }
-} // eom
+  // calculate source term
+  this->Q = 0;
+  this->J = 0;
+  if (update_well)
+  {
+    vector_J_phase = 0;
+    vector_Q_phase = 0;
 
+    for (unsigned int phase = 0; phase<this->model.n_phases(); ++phase)
+      for (const auto & well : model.wells)
+      {
+        std::pair<double,double> J_and_Q = well.get_J_and_Q(cell, phase);
+        vector_J_phase[phase] += J_and_Q.first;
+        vector_Q_phase[phase] += J_and_Q.second;
+      }
 
+    const double Qw = vector_Q_phase[0];
+    const double Qo = vector_Q_phase[1];
+    const double Jw = vector_J_phase[0];
+    const double Jo = vector_J_phase[1];
 
-template <int dim>
-void
-CellValuesMP<dim>::update(const CellIterator<dim> &cell,
-                          const double pressure)
-{
+    this->Q = Qw + B_o/this->B_w*Qo;
+    this->J = Jw + B_o/this->B_w*Jo;
+  }  // end update well
 } // eom
 
 

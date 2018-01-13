@@ -42,8 +42,8 @@ FEFunction(const DoFHandler<dim>         &dof_handler_,
 
 template <int dim, typename VectorType>
 void
-FEFunction<dim,VectorType>::vector_value(const Point<dim>    &p,
-                                         Vector<double> &dst) const
+FEFunction<dim,VectorType>::vector_value(const Point<dim> &p,
+                                         Vector<double>   &dst) const
 {
   /* Don't call this function before setup_dofs */
   AssertThrow(dof_handler.has_active_dofs(), ExcMessage("DofHandler is empty"));
