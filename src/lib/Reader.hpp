@@ -138,34 +138,50 @@ namespace Parsers {
           get_function(kwds.porosity, no_anisotropy, parser);
       }
 
-      // if (model_type == Model::SingleLiquid ||
-      //     model_type == Model::ModelType::WaterOil)
       if (model.has_phase(Model::Phase::Water))
       {
-        const auto & tmp = parser.get_matrix(kwds.pvt_water, ";", ",");
+        auto tmp = parser.get_matrix(kwds.pvt_water, ";", ",");
         // tmp.print_formatted(std::cout);
         AssertThrow(tmp.n() == model.n_pvt_water_columns,
                     ExcDimensionMismatch(tmp.n(), model.n_pvt_water_columns));
+        // loop through columns and apply units
+        for (unsigned int i=0; i<tmp.m(); ++i)
+        {
+          tmp(i, 0) *= model.units.pressure();
+          tmp(i, 2) *= model.units.compressibility();
+          tmp(i, 3) *= model.units.viscosity();
+        }
         Interpolation::LookupTable pvt_water_table(tmp);
         model.set_pvt_water(pvt_water_table);
         // density
-        const double rho_w = parser.get_double(kwds.density_sc_water);
+        double rho_w = parser.get_double(kwds.density_sc_water);
+        rho_w *= model.units.density();
         model.set_density_sc_w(rho_w);
       }
 
-      if (model_type != Model::SingleLiquid &&
-          model_type != Model::WaterGas)
+      if (model.has_phase(Model::Phase::Oil))
       {
-        const auto & tmp = parser.get_matrix(kwds.pvt_oil, ";", ",");
+        auto tmp = parser.get_matrix(kwds.pvt_oil, ";", ",");
         // deadoil: p Bo Co mu_o
         AssertThrow(tmp.n() == model.n_pvt_oil_columns,
                     ExcDimensionMismatch(tmp.n(), model.n_pvt_oil_columns));
+        // loop through columns and apply units
+        for (unsigned int i=0; i<tmp.m(); ++i)
+        {
+          tmp(i, 0) *= model.units.pressure();
+          tmp(i, 2) *= model.units.compressibility();
+          tmp(i, 3) *= model.units.viscosity();
+        }
         Interpolation::LookupTable pvt_oil_table(tmp);
         model.set_pvt_oil(pvt_oil_table);
 
-        const double rho_o = parser.get_double(kwds.density_sc_oil);
+        double rho_o = parser.get_double(kwds.density_sc_oil);
+        rho_o *= model.units.density();
         model.set_density_sc_o(rho_o);
+      }  // end two-phase case
 
+      if (model.type == Model::WaterOil)
+      {
         // Relative permeability
         const auto & rel_perm_water =
             parser.get_double_list(kwds.rel_perm_water, ",");
@@ -178,7 +194,8 @@ namespace Parsers {
         model.set_rel_perm(rel_perm_water[0], rel_perm_oil[0],
                            rel_perm_water[1], rel_perm_oil[1],
                            rel_perm_water[2], rel_perm_oil[2]);
-      }  // end two-phase case
+      }
+
 
     } // end equation data
 

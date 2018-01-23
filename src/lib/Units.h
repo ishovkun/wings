@@ -21,6 +21,7 @@ namespace Units
     double fluid_rate() const {return fluid_rate_constant;}
     double stiffness() const {return stiffness_constant;}
     double transmissibility() const {return transmissibility_constant;}
+    double density() const {return density_constant;}
 
   private:
     UnitSystem unit_system;
@@ -35,7 +36,8 @@ namespace Units
       gas_rate_constant,
       stiffness_constant,
       permeability_constant,
-      transmissibility_constant;
+      transmissibility_constant,
+      density_constant;
     // conversion constants
     const double
       gravity_constant = 9.80665,
@@ -71,6 +73,7 @@ namespace Units
       gas_rate_constant = 1;
       stiffness_constant = 1;
       permeability_constant = 1;
+      density_constant = 1;
     }
     else if (unit_system == field_units)
     {
@@ -83,6 +86,8 @@ namespace Units
       gas_rate_constant = standard_cubic_feet/day;
       stiffness_constant = pressure_constant;
       permeability_constant = milidarcy;
+      density_constant =
+          mass_constant/(length_constant*length_constant*length_constant);
     }
     transmissibility_constant =
       permeability_constant*length_constant/viscosity_constant;
