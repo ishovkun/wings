@@ -21,11 +21,9 @@ namespace CellValues
     virtual void update(const CellIterator<dim> &cell,
                         const double pressure,
                         const std::vector<double> &extra_values,
-                        const bool update_well=1);
+                        const bool update_well=true);
     // light version of the previous function - dosn't update wells
     // and values from extra_values
-    virtual void update(const CellIterator<dim> &cell,
-                        const double pressure);
     virtual double get_mass_matrix_entry() const;
     virtual void update_face_values(const CellValuesBase<dim> &neighbor_data,
                                     const Tensor<1,dim>       &dx,
@@ -83,23 +81,6 @@ namespace CellValues
         J += J_and_Q.first;
         Q += J_and_Q.second;
       }
-  } // eom
-
-
-
-  template <int dim>
-  void
-  CellValuesBase<dim>::update(const CellIterator<dim> &cell,
-                              const double pressure)
-  {
-    // PVT
-    model.get_pvt_water(pressure, pvt_values_water);
-    B_w = pvt_values_water[0];
-    C_w = pvt_values_water[1];
-    mu_w = pvt_values_water[2];
-    //
-    phi = model.get_porosity->value(cell->center());
-    model.get_permeability->vector_value(cell->center(), k);
   } // eom
 
 
@@ -384,8 +365,7 @@ update_face_values(const CellValuesMP<dim> &neighbor_data,
 
 template <int dim>
 double
-CellValuesMP<dim>::
-get_mass_matrix_entry() const
+CellValuesMP<dim>::get_mass_matrix_entry() const
 {
   const double A = -c2o/c1w;
   const double B = 0;

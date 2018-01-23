@@ -172,8 +172,13 @@ namespace Wings
 
     model.update_well_productivities(saturation_function);
 
-    // pressure_solver.assemble_system(*p_cell_values, *p_neighbor_values,
-    //                                 time_step, extra_data);
+    pressure_solver.assemble_system(*p_cell_values, *p_neighbor_values,
+                                    time_step,
+                                    saturation_solver.relevant_solution);
+
+    const auto & system_matrix = pressure_solver.get_system_matrix();
+    system_matrix.print(std::cout, true);
+
   } // eom
 
 } // end of namespace

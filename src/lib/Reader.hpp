@@ -207,7 +207,8 @@ namespace Parsers {
     {  // solver
       parser.enter_subsection(kwds.section_solver);
       model.min_time_step =
-        parser.get_double(kwds.minimum_time_step, 1e-10);
+        parser.get_double(kwds.minimum_time_step, 1e-10) *
+          model.units.time();
     }
   } // eom
 

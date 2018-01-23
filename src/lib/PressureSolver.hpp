@@ -195,13 +195,15 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
         extra_values[c] = s_values[c][0];
       }
 
-      cell_values.update(cell, p, extra_values);
+      cell_values.update(cell, p, extra_values,
+                         /* update_wells = */ true);
 
       const double B_ii = cell_values.get_mass_matrix_entry();
       const double J_i = cell_values.J;
       const double Q_i = cell_values.Q;
 
-      double matrix_ii = B_ii/time_step + J_i;
+      // double matrix_ii = B_ii/time_step + J_i;
+      double matrix_ii = 0;
       double rhs_i = B_ii/time_step*p_old + Q_i;
 
       cell->get_dof_indices(dof_indices);
@@ -232,7 +234,8 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
             dx_ij = cell->neighbor(f)->center() - cell->center();
 
             // assemble local matrix and distribute
-            neighbor_values.update(cell->neighbor(f), p_neighbor, extra_values);
+            neighbor_values.update(neighbor, p_neighbor, extra_values,
+                                   /* update_well = */ false);
             cell_values.update_face_values(neighbor_values, dx_ij, normal, dS);
             // distribute
             matrix_ii += cell_values.T_face;
@@ -268,7 +271,7 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
               dx_ij = neighbor->center() - cell->center();
 
               // assemble local matrix
-              neighbor_values.update(neighbor, p_neighbor, s_values);
+              neighbor_values.update(neighbor, p_neighbor, extra_values);
               cell_values.update_face_values(neighbor_values, dx_ij, normal, dS);
               // distribute
               matrix_ii += cell_values.T_face;

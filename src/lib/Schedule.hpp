@@ -61,8 +61,8 @@ namespace Schedule
     else if (entry.control.type == WellControlType::pressure_control)
     { /*do_nothing() */ }
     else
-      AssertThrow(entry.control.value <= 0,
-                  dealii::ExcMessage("total flow control wellbores are only producers"));
+      AssertThrow(entry.control.value >= 0,
+                  dealii::ExcMessage("phase flow control wellbores are only injectors"));
 
     /* Add schedule entry to the vectors */
     times.push_back(entry.time);
