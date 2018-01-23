@@ -163,11 +163,11 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
   Tensor<1, dim>       dx_ij, normal;
   std::vector<double>  p_values(quadrature_formula.size()),
                        p_old_values(quadrature_formula.size());
-  std::vector< std::vector<double> >  s_values_all(model.n_phases()-1);
-  for (auto & c: s_values_all)
+  std::vector< std::vector<double> >  s_values(model.n_phases()-1);
+  for (auto & c: s_values)
     c.resize(face_quadrature_formula.size());
-  // we need this since we don't really have quadrature points
-  std::vector<double>  s_values(model.n_phases() - 1);
+  // this one stores both saturation values and geomechanics
+  std::vector<double>  extra_values(model.n_phases() - 1);
 
   typename DoFHandler<dim>::active_cell_iterator
       cell = dof_handler.begin_active(),
@@ -180,9 +180,6 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
   {
     if (cell->is_locally_owned())
     {
-      cell->get_dof_indices(dof_indices);
-      unsigned int i = dof_indices[0];
-      // std::cout << "i = " << i << "\t" << cell->center() << std::endl;
       fe_values.reinit(cell);
       fe_values.get_function_values(old_solution, p_old_values);
       fe_values.get_function_values(relevant_solution, p_values);
@@ -194,11 +191,11 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
 
       for (unsigned int c=0; c<model.n_phases() - 1; ++c)
       {
-        fe_values.get_function_values(saturation[c], s_values_all[c]);
-        s_values[c] = s_values_all[c][0];
+        fe_values.get_function_values(saturation[c], s_values[c]);
+        extra_values[c] = s_values[c][0];
       }
 
-      cell_values.update(cell, p, s_values);
+      cell_values.update(cell, p, extra_values);
 
       const double B_ii = cell_values.get_mass_matrix_entry();
       const double J_i = cell_values.J;
@@ -207,6 +204,8 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
       double matrix_ii = B_ii/time_step + J_i;
       double rhs_i = B_ii/time_step*p_old + Q_i;
 
+      cell->get_dof_indices(dof_indices);
+      const unsigned int i = dof_indices[0];
       unsigned int j = 0;
       for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
       {
@@ -224,8 +223,8 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
             const double p_neighbor = p_values[0];
             for (unsigned int c=0; c<model.n_phases() - 1; ++c)
             {
-              fe_values.get_function_values(saturation[c], s_values_all[c]);
-              s_values[c] = s_values_all[c][0];
+              fe_values.get_function_values(saturation[c], s_values[c]);
+              extra_values[c] = s_values[c][0];
             }
 
             normal = fe_face_values.normal_vector(0); // 0 is gauss point
@@ -233,7 +232,7 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
             dx_ij = cell->neighbor(f)->center() - cell->center();
 
             // assemble local matrix and distribute
-            neighbor_values.update(cell->neighbor(f), p_neighbor, s_values);
+            neighbor_values.update(cell->neighbor(f), p_neighbor, extra_values);
             cell_values.update_face_values(neighbor_values, dx_ij, normal, dS);
             // distribute
             matrix_ii += cell_values.T_face;
