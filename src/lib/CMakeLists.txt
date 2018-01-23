@@ -9,7 +9,7 @@ ADD_LIBRARY(wings SHARED
   RelativePermeability.hpp
   ExtraFEData.hpp
   FEFunction.hpp
-  SaturationSolverExplicit.hpp
+  SaturationSolver.hpp
   Model.hpp
   BitMap.hpp
   Parsers.hpp

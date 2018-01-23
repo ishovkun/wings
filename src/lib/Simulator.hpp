@@ -10,7 +10,7 @@
 
 // #include <Wellbore.hpp>
 #include <PressureSolver.hpp>
-#include <SaturationSolverExplicit.hpp>
+#include <SaturationSolver.hpp>
 #include <FEFunction.hpp>
 // #include <CellValues.hpp>
 
@@ -104,7 +104,7 @@ namespace Wings
     read_mesh();
     // refine_mesh();
 
-    FluidSolvers::SaturationSolverExplicit<dim>
+    FluidSolvers::SaturationSolver<dim>
       saturation_solver(2, mpi_communicator,
                         pressure_solver.get_dof_handler(),
                         model, pcout);

@@ -7,16 +7,17 @@
 namespace FluidSolvers
 {
   template <int dim>
-  class SaturationSolverExplicit
+  class SaturationSolver
   {
   public:
-    SaturationSolverExplicit(const int                n_phases_,
-                             MPI_Comm                 &mpi_communicator_,
-                             const DoFHandler<dim>    &dof_handler_,
-                             const Model::Model<dim>  &model_,
-                             ConditionalOStream       &pcout_);
+    SaturationSolver(const int                n_phases_,
+                     MPI_Comm                 &mpi_communicator_,
+                     const DoFHandler<dim>    &dof_handler_,
+                     const Model::Model<dim>  &model_,
+                     ConditionalOStream       &pcout_);
     void setup_dofs(IndexSet &locally_owned_dofs,
                     IndexSet &locally_relevant_dofs);
+
     const unsigned int                        n_phases;
   private:
     MPI_Comm                                  &mpi_communicator;
@@ -31,12 +32,12 @@ namespace FluidSolvers
 
 
   template <int dim>
-  SaturationSolverExplicit<dim>::
-  SaturationSolverExplicit(const int                  n_phases_,
-                           MPI_Comm                   &mpi_communicator_,
-                           const DoFHandler<dim>      &dof_handler_,
-                           const Model::Model<dim>    &model_,
-                           ConditionalOStream         &pcout_)
+  SaturationSolver<dim>::
+  SaturationSolver(const int                  n_phases_,
+                   MPI_Comm                   &mpi_communicator_,
+                   const DoFHandler<dim>      &dof_handler_,
+                   const Model::Model<dim>    &model_,
+                   ConditionalOStream         &pcout_)
     :
     n_phases(n_phases_),
     mpi_communicator(mpi_communicator_),
@@ -48,8 +49,8 @@ namespace FluidSolvers
 
   template <int dim>
   void
-  SaturationSolverExplicit<dim>::setup_dofs(IndexSet &locally_owned_dofs,
-                                            IndexSet &locally_relevant_dofs)
+  SaturationSolver<dim>::setup_dofs(IndexSet &locally_owned_dofs,
+                                    IndexSet &locally_relevant_dofs)
   {
     if (solution.size() != n_phases)
     {

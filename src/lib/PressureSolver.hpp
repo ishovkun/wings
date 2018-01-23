@@ -41,10 +41,10 @@ class PressureSolver
   ~PressureSolver();
 
   void setup_dofs();
-  void assemble_system(CellValues::CellValuesBase<dim> &cell_values,
-                       CellValues::CellValuesBase<dim> &neighbor_values,
-                       const double                    time_step,
-                       ExtraFEData::ExtraFEData<dim>   &extra_data);
+  void assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
+                       CellValues::CellValuesBase<dim>                  &neighbor_values,
+                       const double                                      time_step,
+                       const std::vector<TrilinosWrappers::MPI::Vector> &saturation);
   unsigned int solve();
   // accessing private members
   const TrilinosWrappers::SparseMatrix& get_system_matrix();
@@ -132,10 +132,11 @@ void PressureSolver<dim>::setup_dofs()
 
 template <int dim>
 void
-PressureSolver<dim>::assemble_system(CellValues::CellValuesBase<dim> &cell_values,
-                                     CellValues::CellValuesBase<dim> &neighbor_values,
-                                     const double                    time_step,
-                                     ExtraFEData::ExtraFEData<dim>   &extra_data)
+PressureSolver<dim>::
+assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
+                CellValues::CellValuesBase<dim>                  &neighbor_values,
+                const double                                      time_step,
+                const std::vector<TrilinosWrappers::MPI::Vector> &saturation)
 {
   // Only one integration point in FVM
   QGauss<dim>       quadrature_formula(1);
@@ -143,8 +144,6 @@ PressureSolver<dim>::assemble_system(CellValues::CellValuesBase<dim> &cell_value
 
   FEValues<dim> fe_values(fe, quadrature_formula, update_values);
   FEValues<dim> fe_values_neighbor(fe, quadrature_formula, update_values);
-  // fe_values for additional vectors
-  extra_data.make_fe_values(quadrature_formula);
 
   // the following two objects only get geometry data
   FEFaceValues<dim> fe_face_values(fe, face_quadrature_formula,
@@ -162,12 +161,17 @@ PressureSolver<dim>::assemble_system(CellValues::CellValuesBase<dim> &cell_value
 
   // objects to store local data
   Tensor<1, dim>       dx_ij, normal;
-  std::vector<double>  p_old_values(quadrature_formula.size());
+  std::vector<double>  p_values(quadrature_formula.size()),
+                       p_old_values(quadrature_formula.size());
+  std::vector< std::vector<double> >  s_values_all(model.n_phases()-1);
+  for (auto & c: s_values_all)
+    c.resize(face_quadrature_formula.size());
+  // we need this since we don't really have quadrature points
+  std::vector<double>  s_values(model.n_phases() - 1);
 
   typename DoFHandler<dim>::active_cell_iterator
       cell = dof_handler.begin_active(),
       endc = dof_handler.end();
-  extra_data.cells_begin();
 
   system_matrix = 0;
   rhs_vector = 0;
@@ -181,19 +185,22 @@ PressureSolver<dim>::assemble_system(CellValues::CellValuesBase<dim> &cell_value
       // std::cout << "i = " << i << "\t" << cell->center() << std::endl;
       fe_values.reinit(cell);
       fe_values.get_function_values(old_solution, p_old_values);
-
-      extra_data.reinit();
-      extra_data.update_fe_values();
+      fe_values.get_function_values(relevant_solution, p_values);
 
       // std::cout << "cell: " << i << std::endl;
       // double p_i = solution[i];
-      double p_old = p_old_values[0];
+      const double p_old = p_old_values[0];
+      const double p = p_values[0];
 
-      cell_values.update(cell, p_old, extra_data.get_values(0));
-      // cell_values.update(cell, p_old);
+      for (unsigned int c=0; c<model.n_phases() - 1; ++c)
+      {
+        fe_values.get_function_values(saturation[c], s_values_all[c]);
+        s_values[c] = s_values_all[c][0];
+      }
+
+      cell_values.update(cell, p, s_values);
 
       const double B_ii = cell_values.get_mass_matrix_entry();
-
       const double J_i = cell_values.J;
       const double Q_i = cell_values.Q;
 
@@ -209,20 +216,31 @@ PressureSolver<dim>::assemble_system(CellValues::CellValuesBase<dim> &cell_value
               cell->neighbor(f)->has_children() == false) ||
              cell->neighbor_is_coarser(f))
           {
-            cell->neighbor(f)->get_dof_indices(dof_indices_neighbor);
+            const auto & neighbor = cell->neighbor(f);
+            fe_values.reinit(neighbor);
             fe_face_values.reinit(cell, f);
-            const double p_old_neighbor = 0;
+
+            fe_values.get_function_values(relevant_solution, p_values);
+            const double p_neighbor = p_values[0];
+            for (unsigned int c=0; c<model.n_phases() - 1; ++c)
+            {
+              fe_values.get_function_values(saturation[c], s_values_all[c]);
+              s_values[c] = s_values_all[c][0];
+            }
+
             normal = fe_face_values.normal_vector(0); // 0 is gauss point
-            j = dof_indices_neighbor[0];
             const double dS = cell->face(f)->measure();  // face area
             dx_ij = cell->neighbor(f)->center() - cell->center();
-            // neighbor_values.update(cell->neighbor(f), p_old);
-            // neighbor_values.update(cell->neighbor(f), p_old_neighbor,
-            //                        extra_data.get_values(0));
+
             // assemble local matrix and distribute
+            neighbor_values.update(cell->neighbor(f), p_neighbor, s_values);
             cell_values.update_face_values(neighbor_values, dx_ij, normal, dS);
+            // distribute
             matrix_ii += cell_values.T_face;
             rhs_i += cell_values.G_face;
+
+            neighbor->get_dof_indices(dof_indices_neighbor);
+            j = dof_indices_neighbor[0];
             system_matrix.add(i, j, -cell_values.T_face);
           }
           else if ((cell->neighbor(f)->level() == cell->level()) &&
@@ -232,19 +250,28 @@ PressureSolver<dim>::assemble_system(CellValues::CellValuesBase<dim> &cell_value
                  subface<cell->face(f)->n_children(); ++subface)
             {
               // compute parameters
-              const auto & neighbor_child
+              const auto & neighbor
                   = cell->neighbor_child_on_subface(f, subface);
-              const double p_old_neighbor = 0;
-              neighbor_child->get_dof_indices(dof_indices_neighbor);
+
+              fe_values.reinit(neighbor);
+              fe_face_values.reinit(cell, f);
+
+              fe_values.get_function_values(relevant_solution, p_values);
+              const double p_neighbor = p_values[0];
+              for (unsigned int c=0; c<model.n_phases() - 1; ++c)
+                fe_values.get_function_values(saturation[c], s_values[c]);
+
+              neighbor->get_dof_indices(dof_indices_neighbor);
               j = dof_indices_neighbor[0];
               fe_subface_values.reinit(cell, f, subface);
               normal = fe_subface_values.normal_vector(0); // 0 is gauss point
-              // neighbor_values.update(neighbor_child, p_old_neighbor,
-              //                        extra_data.get_values(0));
               const double dS = fe_subface_values.JxW(0);
-              dx_ij = neighbor_child->center() - cell->center();
-              // assemble local matrix and distribute
+              dx_ij = neighbor->center() - cell->center();
+
+              // assemble local matrix
+              neighbor_values.update(neighbor, p_neighbor, s_values);
               cell_values.update_face_values(neighbor_values, dx_ij, normal, dS);
+              // distribute
               matrix_ii += cell_values.T_face;
               rhs_i += cell_values.G_face;
               system_matrix.add(i, j, -cell_values.T_face);
@@ -259,7 +286,6 @@ PressureSolver<dim>::assemble_system(CellValues::CellValuesBase<dim> &cell_value
 
       // std::cout << "------------------------------\n";
     } // end local cells
-    extra_data.increment_cells();
   } // end cells loop
   system_matrix.compress(VectorOperation::add);
   rhs_vector.compress(VectorOperation::add);
