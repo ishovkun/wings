@@ -2,6 +2,7 @@
 #include <deal.II/base/conditional_ostream.h>
 #include <deal.II/base/timer.h>
 #include <deal.II/grid/grid_in.h>
+#include <deal.II/grid/grid_tools.h>
 #include <deal.II/distributed/tria.h>
 
 // Custom modules
@@ -67,6 +68,7 @@ namespace Wings
     // typename GridIn<dim>::format format = gridin<dim>::ucd;
     // gridin.read(f, format);
     gridin.read_msh(f);
+    GridTools::scale(model.units.length(), triangulation);
   }  // eom
 
 

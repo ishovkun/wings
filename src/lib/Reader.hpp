@@ -268,7 +268,8 @@ namespace Parsers {
       // name
       const std::string name = well_strs[0];
       // radius
-      const double r = Parsers::convert<double>(well_strs[1]);
+      double r = Parsers::convert<double>(well_strs[1]);
+      r *= model.units.length();
       // parse locations
       unsigned int n_loc = (well_strs.size()-2) / 3;
       const int dim = 3;
@@ -279,6 +280,9 @@ namespace Parsers {
         double x = Parsers::convert<double>(well_strs[i]);
         double y = Parsers::convert<double>(well_strs[i+1]);
         double z = Parsers::convert<double>(well_strs[i+2]);
+        x *= model.units.length();
+        y *= model.units.length();
+        z *= model.units.length();
         locations[loc] = Point<dim>(x,y,z);
         loc++;
       }
@@ -319,9 +323,21 @@ namespace Parsers {
         Schedule::well_control_type_indexing.find(control_type_id)->second;
       // get control value
       schedule_entry.control.value = Parsers::convert<double>(entries[3]);
-      // get skin
-      if (entries.size() > 4)
-          schedule_entry.control.skin = Parsers::convert<double>(entries[4]);
+
+      // convert value units
+      if (schedule_entry.control.type == Schedule::pressure_control)
+        schedule_entry.control.value *= model.units.pressure();
+
+      if (   model.type == Model::WaterOil
+          || model.type == Model::SingleLiquid)
+      {
+        if (schedule_entry.control.type != Schedule::pressure_control)
+          schedule_entry.control.value *= model.units.fluid_rate();
+      }
+      else
+      {
+        AssertThrow(false, ExcNotImplemented());
+      }
 
       model.schedule.add_entry(schedule_entry);
     } // end lines loop
