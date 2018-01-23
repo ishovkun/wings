@@ -66,6 +66,7 @@ namespace CellValues
     B_w = pvt_values_water[0];
     C_w = pvt_values_water[1];
     mu_w = pvt_values_water[2];
+
     //
     cell_coord = cell->center();
     phi = model.get_porosity->value(cell_coord);
@@ -207,6 +208,11 @@ CellValuesMP<dim>::update(const CellIterator<dim> &cell,
     this->B_w = pvt_values_water[0];
     this->C_w = pvt_values_water[1];
     this->mu_w = pvt_values_water[2];
+
+    // std::cout << "mu_w " << this->mu_w << std::endl;
+    // std::cout << "B_w " << this->B_w << std::endl;
+    // std::cout << "c_w " << this->C_w << std::endl;
+
   }
   if (model.has_phase(Model::Phase::Oil))
   {

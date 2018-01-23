@@ -107,14 +107,26 @@ namespace Wings
     // refine_mesh();
 
     FluidSolvers::SaturationSolver<dim>
-      saturation_solver(2, mpi_communicator,
-                        pressure_solver.get_dof_handler(),
-                        model, pcout);
+        saturation_solver(model.n_phases(), mpi_communicator,
+                          pressure_solver.get_dof_handler(),
+                          model, pcout);
+
 
     pressure_solver.setup_dofs();
     // if multiphase
     saturation_solver.setup_dofs(pressure_solver.locally_owned_dofs,
                                  pressure_solver.locally_relevant_dofs);
+
+
+    // initial values
+    for (unsigned int i=0; i<saturation_solver.solution[0].size(); ++i)
+    {
+      saturation_solver.solution[0][i] =0.2;
+      pressure_solver.solution = 6894760;
+    }
+    saturation_solver.relevant_solution[0] = saturation_solver.solution[0];
+    pressure_solver.relevant_solution = pressure_solver.solution;
+
 
     // double time = 1;
     const DoFHandler<dim> & pressure_dof_handler =
@@ -170,14 +182,25 @@ namespace Wings
       pcout << "Sw " << tmp[0] << std::endl;
     }
 
-    model.update_well_productivities(saturation_function);
+    const double p = 6894760;
+    std::vector<double>      pvt_values_water(4);
+    model.get_pvt_water(p, pvt_values_water);
+    const double Bw = pvt_values_water[0];
+    const double Cw = pvt_values_water[1];
+    const double muw = pvt_values_water[2];
+    std::cout << "mu_w " << muw << std::endl;
+    std::cout << "B_w " << Bw << std::endl;
+    std::cout << "c_w " << Cw << std::endl;
 
-    pressure_solver.assemble_system(*p_cell_values, *p_neighbor_values,
-                                    time_step,
-                                    saturation_solver.relevant_solution);
+    // model.update_well_productivities(saturation_function);
 
-    const auto & system_matrix = pressure_solver.get_system_matrix();
-    system_matrix.print(std::cout, true);
+    // pressure_solver.assemble_system(*p_cell_values, *p_neighbor_values,
+    //                                 time_step,
+    //                                 saturation_solver.relevant_solution);
+
+    // const auto & system_matrix = pressure_solver.get_system_matrix();
+    // system_matrix.print(std::cout, true);
+
 
   } // eom
 

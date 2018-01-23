@@ -97,7 +97,10 @@ namespace Interpolation
     for (unsigned int i=0; i<xy.m(); ++i)
       x_values[i] = xy(i, 0);
     y_values.fill(xy, 0, 0, 0, 1);
+
     all_columns.resize(y_values.n());
+    for (unsigned int i=0; i<all_columns.size(); ++i)
+      all_columns[i] = i;
   }
 
 
@@ -151,6 +154,9 @@ namespace Interpolation
 
     if (size == 1) // case with constant value
     {
+      // y_values.print_formatted(std::cout, 3, false);
+      // for (unsigned int shit=0; shit<cols.size(); ++shit)
+      //   std::cout << "col " << cols[shit] << std::endl;
       for (unsigned int c=0; c<cols.size(); ++c)
         dst[c] = y_values(0, cols[c]);
       for (const auto & c:cols_d)
