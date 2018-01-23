@@ -114,6 +114,14 @@ namespace Parsers {
 
       model.set_model_type(model_type);
 
+      { // units
+        const auto & tmp = parser.get(kwds.unit_system);
+        if (tmp == kwds.si_units)
+          model.units.set_system(Units::UnitSystem::si_units);
+        else if (tmp == kwds.field_units)
+          model.units.set_system(Units::UnitSystem::field_units);
+      }
+
       {// Permeability & porosity
         const int dim = 3;
         std::vector<double> default_anisotropy{1,1,1};
@@ -121,6 +129,8 @@ namespace Parsers {
         Tensor<1,dim> anisotropy = Parsers::convert<dim>
             (parser.get_double_list(kwds.permeability_anisotropy, ",",
                                   default_anisotropy));
+        // apply units
+        anisotropy *= model.units.permeability();
         model.get_permeability =
           get_function(kwds.permeability, anisotropy, parser);
 

@@ -32,6 +32,8 @@ namespace Keywords
       model_water_gas_elasticity = "WaterGasElasticity",
       model_blackoil_elasticity = "BlackoilElasticity",
       unit_system = "Units",
+      si_units = "Metric",
+      field_units = "Field",
       young_modulus = "Young modulus",
       poisson_ratio = "Poisson ratio",
       volume_factor_water = "Volume factor water",

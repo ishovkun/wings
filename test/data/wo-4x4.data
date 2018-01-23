@@ -2,7 +2,7 @@ subsection Mesh
 
 Global refinement steps    4 /
 Adaptive refinement steps  4 /
-Mesh file                  domain.msh /
+Mesh file                  3x3x1.msh /
 # Local refinement regions 16, 24, 17.5, 22.5, 0 ,0 /
 
 subsection Well data
@@ -27,8 +27,8 @@ Schedule
 /
 
 subsection Equation data
-
 Model                   WaterOil /
+Units                   Field /
 Permeability            bitmap perm4x4_homog.dat /
 Porosity                0.3 /
 Perm anisotropy         1, 1, 1 /
