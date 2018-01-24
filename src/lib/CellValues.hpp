@@ -26,28 +26,41 @@ namespace CellValues
     // and values from extra_values
     virtual double get_mass_matrix_entry() const;
     virtual void update_face_values(const CellValuesBase<dim> &neighbor_data,
-                                    const Tensor<1,dim>       &dx,
                                     const Tensor<1,dim>       &face_normal,
                                     const double              dS);
 
 
-   public:
-    double Q, J, T_face, G_face;
    protected:
     const Model::Model<dim> &model;
-    double                   phi, mu_w, B_w, C_w, cell_volume;
-    Point<dim>               cell_coord;
+
+   public:
     Vector<double>           k;
     std::vector<double>      pvt_values_water;
+    double                   Q, J, T_face, G_face;
+    double                   phi, mu_w, B_w, C_w, cell_volume;
+    Point<dim>               cell_coord;
+    // new, needed for child class
+    // std::vector<double> pvt_values_oil, pvt_values_gas;
+    double p;
+    double mu_o, B_o, C_o,
+      mu_g, B_g, C_g;
+    double krw, kro, krg;
+
+    std::vector<double> rel_perm;
+    Vector<double>      vector_J_phase;
+    Vector<double>      vector_Q_phase;
+    Vector<double>      saturation;
+
   };
 
 
   template <int dim>
-  CellValuesBase<dim>::CellValuesBase(const Model::Model<dim> &model_)
+  CellValuesBase<dim>::CellValuesBase(const Model::Model<dim> &model)
     :
-    model(model_),
+    model(model),
     k(dim),
-    pvt_values_water(model.n_pvt_water_columns - 1) // cause p not really an entry
+    pvt_values_water(model.n_pvt_water_columns - 1), // cause p not really an entry
+    rel_perm(model.n_phases())
   {}
 
 
@@ -61,6 +74,8 @@ namespace CellValues
   {
     AssertThrow(extra_values.size() == 0,
                 ExcDimensionMismatch(extra_values.size(), 0));
+
+    p = pressure;
     // PVT
     model.get_pvt_water(pressure, pvt_values_water);
     B_w = pvt_values_water[0];
@@ -98,11 +113,9 @@ namespace CellValues
   template <int dim>
   void CellValuesBase<dim>::
   update_face_values(const CellValuesBase<dim> &neighbor_data,
-                     const Tensor<1,dim>       &dx,
                      const Tensor<1,dim>       &face_normal,
                      const double              face_area)
   {
-    std::cout << "fuck2 "  << std::endl;
 
     T_face = 0;
     G_face = 0;
@@ -112,7 +125,8 @@ namespace CellValues
     const double mu_w_face = Math::arithmetic_mean(mu_w, neighbor_data.mu_w);
     const double B_w_face = Math::arithmetic_mean(B_w, neighbor_data.B_w);
 
-    double distance = dx.norm(); // to normalize
+    const auto & dx = (neighbor_data.cell_coord - this->cell_coord);
+    const double distance = dx.norm();
     if (distance == 0.0)
       return;
 
@@ -145,23 +159,20 @@ namespace CellValues
                         const std::vector<double> &extra_values,
                         const bool update_well=1);
     virtual void update_face_values(const CellValuesBase<dim> &neighbor_data,
-                                    const Tensor<1,dim>       &dx,
                                     const Tensor<1,dim>       &face_normal,
                                     const double               dS);
     double get_mass_matrix_entry() const;
 
-   protected:
+   public:
     std::vector<double> pvt_values_oil, pvt_values_gas;
-    double p;
-    double mu_o, B_o, C_o,
-           mu_g, B_g, C_g;
-    double Sw, So, Sg;
-    double krw, kro, krg;
+
     double
       c1w, c1p, c1e,
       c2o, c2p, c2e,
       c3g, c3o, c3w, c3p, c3e;
-    std::vector<double> rel_perm;
+
+    double Sw, So, Sg;
+
     Vector<double>      vector_J_phase;
     Vector<double>      vector_Q_phase;
     Vector<double>      saturation;
@@ -175,7 +186,6 @@ CellValuesMP<dim>::CellValuesMP(const Model::Model<dim> &model_)
     CellValuesBase<dim>::CellValuesBase(model_),
     pvt_values_oil(model_.n_pvt_oil_columns - 1), // cause p not really an entry
     pvt_values_gas(model_.n_pvt_gas_columns - 1), // cause p not really an entry
-    rel_perm(model_.n_phases()),
     vector_J_phase(model_.n_phases()),
     vector_Q_phase(model_.n_phases()),
     saturation(model_.n_phases())
@@ -195,10 +205,11 @@ CellValuesMP<dim>::update(const CellIterator<dim> &cell,
               ExcDimensionMismatch(extra_values.size(),
                                    model.n_phases()-1));
 
+  this->cell_coord = cell->center();
   this->phi = model.get_porosity->value(cell->center());
   model.get_permeability->vector_value(cell->center(), this->k);
   this->cell_volume = cell->measure();
-  p = pressure;
+  this->p = pressure;
 
   // Phase-dependent values
   if (model.has_phase(Model::Phase::Water))
@@ -220,15 +231,15 @@ CellValuesMP<dim>::update(const CellIterator<dim> &cell,
     // std::cout << "getting oil" << std::endl;
     // std::cout << "size " << pvt_values_oil.size() << std::endl;
     model.get_pvt_oil(pressure, pvt_values_oil);
-    B_o = pvt_values_oil[0];
-    C_o = pvt_values_oil[1];
-    mu_o = pvt_values_oil[2];
+    this->B_o = pvt_values_oil[0];
+    this->C_o = pvt_values_oil[1];
+    this->mu_o = pvt_values_oil[2];
   }
 
   // water coeffs
-  Sw = extra_values[0];
+  this->Sw = extra_values[0];
   c1w = this->phi /this->B_w * this->cell_volume;
-  c1p = Sw / this->B_w * this->phi * this->C_w;
+  c1p = this->Sw / this->B_w * this->phi * this->C_w;
   c1e = 0;
 
   // oil coeffs
@@ -240,8 +251,8 @@ CellValuesMP<dim>::update(const CellIterator<dim> &cell,
   //     model.has_phase(Model::Phase::Gas))
   //   So = extra_values[1];
 
-  c2o = this->phi / B_o * this->cell_volume;
-  c2p = So * this->phi * C_o * this->cell_volume;
+  c2o = this->phi / this->B_o * this->cell_volume;
+  c2p = So * this->phi * this->C_o * this->cell_volume;
   c2e = 0;
   // gas coeffs
   // double Sg = 0;
@@ -263,7 +274,7 @@ CellValuesMP<dim>::update(const CellIterator<dim> &cell,
 
   saturation[0] = Sw;
   saturation[1] = So;
-  model.get_relative_permeability(saturation, rel_perm);
+  model.get_relative_permeability(saturation, this->rel_perm);
 
   // calculate source term
   this->Q = 0;
@@ -277,6 +288,7 @@ CellValuesMP<dim>::update(const CellIterator<dim> &cell,
       for (const auto & well : model.wells)
       {
         std::pair<double,double> J_and_Q = well.get_J_and_Q(cell, phase);
+        std::cout << "J " << J_and_Q.first << "\t" << phase << std::endl;
         vector_J_phase[phase] += J_and_Q.first;
         vector_Q_phase[phase] += J_and_Q.second;
       }
@@ -286,8 +298,8 @@ CellValuesMP<dim>::update(const CellIterator<dim> &cell,
     const double Jw = vector_J_phase[0];
     const double Jo = vector_J_phase[1];
 
-    this->Q = Qw + B_o/this->B_w*Qo;
-    this->J = Jw + B_o/this->B_w*Jo;
+    this->Q = Qw + this->B_o/this->B_w*Qo;
+    this->J = Jw + this->B_o/this->B_w*Jo;
   }  // end update well
 } // eom
 
@@ -297,44 +309,47 @@ template <int dim>
 void
 CellValuesMP<dim>::
 update_face_values(const CellValuesBase<dim> &neighbor_data,
-                   const Tensor<1,dim>     &dx,
                    const Tensor<1,dim>     &face_normal,
                    const double            face_area)
 {
-  std::cout << "fuck1 "  << std::endl;
   const auto & model = this->model;
   this->T_face = 0;
   this->G_face = 0;
 
-
-  Vector<double> k_face(3);
+  Vector<double> k_face(dim);
   Math::harmonic_mean(this->k, neighbor_data.k, k_face);
   const double mu_w_face = Math::arithmetic_mean(this->mu_w, neighbor_data.mu_w);
   const double B_w_face = Math::arithmetic_mean(this->B_w, neighbor_data.B_w);
-  const double mu_o_face = Math::arithmetic_mean(mu_o, neighbor_data.mu_o);
-  const double B_o_face = Math::arithmetic_mean(B_o, neighbor_data.B_o);
+  const double mu_o_face = Math::arithmetic_mean(this->mu_o, neighbor_data.mu_o);
+  const double B_o_face = Math::arithmetic_mean(this->B_o, neighbor_data.B_o);
 
   // potential for upwinding
   const double pot_w =
-      p + model.density_sc_water()/this->B_w * model.gravity();
+      this->p + model.density_sc_water()/this->B_w * model.gravity();
   const double pot_w_neighbor =
       neighbor_data.p +
       model.density_sc_water()/neighbor_data.B_w*model.gravity();
 
   const double pot_o =
-      p + model.density_sc_oil() / B_o * model.gravity();
+      this->p + model.density_sc_oil() / this->B_o * model.gravity();
   const double pot_o_neighbor =
       neighbor_data.p +
       model.density_sc_oil()/neighbor_data.B_o*model.gravity();
 
   // upwind relperms
-  const double k_rw_face = Math::upwind(rel_perm[0], neighbor_data.rel_perm[0],
+  const double k_rw_face = Math::upwind(this->rel_perm[0],
+                                        neighbor_data.rel_perm[0],
                                         pot_w, pot_w_neighbor);
-  const double k_ro_face = Math::upwind(rel_perm[1], neighbor_data.rel_perm[1],
+  const double k_ro_face = Math::upwind(this->rel_perm[1],
+                                        neighbor_data.rel_perm[1],
                                         pot_o, pot_o_neighbor);
 
-  const double distance = dx.norm(); // to normalize
-  // const double distance = (neighbor_data.cell_coord - this->cell_coord).norm();
+  const auto & dx = (neighbor_data.cell_coord - this->cell_coord);
+  const double distance = dx.norm();
+  std::cout << "dx " << distance << std::endl;
+  std::cout << "face area " << face_area << std::endl;
+  std::cout << "mu_w_face " << mu_w_face << std::endl;
+  std::cout << "B_w_face " << B_w_face << std::endl;
   // const double distance =
   if (distance == 0.0)
     return;

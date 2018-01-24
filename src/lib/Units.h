@@ -48,7 +48,7 @@ namespace Units
       day = 60*60*24,
       us_oil_barrel =  0.158987295,
       darcy = 9.869233e-13,
-      milidarcy = darcy*1e-2,
+      milidarcy = darcy*1e-3,
       standard_cubic_feet = feet*feet*feet;
   };
 

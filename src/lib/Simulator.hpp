@@ -150,7 +150,10 @@ namespace Wings
     // QGauss<dim>  quadrature_formula(1);
     // extra_data.make_fe_values(quadrature_formula);
 
+    double time = 0;
     double time_step = model.min_time_step;
+    model.update_well_controls(time);
+
     CellValues::CellValuesBase<dim> cell_values_sf(model),
                                     neighbor_values_sf(model);
     CellValues::CellValuesMP<dim> cell_values_mp(model),
@@ -165,7 +168,6 @@ namespace Wings
     }
     else
     {
-      std::cout << "i'm here bitch " << std::endl;
 
       p_cell_values = &cell_values_mp;
       p_neighbor_values = &neighbor_values_mp;
@@ -223,8 +225,25 @@ namespace Wings
                                     time_step,
                                     saturation_solver.relevant_solution);
 
-    // const auto & system_matrix = pressure_solver.get_system_matrix();
-    // system_matrix.print(std::cout, true);
+    // for (auto & id : model.get_well_ids())
+    // {
+    //   std::cout << "well_id " << id << std::endl;
+    //   auto & well = model.wells[id];
+
+    //   std::cout << "Real locations"  << std::endl;
+    //   for (auto & loc : well.get_locations())
+    //     std::cout << loc << std::endl;
+
+    //   std::cout << "Assigned locations"  << std::endl;
+    //   for (auto & cell : well.get_cells())
+    //     std::cout << cell->center() << std::endl;
+
+    //   std::cout << std::endl;
+    // }
+
+
+    const auto & system_matrix = pressure_solver.get_system_matrix();
+    system_matrix.print(std::cout, true);
 
 
   } // eom

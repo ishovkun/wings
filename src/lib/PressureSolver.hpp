@@ -160,7 +160,7 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
       dof_indices_neighbor(dofs_per_cell);
 
   // objects to store local data
-  Tensor<1, dim>       dx_ij, normal;
+  Tensor<1, dim>       normal;
   std::vector<double>  p_values(quadrature_formula.size()),
                        p_old_values(quadrature_formula.size());
   std::vector< std::vector<double> >  s_values(model.n_phases()-1);
@@ -203,7 +203,8 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
       const double Q_i = cell_values.Q;
 
       // double matrix_ii = B_ii/time_step + J_i;
-      double matrix_ii = 0;
+      double matrix_ii = J_i;
+      // double matrix_ii = 0;
       double rhs_i = B_ii/time_step*p_old + Q_i;
 
       cell->get_dof_indices(dof_indices);
@@ -231,20 +232,18 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
 
             normal = fe_face_values.normal_vector(0); // 0 is gauss point
             const double dS = cell->face(f)->measure();  // face area
-            dx_ij = cell->neighbor(f)->center() - cell->center();
 
             // assemble local matrix and distribute
             neighbor_values.update(neighbor, p_neighbor, extra_values,
                                    /* update_well = */ false);
-            std::cout << "fuck "  << std::endl;
-            cell_values.update_face_values(neighbor_values, dx_ij, normal, dS);
-            // distribute
-            matrix_ii += cell_values.T_face;
-            rhs_i += cell_values.G_face;
+            cell_values.update_face_values(neighbor_values, normal, dS);
 
+            // distribute
             neighbor->get_dof_indices(dof_indices_neighbor);
             j = dof_indices_neighbor[0];
-            system_matrix.add(i, j, -cell_values.T_face);
+            // matrix_ii += cell_values.T_face;
+            rhs_i += cell_values.G_face;
+            // system_matrix.add(i, j, -cell_values.T_face);
           }
           else if ((cell->neighbor(f)->level() == cell->level()) &&
                    (cell->neighbor(f)->has_children() == true))
@@ -269,15 +268,14 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
               fe_subface_values.reinit(cell, f, subface);
               normal = fe_subface_values.normal_vector(0); // 0 is gauss point
               const double dS = fe_subface_values.JxW(0);
-              dx_ij = neighbor->center() - cell->center();
 
               // assemble local matrix
               neighbor_values.update(neighbor, p_neighbor, extra_values);
-              cell_values.update_face_values(neighbor_values, dx_ij, normal, dS);
+              cell_values.update_face_values(neighbor_values, normal, dS);
               // distribute
-              matrix_ii += cell_values.T_face;
+              // matrix_ii += cell_values.T_face;
               rhs_i += cell_values.G_face;
-              system_matrix.add(i, j, -cell_values.T_face);
+              // system_matrix.add(i, j, -cell_values.T_face);
             }
           } // end case neighbor is finer
 

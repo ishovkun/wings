@@ -715,6 +715,7 @@ Wellbore<dim>::get_J_and_Q(const CellIterator<dim> & cell,
 
   if (control.type == Schedule::WellControlType::pressure_control)
   {
+    std::cout << "control " << control.value << "\n";
     return std::make_pair(productivities[segment][phase],
                           control.value*productivities[segment][phase]);
   }
@@ -723,12 +724,20 @@ Wellbore<dim>::get_J_and_Q(const CellIterator<dim> & cell,
     // compute sum of productivities per phase to normalize flow in a segment
     // l1_norm cause they all should be positive
     const double sum_phase_productivities = total_productivity.l1_norm();
+    // std::cout << "productivity sum" << sum_phase_productivities << "\n";
 
     const double normalized_flux =
         control.value*productivities[segment][phase]/sum_phase_productivities;
 
     if (sum_phase_productivities > 0)
       return std::make_pair(0.0, normalized_flux);
+    else
+      return std::make_pair(0.0, 0.0);
+  }
+  else if (control.type == Schedule::flow_control_phase_1)
+  {
+    if (phase == 1)
+      return std::make_pair(0.0, control.value);
     else
       return std::make_pair(0.0, 0.0);
   }
