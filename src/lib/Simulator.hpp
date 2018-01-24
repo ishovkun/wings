@@ -165,6 +165,8 @@ namespace Wings
     }
     else
     {
+      std::cout << "i'm here bitch " << std::endl;
+
       p_cell_values = &cell_values_mp;
       p_neighbor_values = &neighbor_values_mp;
     }
@@ -183,6 +185,7 @@ namespace Wings
     }
 
     const double p = 6894760;
+    // test pvt
     std::vector<double>      pvt_values_water(4);
     model.get_pvt_water(p, pvt_values_water);
     const double Bw = pvt_values_water[0];
@@ -192,11 +195,33 @@ namespace Wings
     std::cout << "B_w " << Bw << std::endl;
     std::cout << "c_w " << Cw << std::endl;
 
-    // model.update_well_productivities(saturation_function);
+    std::vector<double>      pvt_values_oil(4);
+    model.get_pvt_oil(p, pvt_values_oil);
+    const double Bo = pvt_values_oil[0];
+    const double Co = pvt_values_oil[1];
+    const double muo = pvt_values_oil[2];
+    std::cout << "mu_o " << muo << std::endl;
+    std::cout << "B_o " << Bo << std::endl;
+    std::cout << "c_o " << Co << std::endl;
 
-    // pressure_solver.assemble_system(*p_cell_values, *p_neighbor_values,
-    //                                 time_step,
-    //                                 saturation_solver.relevant_solution);
+    {
+      // test rel_perm
+      Vector<double> saturation(2);
+      std::vector<double> rel_perm(2);
+      saturation[0] = 0.2;
+      saturation[1] = 1-saturation[0];
+      model.get_relative_permeability(saturation, rel_perm);
+      std::cout << "kw " << rel_perm[0] << std::endl;
+      std::cout << "ko " << rel_perm[1] << std::endl;
+
+    }
+
+
+    model.update_well_productivities(saturation_function);
+
+    pressure_solver.assemble_system(*p_cell_values, *p_neighbor_values,
+                                    time_step,
+                                    saturation_solver.relevant_solution);
 
     // const auto & system_matrix = pressure_solver.get_system_matrix();
     // system_matrix.print(std::cout, true);

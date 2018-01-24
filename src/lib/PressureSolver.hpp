@@ -236,6 +236,7 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
             // assemble local matrix and distribute
             neighbor_values.update(neighbor, p_neighbor, extra_values,
                                    /* update_well = */ false);
+            std::cout << "fuck "  << std::endl;
             cell_values.update_face_values(neighbor_values, dx_ij, normal, dS);
             // distribute
             matrix_ii += cell_values.T_face;

@@ -97,12 +97,13 @@ namespace CellValues
 
   template <int dim>
   void CellValuesBase<dim>::
-  // face_transmissibility(const CellValuesBase<dim> &neighbor_data,
   update_face_values(const CellValuesBase<dim> &neighbor_data,
                      const Tensor<1,dim>       &dx,
                      const Tensor<1,dim>       &face_normal,
                      const double              face_area)
   {
+    std::cout << "fuck2 "  << std::endl;
+
     T_face = 0;
     G_face = 0;
 
@@ -143,10 +144,10 @@ namespace CellValues
                         const double pressure,
                         const std::vector<double> &extra_values,
                         const bool update_well=1);
-    virtual void update_face_values(const CellValuesMP<dim> &neighbor_data,
-                                    const Tensor<1,dim>     &dx,
-                                    const Tensor<1,dim>     &face_normal,
-                                    const double            dS);
+    virtual void update_face_values(const CellValuesBase<dim> &neighbor_data,
+                                    const Tensor<1,dim>       &dx,
+                                    const Tensor<1,dim>       &face_normal,
+                                    const double               dS);
     double get_mass_matrix_entry() const;
 
    protected:
@@ -295,14 +296,16 @@ CellValuesMP<dim>::update(const CellIterator<dim> &cell,
 template <int dim>
 void
 CellValuesMP<dim>::
-update_face_values(const CellValuesMP<dim> &neighbor_data,
+update_face_values(const CellValuesBase<dim> &neighbor_data,
                    const Tensor<1,dim>     &dx,
                    const Tensor<1,dim>     &face_normal,
                    const double            face_area)
 {
+  std::cout << "fuck1 "  << std::endl;
   const auto & model = this->model;
   this->T_face = 0;
   this->G_face = 0;
+
 
   Vector<double> k_face(3);
   Math::harmonic_mean(this->k, neighbor_data.k, k_face);
@@ -350,6 +353,7 @@ update_face_values(const CellValuesMP<dim> &neighbor_data,
   }
 
   this->T_face = -c2o/c1w * Tw_face + To_face;
+  std::cout << "T " << this->T_face << std::endl;
 
   // // G_face = data.density_sc_water()/B_w_face*data.gravity()*T_face*dx[2]*face_normal[2];
   // G_face = model.density_sc_water()/B_w_face/B_w_face/mu_w_face *

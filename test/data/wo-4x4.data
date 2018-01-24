@@ -40,10 +40,10 @@ PVT water
 
 PVT oil
 # p Bo   Co    mu_o  R_s
-01, 1.0, 1e-8, 5, 0.0;
-10, 1.0, 1e-8, 5, 0.0;
-20, 1.0, 1e-8, 5, 0.0;
-30, 1.0, 1e-8, 5, 0.0;
+01, 1.0, 1e-8, 5,    0.0;
+10, 1.0, 1e-8, 5,    0.0;
+20, 1.0, 1e-8, 5,    0.0;
+30, 1.0, 1e-8, 5,    0.0;
 /
 
 Rel perm water
@@ -55,7 +55,7 @@ Rel perm oil
 0.2,    1.0,  3 /
 
 subsection Solver
-Minimum time step    1 /
+Minimum time step    0.1 /
 T max                100 /
 FSS tolerance        1e-8 /
 Max FSS steps        30 /
