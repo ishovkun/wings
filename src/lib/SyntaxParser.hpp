@@ -79,7 +79,7 @@ namespace Parsers
       AssertThrow(match.size() <= 1,
                   ExcMessage("Found more than one subsection " + kwd));
       // std::cout << "match.size " << match.size() << std::endl;
-      std::cout << "weird section " << active_text << std::endl;
+      // std::cout << "weird section " << active_text << std::endl;
     }
 
     // std::cout<<active_text<<std::endl;

@@ -233,9 +233,9 @@ namespace Wings
 
     model.update_well_productivities(pressure_function, saturation_function);
 
-    // pressure_solver.assemble_system(*p_cell_values, *p_neighbor_values,
-    //                                 time_step,
-    //                                 saturation_solver.relevant_solution);
+    pressure_solver.assemble_system(*p_cell_values, *p_neighbor_values,
+                                    time_step,
+                                    saturation_solver.relevant_solution);
 
     // for (auto & id : model.get_well_ids())
     // {
@@ -254,8 +254,8 @@ namespace Wings
     // }
 
 
-    // const auto & system_matrix = pressure_solver.get_system_matrix();
-    // system_matrix.print(std::cout, true);
+    const auto & system_matrix = pressure_solver.get_system_matrix();
+    system_matrix.print(std::cout, true);
 
 
   } // eom
