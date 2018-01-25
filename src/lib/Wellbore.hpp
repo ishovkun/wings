@@ -637,11 +637,9 @@ update_productivity(const Function<dim> &get_pressure,
   Tensor<1,dim>       abs_productivity;
   std::vector<double> productivity(n_phases);
   std::vector<double> rel_perm(n_phases);
-  std::cout << "calling size " << pvt_tables.size()  << "\n" << std::flush;
   std::vector<double> pvt_values(pvt_tables[0]->n_cols()); // size first pvt table
 
   productivities.clear();
-  std::cout << "is this working "  << "\n" << std::flush;
 
   const std::vector< Tensor<1,dim> > h = get_cell_sizes(cells);
   for (unsigned int i=0; i<cells.size(); i++)
@@ -661,17 +659,14 @@ update_productivity(const Function<dim> &get_pressure,
 
     // phase productivities
     get_saturation.vector_value(cells[i]->center(), saturation);
-    std::cout << "getting pressure "  << "\n" << std::flush;
     const double pressure = get_pressure.value(cells[i]->center());
     // const double pressure = 0;
     relative_permeability.get_values(saturation, rel_perm);
     for (int p=0; p<n_phases; ++p)
     {
-      std::cout << "size 1 " << pvt_tables.size()  << "\n" << std::flush;
       pvt_tables[p]->get_values(pressure, pvt_values);
-      // std::cout << "size 1 " << pvt_values.size()  << "\n";
-      // std::cout << "size 2 " << n_phases  << "\n";
-      productivity[p] = rel_perm[p]*j_ind;
+      //                            volume factor viscosity
+      productivity[p] = rel_perm[p]/pvt_values[0]/pvt_values[2]*j_ind;
     }
 
     productivities.push_back(productivity);
@@ -703,16 +698,15 @@ double Wellbore<dim>::compute_productivity(const double k1,
   const double r =
       0.28*std::sqrt(std::sqrt(k2/k1)*dx1*dx1 + std::sqrt(k1/k2)*dx2*dx2) /
       (std::pow(k2/k1, 0.25) + std::pow(k1/k2, 0.25));
-  double trans =
+  double j_ind =
       2*M_PI*std::sqrt(k1*k2)*length/(std::log(r/radius) + control.skin);
-  std::cout << "pieceman, rwell " << r << "\t" << radius << std::endl << std::flush;
-  std::cout << "length " << length << std::endl << std::flush;
+  // std::cout << "pieceman, rwell " << r << "\t" << radius << std::endl << std::flush;
+  // std::cout << "length " << length << std::endl << std::flush;
   // std::cout << "log " << std::log(r/radius) << std::endl << std::flush;
-  std::cout << "trans " << trans << std::endl << std::flush;
   // std::cout << "other "<< 2*M_PI*std::sqrt(k1*k2)*length << std::endl;
-  AssertThrow(trans >= 0,
+  AssertThrow(j_ind >= 0,
               ExcMessage("productivity <0, probably Cell size is too small, pieceman formula not valid"));
-  return trans;
+  return j_ind;
 }  // eom
 
 

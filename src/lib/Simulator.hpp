@@ -254,8 +254,8 @@ namespace Wings
     // }
 
 
-    // const auto & system_matrix = pressure_solver.get_system_matrix();
-    // system_matrix.print(std::cout, true);
+    const auto & system_matrix = pressure_solver.get_system_matrix();
+    system_matrix.print(std::cout, true);
 
 
   } // eom
