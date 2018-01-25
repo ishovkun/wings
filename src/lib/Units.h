@@ -16,7 +16,7 @@ namespace Units
     double pressure() const {return pressure_constant;}
     double viscosity() const {return viscosity_constant;}
     double permeability() const {return permeability_constant;}
-    double compressibility() const {return 1.0/stiffness_constant;}
+    double compressibility() const {return 1.0/pressure_constant;}
     double gas_rate() const {return gas_rate_constant;}
     double fluid_rate() const {return fluid_rate_constant;}
     double stiffness() const {return stiffness_constant;}

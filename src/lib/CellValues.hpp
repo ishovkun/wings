@@ -238,9 +238,13 @@ CellValuesMP<dim>::update(const CellIterator<dim> &cell,
 
   // water coeffs
   this->Sw = extra_values[0];
-  c1w = this->phi /this->B_w * this->cell_volume;
-  c1p = this->Sw / this->B_w * this->phi * this->C_w;
+  c1w = this->phi * this->cell_volume / this->B_w;
+  c1p = this->phi * this->Sw * this->C_w * this->cell_volume / this->B_w ;
   c1e = 0;
+  // std::cout << "phi = " << this->phi << std::endl;
+  // std::cout << "Bw = " << this->B_w << std::endl;
+  // std::cout << "V = " << this->cell_volume << std::endl;
+  // std::cout << "cw = " << this->C_w << std::endl;
 
   // oil coeffs
   So = 1.0 - Sw;
@@ -251,9 +255,12 @@ CellValuesMP<dim>::update(const CellIterator<dim> &cell,
   //     model.has_phase(Model::Phase::Gas))
   //   So = extra_values[1];
 
-  c2o = this->phi / this->B_o * this->cell_volume;
-  c2p = So * this->phi * this->C_o * this->cell_volume;
+  c2o = this->phi * this->cell_volume / this->B_o;
+  c2p = this->phi * So * this->C_o * this->cell_volume / this->B_o;
   c2e = 0;
+
+  std::cout << "Bo = " << this->B_o << std::endl;
+  std::cout << "co = " << this->C_o << std::endl;
   // gas coeffs
   // double Sg = 0;
   // if (!model.has_phase(Model::Phase::Oil) ||
@@ -392,11 +399,23 @@ template <int dim>
 double
 CellValuesMP<dim>::get_mass_matrix_entry() const
 {
-  const double A = -c2o/c1w;
-  const double B = 0;
-  // A = c2o/c1w * (c3g-c3w)/(c3g-c3o);
-  // B = c20 / (c3g - c3o);
-  const double B_mass = A*c1p + c2p + B*c3p;
+  double B_mass = 0;
+  const auto & model = this->model;
+  if (model.type == Model::ModelType::Blackoil)
+  {
+    const double A = c2o/c1w * (c3g-c3w)/(c3g-c3o);
+    const double B = c2o / (c3g - c3o);
+    B_mass = A*c1p + c2p + B*c3p;
+  }
+  else if (model.type == Model::ModelType::WaterOil)
+  {
+    const double A = +c2o/c1w;
+    B_mass = A*c1p + c2p;
+    std::cout << "c1w = " << c1w << std::endl;
+    std::cout << "c1p =  " << c1p << std::endl;
+    std::cout << "c2o = " << c2o << std::endl;
+    std::cout << "c2p =  " << c2p << std::endl;
+  }
   return B_mass;
 }
 

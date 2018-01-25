@@ -63,10 +63,23 @@ namespace Parsers
                                 subsection_close);
     }
     catch (std::exception &exc) { // to the end of file
-      active_text =
-        Parsers::find_substring(text,
-                                subsection_prefix + kwd+"[^$]");
+      // this doesn't work for some reason
+      // active_text =
+      //   Parsers::find_substring(text,
+      //                           // subsection_prefix + kwd + "[^$]+");
+      //                           // subsection_prefix + kwd + "[^\z]*");
+      //                           subsection_prefix + kwd + ".*");
 
+      std::regex re(subsection_prefix + kwd + "[^\z]*");
+      std::smatch match;
+      std::regex_search (text, match, re);
+      active_text = text.substr(match.position(0) +
+                                subsection_prefix.size() + kwd.size(),
+                                text.size());
+      AssertThrow(match.size() <= 1,
+                  ExcMessage("Found more than one subsection " + kwd));
+      // std::cout << "match.size " << match.size() << std::endl;
+      std::cout << "weird section " << active_text << std::endl;
     }
 
     // std::cout<<active_text<<std::endl;
@@ -103,14 +116,15 @@ namespace Parsers
 
 
   double SyntaxParser::get_double(const std::string &kwd,
-                                   const double default_value) const
+                                  const double default_value) const
   {
     try
     {
-      get_double(kwd);
+      return get_double(kwd);
     }
     catch (std::exception &exc)
     {
+      std::cout << "Caught something!!11" << std::endl;
       return default_value;
     }
     return default_value;

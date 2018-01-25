@@ -256,7 +256,6 @@ std::vector<int> Model<dim>::get_well_ids() const
 template <int dim>
 const std::vector<const Interpolation::LookupTable*> Model<dim>::get_pvt_tables() const
 {
-  std::cout << "shit size = " << get_pvt_table_water().n_cols() << std::endl;
   std::vector<const Interpolation::LookupTable*> pvt_tables;
   if (has_phase(Phase::Water))
     pvt_tables.push_back(&pvt_table_water);

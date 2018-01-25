@@ -203,8 +203,9 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
       const double Q_i = cell_values.Q;
 
       // double matrix_ii = B_ii/time_step + J_i;
-      double matrix_ii = J_i;
-      // double matrix_ii = 0;
+      // double matrix_ii = J_i;
+      double matrix_ii = B_ii/time_step;
+      std::cout << "dt = " << time_step << std::endl;
       double rhs_i = B_ii/time_step*p_old + Q_i;
 
       cell->get_dof_indices(dof_indices);
