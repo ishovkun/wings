@@ -23,6 +23,7 @@ class LookupTable
               const bool               interpolate_=true,
               const bool               extrapolate_=true);
   void set_data(const FullMatrix<double> &xy);
+  unsigned int n_cols() const {return y_values.n();}
   // getting data
   double get_value(const double x,
                    const int    col) const;

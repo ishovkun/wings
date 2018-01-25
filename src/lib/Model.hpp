@@ -256,15 +256,16 @@ std::vector<int> Model<dim>::get_well_ids() const
 template <int dim>
 const std::vector<const Interpolation::LookupTable*> Model<dim>::get_pvt_tables() const
 {
+  std::cout << "shit size = " << get_pvt_table_water().n_cols() << std::endl;
   std::vector<const Interpolation::LookupTable*> pvt_tables;
   if (has_phase(Phase::Water))
-    pvt_tables.push_back(&(get_pvt_table_water()));
+    pvt_tables.push_back(&pvt_table_water);
   if (has_phase(Phase::Oil))
-    pvt_tables.push_back(&(get_pvt_table_oil()));
-
-  return pvt_tables;
+    pvt_tables.push_back(&pvt_table_oil);
   // if (has_phase(const Model::Gas))
   //   pvt_tables.push_back(get_pvt_table_gas());
+
+  return pvt_tables;
 }  // eom
 
 

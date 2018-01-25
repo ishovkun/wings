@@ -90,7 +90,9 @@ class Wellbore : public Function<dim>
   MPI_Comm                                             &mpi_communicator;
   const Function<dim>                                  &get_permeability;
   const RelativePermeability                           &relative_permeability;
-  const std::vector<const Interpolation::LookupTable*> &pvt_tables;
+  // I'm making this this not-a-ref because the original object is destroyed
+  // should't be too heavy
+  const std::vector<const Interpolation::LookupTable*>  pvt_tables;
   int                                n_phases;
   Schedule::WellControl              control;
   const DoFHandler<dim>              *p_dof_handler;
@@ -119,8 +121,9 @@ Wellbore<dim>::Wellbore(const std::vector< Point<dim> >&                      lo
     n_phases(pvt_tables.size()),
     total_productivity(n_phases)
 {
+  // AssertThrow(pvt_tables.size() == 2, ExcMessage("how many phases do you have man?"));
   AssertThrow(locations.size() > 0,
-              ExcMessage("That ain't no a proper well"));
+              ExcMessage("That ain't no proper well"));
   AssertThrow(radius > 0,
               ExcMessage("Well radius should be a positive number"));
   // check for duplicates
@@ -634,9 +637,11 @@ update_productivity(const Function<dim> &get_pressure,
   Tensor<1,dim>       abs_productivity;
   std::vector<double> productivity(n_phases);
   std::vector<double> rel_perm(n_phases);
-  std::vector<double> pvt_values(5);
+  std::cout << "calling size " << pvt_tables.size()  << "\n" << std::flush;
+  std::vector<double> pvt_values(pvt_tables[0]->n_cols()); // size first pvt table
 
   productivities.clear();
+  std::cout << "is this working "  << "\n" << std::flush;
 
   const std::vector< Tensor<1,dim> > h = get_cell_sizes(cells);
   for (unsigned int i=0; i<cells.size(); i++)
@@ -656,11 +661,16 @@ update_productivity(const Function<dim> &get_pressure,
 
     // phase productivities
     get_saturation.vector_value(cells[i]->center(), saturation);
+    std::cout << "getting pressure "  << "\n" << std::flush;
     const double pressure = get_pressure.value(cells[i]->center());
+    // const double pressure = 0;
     relative_permeability.get_values(saturation, rel_perm);
     for (int p=0; p<n_phases; ++p)
     {
+      std::cout << "size 1 " << pvt_tables.size()  << "\n" << std::flush;
       pvt_tables[p]->get_values(pressure, pvt_values);
+      // std::cout << "size 1 " << pvt_values.size()  << "\n";
+      // std::cout << "size 2 " << n_phases  << "\n";
       productivity[p] = rel_perm[p]*j_ind;
     }
 
