@@ -81,7 +81,7 @@ template <int dim>
 PressureSolver<dim>::
 PressureSolver(MPI_Comm                                  &mpi_communicator_,
                parallel::distributed::Triangulation<dim> &triangulation_,
-               const Model::Model<dim>                 &model_,
+               const Model::Model<dim>                   &model_,
                ConditionalOStream                        &pcout_)
     :
     mpi_communicator(mpi_communicator_),

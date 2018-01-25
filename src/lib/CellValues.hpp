@@ -346,10 +346,10 @@ update_face_values(const CellValuesBase<dim> &neighbor_data,
 
   const auto & dx = (neighbor_data.cell_coord - this->cell_coord);
   const double distance = dx.norm();
-  std::cout << "dx " << distance << std::endl;
-  std::cout << "face area " << face_area << std::endl;
-  std::cout << "mu_w_face " << mu_w_face << std::endl;
-  std::cout << "B_w_face " << B_w_face << std::endl;
+  // std::cout << "dx " << distance << std::endl;
+  // std::cout << "face area " << face_area << std::endl;
+  // std::cout << "mu_w_face " << mu_w_face << std::endl;
+  // std::cout << "B_w_face " << B_w_face << std::endl;
   // const double distance =
   if (distance == 0.0)
     return;

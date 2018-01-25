@@ -1,4 +1,5 @@
 # lib/CMakeLists.txt
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/FEFunction)
 
 ADD_LIBRARY(wings SHARED
   Simulator.hpp
@@ -8,19 +9,20 @@ ADD_LIBRARY(wings SHARED
   PressureSolver.hpp
   RelativePermeability.hpp
   ExtraFEData.hpp
-  FEFunction.hpp
+  FEFunction/FEFunction.hpp
+  FEFunction/FEFunctionPVT.hpp
   SaturationSolver.hpp
+  Math.hpp
   Model.hpp
   BitMap.hpp
   Parsers.hpp
   Units.h
   Tensors.hpp
   Keywords.h
-  Wellbore.hpp
   Schedule.hpp
   DefaultValues.h
   LookupTable.hpp
-  Math.hpp
+  Wellbore.hpp
 )
 
 DEAL_II_SETUP_TARGET(wings)

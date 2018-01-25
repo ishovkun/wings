@@ -12,7 +12,8 @@
 // #include <Wellbore.hpp>
 #include <PressureSolver.hpp>
 #include <SaturationSolver.hpp>
-#include <FEFunction.hpp>
+#include <FEFunction/FEFunction.hpp>
+#include <FEFunction/FEFunctionPVT.hpp>
 // #include <CellValues.hpp>
 
 #include <ExtraFEData.hpp>
@@ -186,6 +187,17 @@ namespace Wings
       pcout << "Sw " << tmp[0] << std::endl;
     }
 
+    FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
+        pressure_function(pressure_solver.get_dof_handler(),
+                          pressure_solver.relevant_solution);
+
+    // std::vector<const Interpolation::LookupTable*> phase_pvt =
+    //     {&model.get_pvt_table_water(), &model.get_pvt_table_oil()};
+    // FEFunction::FEFunctionPVT<dim,TrilinosWrappers::MPI::Vector>
+    //     pvt_water_function(pressure_solver.get_dof_handler(),
+    //                        pressure_solver.relevant_solution,
+    //                        model.get_pvt_table_water());
+
     const double p = 6894760;
     // test pvt
     std::vector<double>      pvt_values_water(4);
@@ -219,7 +231,7 @@ namespace Wings
     }
 
 
-    model.update_well_productivities(saturation_function);
+    model.update_well_productivities(pressure_function, saturation_function);
 
     pressure_solver.assemble_system(*p_cell_values, *p_neighbor_values,
                                     time_step,
@@ -242,8 +254,8 @@ namespace Wings
     // }
 
 
-    const auto & system_matrix = pressure_solver.get_system_matrix();
-    system_matrix.print(std::cout, true);
+    // const auto & system_matrix = pressure_solver.get_system_matrix();
+    // system_matrix.print(std::cout, true);
 
 
   } // eom

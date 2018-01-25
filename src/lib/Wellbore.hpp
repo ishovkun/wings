@@ -12,6 +12,7 @@
 #include <DefaultValues.h>
 #include <Schedule.hpp>
 #include <Math.hpp>
+#include <LookupTable.hpp>
 #include <RelativePermeability.hpp>
 
 
@@ -34,10 +35,12 @@ template <int dim>
 class Wellbore : public Function<dim>
 {
  public:
-  Wellbore(const std::vector< Point<dim> >& locations_,
-           const double                     radius_,
-           MPI_Comm                         &mpi_communicator_,
-           int                              n_phases=1);
+  Wellbore(const std::vector< Point<dim> >&                      locations_,
+           const double                                          radius_,
+           MPI_Comm                                             &mpi_communicator_,
+           const Function<dim>                                  &get_permeability,
+           const RelativePermeability                           &relative_permeability,
+           const std::vector<const Interpolation::LookupTable*> &pvt_tables);
   // set data methods
   void set_control(const Schedule::WellControl& control_);
   // access methods
@@ -51,9 +54,8 @@ class Wellbore : public Function<dim>
   void locate(const DoFHandler<dim>& dof_handler);
   std::pair<double,double> get_J_and_Q(const CellIterator<dim> & cell,
                                        const unsigned int        phase = 0) const;
-  void update_productivity(const Function<dim>        &permeability,
-                           const Function<dim>        &get_saturation,
-                           const RelativePermeability &rel_perm);
+  void update_productivity(const Function<dim> &get_pressure,
+                           const Function<dim> &get_saturation);
   static bool point_inside_cell(const CellIterator<dim> &cell,
                                 const Point<dim>        &p);
 
@@ -83,9 +85,12 @@ class Wellbore : public Function<dim>
                          const Tensor<1,dim> &face_normal) const;
 
   // variables
-  std::vector< Point<dim> >          locations;
-  double                             radius;
-  MPI_Comm                           &mpi_communicator;
+  std::vector< Point<dim> >                             locations;
+  double                                                radius;
+  MPI_Comm                                             &mpi_communicator;
+  const Function<dim>                                  &get_permeability;
+  const RelativePermeability                           &relative_permeability;
+  const std::vector<const Interpolation::LookupTable*> &pvt_tables;
   int                                n_phases;
   Schedule::WellControl              control;
   const DoFHandler<dim>              *p_dof_handler;
@@ -98,15 +103,20 @@ class Wellbore : public Function<dim>
 
 
 template <int dim>
-Wellbore<dim>::Wellbore(const std::vector< Point<dim> >& locations_,
-                        const double                     radius_,
-                        MPI_Comm                         &mpi_communicator_,
-                        int                              n_phases_)
+Wellbore<dim>::Wellbore(const std::vector< Point<dim> >&                      locations,
+                        const double                                          radius,
+                        MPI_Comm                                             &mpi_communicator,
+                        const Function<dim>                                  &get_permeability,
+                        const RelativePermeability                           &relative_permeability,
+                        const std::vector<const Interpolation::LookupTable*> &pvt_tables)
     :
-    locations(locations_),
-    radius(radius_),
-    mpi_communicator(mpi_communicator_),
-    n_phases(n_phases_),
+    locations(locations),
+    radius(radius),
+    mpi_communicator(mpi_communicator),
+    get_permeability(get_permeability),
+    relative_permeability(relative_permeability),
+    pvt_tables(pvt_tables),
+    n_phases(pvt_tables.size()),
     total_productivity(n_phases)
 {
   AssertThrow(locations.size() > 0,
@@ -610,14 +620,13 @@ Wellbore<dim>:: get_productivities()
 
 template <int dim>
 void Wellbore<dim>::
-update_productivity(const Function<dim>        &get_permeability,
-                    const Function<dim>        &get_saturation,
-                    const RelativePermeability &get_relative_permeability)
+update_productivity(const Function<dim> &get_pressure,
+                    const Function<dim> &get_saturation)
 {
   /*
     First get cell dimensions dx dy dz
     First compute the sum of permeabilities for the flux normalization
-    Then compute transmissibilities.
+    Then compute productivities.
     How do I normalize permeability when it's a tensor?
   */
   Vector<double>      perm(dim);
@@ -625,6 +634,7 @@ update_productivity(const Function<dim>        &get_permeability,
   Tensor<1,dim>       abs_productivity;
   std::vector<double> productivity(n_phases);
   std::vector<double> rel_perm(n_phases);
+  std::vector<double> pvt_values(5);
 
   productivities.clear();
 
@@ -646,9 +656,13 @@ update_productivity(const Function<dim>        &get_permeability,
 
     // phase productivities
     get_saturation.vector_value(cells[i]->center(), saturation);
-    get_relative_permeability.get_values(saturation, rel_perm);
+    const double pressure = get_pressure.value(cells[i]->center());
+    relative_permeability.get_values(saturation, rel_perm);
     for (int p=0; p<n_phases; ++p)
+    {
+      pvt_tables[p]->get_values(pressure, pvt_values);
       productivity[p] = rel_perm[p]*j_ind;
+    }
 
     productivities.push_back(productivity);
 
@@ -681,9 +695,10 @@ double Wellbore<dim>::compute_productivity(const double k1,
       (std::pow(k2/k1, 0.25) + std::pow(k1/k2, 0.25));
   double trans =
       2*M_PI*std::sqrt(k1*k2)*length/(std::log(r/radius) + control.skin);
-  // std::cout << "pieceman, rwell " << r << "\t" << radius << std::endl << std::flush;
+  std::cout << "pieceman, rwell " << r << "\t" << radius << std::endl << std::flush;
+  std::cout << "length " << length << std::endl << std::flush;
   // std::cout << "log " << std::log(r/radius) << std::endl << std::flush;
-  // std::cout << "trans " << trans << std::endl << std::flush;
+  std::cout << "trans " << trans << std::endl << std::flush;
   // std::cout << "other "<< 2*M_PI*std::sqrt(k1*k2)*length << std::endl;
   AssertThrow(trans >= 0,
               ExcMessage("productivity <0, probably Cell size is too small, pieceman formula not valid"));

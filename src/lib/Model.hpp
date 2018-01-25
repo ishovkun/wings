@@ -96,12 +96,19 @@ class Model
                                  std::vector<double> &dst) const;
   int get_well_id(const std::string& well_name) const;
 
+  const Interpolation::LookupTable &
+  get_pvt_table_water() const {return pvt_table_water;}
+  const Interpolation::LookupTable &
+  get_pvt_table_oil() const {return pvt_table_oil;}
+
   // update methods
   void update_well_controls(const double time);
   void locate_wells(const DoFHandler<dim>& dof_handler);
-  void update_well_productivities(const Function<dim> &get_saturation);
+  void update_well_productivities(const Function<dim> &get_pressure,
+                                  const Function<dim> &get_saturation);
 
   void compute_runtime_parameters();
+  const std::vector<const Interpolation::LookupTable*> get_pvt_tables() const;
 
   // ATTRIBUTES
  public:
@@ -124,15 +131,16 @@ class Model
   ModelType                              type;
   ModelConfig                            config;
  protected:
-  std::string                            mesh_file_name, input_file_name;
+  std::string                            mesh_file_name,
+                                         input_file_name;
   double                                 density_sc_w_constant,
-    density_sc_o_constant,
-    porosity,
-    young_modulus,
-    poisson_ratio_constant;
+                                         density_sc_o_constant,
+                                         porosity,
+                                         young_modulus,
+                                         poisson_ratio_constant;
   Interpolation::LookupTable             pvt_table_water,
-    pvt_table_oil,
-    pvt_table_gas;
+                                         pvt_table_oil,
+                                         pvt_table_gas;
   RelativePermeability                   rel_perm;
   std::vector<Phase>                     phases;
  private:
@@ -246,11 +254,27 @@ std::vector<int> Model<dim>::get_well_ids() const
 
 
 template <int dim>
+const std::vector<const Interpolation::LookupTable*> Model<dim>::get_pvt_tables() const
+{
+  std::vector<const Interpolation::LookupTable*> pvt_tables;
+  if (has_phase(Phase::Water))
+    pvt_tables.push_back(&(get_pvt_table_water()));
+  if (has_phase(Phase::Oil))
+    pvt_tables.push_back(&(get_pvt_table_oil()));
+
+  return pvt_tables;
+  // if (has_phase(const Model::Gas))
+  //   pvt_tables.push_back(get_pvt_table_gas());
+}  // eom
+
+
+template <int dim>
 void Model<dim>::add_well(const std::string name,
                           const double radius,
                           const std::vector< Point<dim> > &locations)
 {
-  Wellbore<dim> w(locations, radius, mpi_communicator, n_phases());
+  Wellbore<dim> w(locations, radius, mpi_communicator,
+                  *get_permeability, rel_perm, get_pvt_tables());
   this->wells.push_back(w);
 
   // check if well_id is in unique_well_ids and add if not
@@ -269,84 +293,6 @@ void Model<dim>::add_well(const std::string name,
     well_ids[name] = id;
   }
 } // eom
-
-
-
-// template <int dim>
-// void Model<dim>::assign_parameters()
-// {
-//   { // Mesh
-//     prm.enter_subsection(keywords.section_mesh);
-//     mesh_file_name = prm.get(keywords.mesh_file);
-//     mesh_file =
-//       find_file_in_relative_path(mesh_file_name);
-//     // std::cout << "mesh_file "<< mesh_file << std::endl;
-
-//     initial_refinement_level =
-//       prm.get_integer(keywords.global_refinement_steps);
-//     n_adaptive_steps = prm.get_integer(keywords.adaptive_refinement_steps);
-
-//     std::vector<double> tmp = Parsers:: parse_string_list<double>
-//       (prm.get(keywords.local_refinement_regions));
-//     local_prerefinement_region.resize(dim);
-//     AssertThrow(tmp.size() == 2*dim,
-//                 ExcMessage("Wrong entry in" +
-//                            keywords.local_refinement_regions));
-//     local_prerefinement_region[0].first = tmp[0];
-//     local_prerefinement_region[0].second = tmp[1];
-//     local_prerefinement_region[1].first = tmp[2];
-//     local_prerefinement_region[1].second = tmp[3];
-//     prm.leave_subsection();
-//   }
-//   { // well data
-//     prm.enter_subsection(keywords.section_wells);
-//     // std::cout << prm.get(keywords.well_parameters) << std::endl;
-//     // assign_wells(prm.get(keywords.well_parameters));
-//     // assign_schedule(prm.get(keywords.well_schedule));
-//     prm.leave_subsection();
-//   }
-//   { // Equation data
-//     prm.enter_subsection(keywords.section_equation_data);
-//     if (prm.get(keywords.unit_system)=="SI")
-//       units.set_system(Units::si_units);
-//     else if (prm.get(keywords.unit_system)=="Field")
-//       units.set_system(Units::field_units);
-
-//     this->poisson_ratio_constant = prm.get_double(keywords.poisson_ratio);
-//     this->volume_factor_w_constant = prm.get_double(keywords.volume_factor_water);
-//     this->viscosity_w_constant =
-//       prm.get_double(keywords.viscosity_water)*units.viscosity();
-//     this->compressibility_w_constant =
-//       prm.get_double(keywords.compressibility_water)*units.stiffness();
-//     this->density_sc_w_constant =
-//         prm.get_double(keywords.density_sc_water)*units.mass();
-
-//     // coefficients that are either constant or mapped
-//     Tensor<1,dim> perm_anisotropy = Tensors::get_unit_vector<dim>();
-//     this->get_permeability =
-//       get_hetorogeneous_function_from_parameter(keywords.permeability,
-//                                                 perm_anisotropy);
-
-//     Tensor<1,dim> stiffness_anisotropy = Tensors::get_unit_vector<dim>();
-//     this->get_young_modulus =
-//       get_hetorogeneous_function_from_parameter(keywords.young_modulus,
-//                                                 stiffness_anisotropy);
-//     Tensor<1,dim> unit_vector = Tensors::get_unit_vector<dim>();
-//     this->get_porosity =
-//       get_hetorogeneous_function_from_parameter(keywords.porosity,
-//                                                 unit_vector);
-//     prm.leave_subsection();
-//   }
-//   { // Solver
-//     prm.enter_subsection(keywords.section_solver);
-//     this->t_max = prm.get_double(keywords.t_max);
-//     this->min_time_step = prm.get_double(keywords.minimum_time_step);
-//     this->fss_tolerance = prm.get_double(keywords.fss_tolerance);
-//     this->max_fss_steps = prm.get_integer(keywords.max_fss_steps);
-//     this->parse_time_stepping();
-//     prm.leave_subsection();
-//   }
-// }  // eom
 
 
 
@@ -372,11 +318,11 @@ void Model<dim>::locate_wells(const DoFHandler<dim>& dof_handler)
 
 
 template <int dim>
-void Model<dim>::update_well_productivities(const Function<dim> &get_saturation)
+void Model<dim>::update_well_productivities(const Function<dim> &get_pressure,
+                                            const Function<dim> &get_saturation)
 {
   for (auto & well : wells)
-    well.update_productivity(*(this->get_permeability),
-                             get_saturation, rel_perm);
+    well.update_productivity(get_pressure, get_saturation);
 }  // eom
 
 
