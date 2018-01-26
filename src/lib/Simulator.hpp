@@ -184,19 +184,12 @@ namespace Wings
     {// test saturation values
       Vector<double> tmp(2);
       saturation_function.vector_value(Point<dim>{0,0,0}, tmp);
-      pcout << "Sw " << tmp[0] << std::endl;
+      // pcout << "Sw " << tmp[0] << std::endl;
     }
 
     FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
         pressure_function(pressure_solver.get_dof_handler(),
                           pressure_solver.relevant_solution);
-
-    // std::vector<const Interpolation::LookupTable*> phase_pvt =
-    //     {&model.get_pvt_table_water(), &model.get_pvt_table_oil()};
-    // FEFunction::FEFunctionPVT<dim,TrilinosWrappers::MPI::Vector>
-    //     pvt_water_function(pressure_solver.get_dof_handler(),
-    //                        pressure_solver.relevant_solution,
-    //                        model.get_pvt_table_water());
 
     const double p = 6894760;
     // test pvt
@@ -353,9 +346,9 @@ namespace Wings
     a = D_entry*pressure_solver.old_solution[dof] + Q8;
     // a = Q8;
     m = rhs_vector(dof);
-    std::cout << "b_an(" << dof<< ") = " << a << std::endl;;
-    std::cout << "b(" << dof<< ") = " << m << std::endl;;
-    std::cout << Math::relative_difference(m, a) << std::endl;
+    // std::cout << "b_an(" << dof<< ") = " << a << std::endl;;
+    // std::cout << "b(" << dof<< ") = " << m << std::endl;;
+    // std::cout << Math::relative_difference(m, a) << std::endl;
     AssertThrow(Math::relative_difference(m, a) < tol,
                 ExcMessage("Wrong entry in b("+std::to_string(dof) + ")"));
 
@@ -377,9 +370,105 @@ namespace Wings
     }
 
     // test pressure solution
-    pressure_solver.solution.print(std::cout, 3, true, false);
+    // pressure_solver.solution.print(std::cout, 3, true, false);
 
-    // rhs_vector.print(std::cout, 3, true, false);
+    //                          0     3   6     1    4    7   2    5    8
+    // P_an_balhoff = {984, 990, 972, 990, 993, 958, 991, 984, 921};
+    // cell order is different in wings
+    std::vector<double> P_an = {984, 991, 990, 993, 993, 984, 972, 958, 921};
+    for (auto & value : P_an)
+      value = value*psi;
+
+    for (int dof =0; dof<9; ++dof)
+    {
+      a = P_an[dof];
+      m = pressure_solver.solution(dof);
+      if (Math::relative_difference(m, a) > tol)
+      {
+        std::cout << "b_an(" << dof<< ") = " << a << std::endl;;
+        std::cout << "b(" << dof<< ") = " << m << std::endl;;
+      }
+      AssertThrow(Math::relative_difference(m, a) < tol,
+                  ExcMessage("Wrong entry in b("+std::to_string(dof) + ")"));
+    }
+
+    // check saturation solution
+    // saturation_solver.solution[0].print(std::cout, 4, true, false);
+    std::vector<double> S_an = {0.2, 0.2, 0.2, 0.2, 0.2004, 0.2, 0.2, 0.2, 0.2001};
+    for (int dof =0; dof<9; ++dof)
+    {
+      a = S_an[dof];
+      m = saturation_solver.solution[0](dof);
+      if (Math::relative_difference(m, a) > tol)
+      {
+        std::cout << "b_an(" << dof<< ") = " << a << std::endl;;
+        std::cout << "b(" << dof<< ") = " << m << std::endl;;
+      }
+      AssertThrow(Math::relative_difference(m, a) < tol,
+                  ExcMessage("Wrong entry in b("+std::to_string(dof) + ")"));
+    }
+
+
+    // Second time step
+    model.update_well_productivities(pressure_function, saturation_function);
+
+    pressure_solver.old_solution = pressure_solver.solution;
+    pressure_solver.assemble_system(*p_cell_values, *p_neighbor_values,
+                                    time_step,
+                                    saturation_solver.relevant_solution);
+
+    pressure_solver.solve();
+    pressure_solver.relevant_solution = pressure_solver.solution;
+    if (model.type != Model::ModelType::SingleLiquid)
+    {
+      saturation_solver.solve(cell_values_saturation,
+                              neighbor_values_pressure,
+                              time_step,
+                              pressure_solver.relevant_solution,
+                              pressure_solver.old_solution);
+      saturation_solver.relevant_solution[0] = saturation_solver.solution[0];
+      saturation_solver.relevant_solution[1] = saturation_solver.solution[1];
+    }
+
+    //                 0     3   6     1    4    7   2    5    8
+    // P_an_balhoff = {970, 974, 947, 976, 977, 932, 978, 968, 896};
+    P_an = {970, 976, 978, 974, 977, 968, 947, 932, 896};
+    for (auto & value : P_an)
+      value = value*psi;
+
+    for (int dof =0; dof<9; ++dof)
+    {
+      a = P_an[dof];
+      m = pressure_solver.solution(dof);
+      if (Math::relative_difference(m, a) > tol)
+      {
+        std::cout << "b_an(" << dof<< ") = " << a << std::endl;;
+        std::cout << "b(" << dof<< ") = " << m << std::endl;;
+      }
+      AssertThrow(Math::relative_difference(m, a) < tol,
+                  ExcMessage("Wrong entry in b("+std::to_string(dof) + ")"));
+    }
+
+
+    // check saturation solution
+    // saturation_solver.solution[0].print(std::cout, 4, true, false);
+
+    //           0     3      6     1    4       7       2    5    8
+    // S_balhoff = {0.2, 0.2, 0.2001. 0.2, 0.2008, 0.2001, 0.2, 0.2, 0.2001};
+    S_an = {0.2, 0.2, 0.2, 0.2, 0.2008, 0.2, 0.2001, 0.2001, 0.2001};
+    for (int dof =0; dof<9; ++dof)
+    {
+      a = S_an[dof];
+      m = saturation_solver.solution[0](dof);
+      if (Math::relative_difference(m, a) > tol)
+      {
+        std::cout << "b_an(" << dof<< ") = " << a << std::endl;;
+        std::cout << "b(" << dof<< ") = " << m << std::endl;;
+      }
+      AssertThrow(Math::relative_difference(m, a) < tol,
+                  ExcMessage("Wrong entry in b("+std::to_string(dof) + ")"));
+    }
+
   } // eom
 
 } // end of namespace
