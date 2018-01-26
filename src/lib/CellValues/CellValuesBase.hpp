@@ -19,8 +19,12 @@ namespace CellValues
     CellValuesBase(const Model::Model<dim> &model_);
     virtual void update(const CellIterator<dim> &cell,
                         const double pressure,
-                        const std::vector<double> &extra_values,
-                        const bool update_well=1);
+                        const std::vector<double> &extra_values);
+    // this method is to later get J and Q
+    virtual void update_wells(const CellIterator<dim> &cell);
+    // this method computes true Q given the current cell block pressure
+    virtual void update_wells(const CellIterator<dim> &cell,
+                              const double pressure);
     virtual void update_face_values(const CellValuesBase<dim> &neighbor_data,
                                     const Tensor<1,dim>       &face_normal,
                                     const double               dS);
@@ -79,8 +83,7 @@ template <int dim>
 void
 CellValuesBase<dim>::update(const CellIterator<dim> &cell,
                             const double pressure,
-                            const std::vector<double> &extra_values,
-                            const bool update_well)
+                            const std::vector<double> &extra_values)
 {
   const auto & model = this->model;
   AssertThrow(extra_values.size() == model.n_phases()-1,
@@ -159,22 +162,41 @@ CellValuesBase<dim>::update(const CellIterator<dim> &cell,
   // Rel perm
   model.get_relative_permeability(saturation, this->rel_perm);
 
-  // calculate source term
-  if (update_well)
-  {
-    vector_J_phase = 0;
-    vector_Q_phase = 0;
-
-    for (unsigned int phase = 0; phase<this->model.n_phases(); ++phase)
-      for (const auto & well : model.wells)
-      {
-        std::pair<double,double> J_and_Q = well.get_J_and_Q(cell, phase);
-        vector_J_phase[phase] += J_and_Q.first;
-        vector_Q_phase[phase] += J_and_Q.second;
-      }
-
-  }  // end update well
 } // eom
+
+
+
+template <int dim>
+void
+CellValuesBase<dim>::update_wells(const CellIterator<dim> &cell)
+{
+  vector_J_phase = 0;
+  vector_Q_phase = 0;
+
+  for (unsigned int phase = 0; phase < this->model.n_phases(); ++phase)
+    for (const auto & well : model.wells)
+    {
+      std::pair<double,double> J_and_Q = well.get_J_and_Q(cell, phase);
+      vector_J_phase[phase] += J_and_Q.first;
+      vector_Q_phase[phase] += J_and_Q.second;
+    }
+
+}  // eom
+
+
+
+template <int dim>
+void
+CellValuesBase<dim>::
+update_wells(const CellIterator<dim> &cell,
+             const double             pressure)
+{
+  vector_Q_phase = 0;
+
+  for (unsigned int phase = 0; phase < this->model.n_phases(); ++phase)
+    for (const auto & well : model.wells)
+      vector_Q_phase[phase] += well.get_flow_rate(cell, pressure, phase);
+}  // eom
 
 
 

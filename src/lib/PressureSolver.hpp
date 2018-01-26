@@ -19,7 +19,6 @@
 
 // Custom modules
 #include <Model.hpp>
-#include <Wellbore.hpp>
 #include <CellValues/CellValuesBase.hpp>
 #include <ExtraFEData.hpp>
 
@@ -195,12 +194,11 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
         extra_values[c] = s_values[c][0];
       }
 
-      cell_values.update(cell, p, extra_values,
-                         /* update_wells = */ true);
+      cell_values.update(cell, p, extra_values);
+      cell_values.update_wells(cell);
 
       const double B_ii = cell_values.get_mass_matrix_entry();
       double matrix_ii = B_ii/time_step + cell_values.get_J();
-      // double matrix_ii = 0;
       double rhs_i = B_ii/time_step*p_old + cell_values.get_Q();
 
       cell->get_dof_indices(dof_indices);
@@ -229,8 +227,7 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
             const double dS = cell->face(f)->measure();  // face area
 
             // assemble local matrix and distribute
-            neighbor_values.update(neighbor, p_neighbor, extra_values,
-                                   /* update_well = */ false);
+            neighbor_values.update(neighbor, p_neighbor, extra_values);
             cell_values.update_face_values(neighbor_values, normal, dS);
 
             // distribute
@@ -267,7 +264,6 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
 
               // update neighbor
               neighbor_values.update(neighbor, p_neighbor, extra_values);
-
               // update face values
               cell_values.update_face_values(neighbor_values, normal, dS);
 

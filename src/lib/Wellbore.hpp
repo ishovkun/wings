@@ -54,6 +54,9 @@ class Wellbore : public Function<dim>
   void locate(const DoFHandler<dim>& dof_handler);
   std::pair<double,double> get_J_and_Q(const CellIterator<dim> & cell,
                                        const unsigned int        phase = 0) const;
+  double get_flow_rate(const CellIterator<dim> & cell,
+                       const double              cell_pressure,
+                       const unsigned int        phase = 0) const;
   void update_productivity(const Function<dim> &get_pressure,
                            const Function<dim> &get_saturation);
   static bool point_inside_cell(const CellIterator<dim> &cell,
@@ -775,5 +778,23 @@ Wellbore<dim>::get_J_and_Q(const CellIterator<dim> & cell,
 
   return std::make_pair(0.0, 0.0) ;
 }  // eom
+
+
+
+template<int dim>
+double
+Wellbore<dim>::get_flow_rate(const CellIterator<dim> & cell,
+                             const double              cell_pressure,
+                             const unsigned int        phase) const
+{
+  const int segment = find_cell(cell);
+  if (segment == -1)
+    return 0.0;
+
+  if (control.type == Schedule::WellControlType::pressure_control)
+    return productivities[segment][phase] * (control.value - cell_pressure);
+  else
+    return get_J_and_Q(cell, phase).second;
+}  // end get_flow_rate
 
 }  // end of namespace

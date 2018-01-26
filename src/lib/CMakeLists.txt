@@ -7,6 +7,7 @@ ADD_LIBRARY(wings SHARED
   Reader.hpp
   SyntaxParser.hpp
   CellValues/CellValuesBase.hpp
+  CellValues/CellValuesSaturation.hpp
   PressureSolver.hpp
   RelativePermeability.hpp
   ExtraFEData.hpp

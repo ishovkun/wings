@@ -14,8 +14,6 @@
 #include <SaturationSolver.hpp>
 #include <FEFunction/FEFunction.hpp>
 #include <FEFunction/FEFunctionPVT.hpp>
-// #include <CellValuesBase.hpp>
-
 #include <ExtraFEData.hpp>
 
 namespace Wings
@@ -361,8 +359,27 @@ namespace Wings
     AssertThrow(Math::relative_difference(m, a) < tol,
                 ExcMessage("Wrong entry in b("+std::to_string(dof) + ")"));
 
+    pressure_solver.solve();
+    pressure_solver.relevant_solution = pressure_solver.solution;
 
 
+    CellValues::CellValuesSaturation<dim> cell_values_saturation(model);
+
+    if (model.type != Model::ModelType::SingleLiquid)
+    {
+      saturation_solver.solve(cell_values_saturation,
+                              neighbor_values_pressure,
+                              time_step,
+                              pressure_solver.relevant_solution,
+                              pressure_solver.old_solution);
+      saturation_solver.relevant_solution[0] = saturation_solver.solution[0];
+      saturation_solver.relevant_solution[1] = saturation_solver.solution[1];
+    }
+
+    // test pressure solution
+    pressure_solver.solution.print(std::cout, 3, true, false);
+
+    // rhs_vector.print(std::cout, 3, true, false);
   } // eom
 
 } // end of namespace
