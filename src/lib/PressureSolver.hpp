@@ -20,7 +20,7 @@
 // Custom modules
 #include <Model.hpp>
 #include <Wellbore.hpp>
-#include <CellValues.hpp>
+#include <CellValues/CellValuesBase.hpp>
 #include <ExtraFEData.hpp>
 
 namespace FluidSolvers
@@ -199,18 +199,12 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
                          /* update_wells = */ true);
 
       const double B_ii = cell_values.get_mass_matrix_entry();
-      const double J_i = cell_values.J;
-      const double Q_i = cell_values.Q;
-
-      // double matrix_ii = B_ii/time_step + J_i;
-      // double matrix_ii = J_i;
-      double matrix_ii = B_ii/time_step;
-      std::cout << "dt = " << time_step << std::endl;
-      double rhs_i = B_ii/time_step*p_old + Q_i;
+      double matrix_ii = B_ii/time_step + cell_values.get_J();
+      // double matrix_ii = 0;
+      double rhs_i = B_ii/time_step*p_old + cell_values.get_Q();
 
       cell->get_dof_indices(dof_indices);
       const unsigned int i = dof_indices[0];
-      unsigned int j = 0;
       for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
       {
         if (cell->at_boundary(f) == false)
@@ -241,10 +235,11 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
 
             // distribute
             neighbor->get_dof_indices(dof_indices_neighbor);
-            j = dof_indices_neighbor[0];
-            // matrix_ii += cell_values.T_face;
-            rhs_i += cell_values.G_face;
-            // system_matrix.add(i, j, -cell_values.T_face);
+            unsigned int j = dof_indices_neighbor[0];
+            const double T_face = cell_values.get_T_face();
+            matrix_ii += T_face;
+            rhs_i += cell_values.get_G_face();
+            system_matrix.add(i, j, -T_face);
           }
           else if ((cell->neighbor(f)->level() == cell->level()) &&
                    (cell->neighbor(f)->has_children() == true))
@@ -265,18 +260,22 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
                 fe_values.get_function_values(saturation[c], s_values[c]);
 
               neighbor->get_dof_indices(dof_indices_neighbor);
-              j = dof_indices_neighbor[0];
+              unsigned int j = dof_indices_neighbor[0];
               fe_subface_values.reinit(cell, f, subface);
               normal = fe_subface_values.normal_vector(0); // 0 is gauss point
               const double dS = fe_subface_values.JxW(0);
 
-              // assemble local matrix
+              // update neighbor
               neighbor_values.update(neighbor, p_neighbor, extra_values);
+
+              // update face values
               cell_values.update_face_values(neighbor_values, normal, dS);
+
               // distribute
-              // matrix_ii += cell_values.T_face;
-              rhs_i += cell_values.G_face;
-              // system_matrix.add(i, j, -cell_values.T_face);
+              const double T_face = cell_values.get_T_face();
+              matrix_ii += T_face;
+              rhs_i += cell_values.get_G_face();
+              system_matrix.add(i, j, -T_face);
             }
           } // end case neighbor is finer
 
@@ -314,12 +313,6 @@ PressureSolver<dim>::solve()
   return solver_control.last_step();
 }
 
-// template <int dim>
-// void PressureSolver<dim>::print_system_matrix(const double denominator) const
-// {
-//   // out, precision, scientific
-//   system_matrix.print_formatted(std::cout, 1, false, 0, " ", denominator);
-// }  // eom
 
 
 template <int dim>
@@ -328,6 +321,7 @@ PressureSolver<dim>::get_system_matrix()
 {
   return system_matrix;
 }  // eom
+
 
 
 template <int dim>

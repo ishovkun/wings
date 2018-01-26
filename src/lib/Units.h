@@ -40,7 +40,9 @@ namespace Units
       density_constant;
     // conversion constants
     const double
-      gravity_constant = 9.80665,
+        gravity_constant = 9.80665;
+ public:
+    const double
       pounds_per_square_inch = 6894.76,
       pounds_mass = 0.453592,
       centipoise = 1e-3,

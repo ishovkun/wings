@@ -70,7 +70,7 @@ namespace Parsers
       //                           // subsection_prefix + kwd + "[^\z]*");
       //                           subsection_prefix + kwd + ".*");
 
-      std::regex re(subsection_prefix + kwd + "[^\z]*");
+      std::regex re(subsection_prefix + kwd + "[^$]*");
       std::smatch match;
       std::regex_search (text, match, re);
       active_text = text.substr(match.position(0) +
@@ -124,7 +124,7 @@ namespace Parsers
     }
     catch (std::exception &exc)
     {
-      std::cout << "Caught something!!11" << std::endl;
+      // std::cout << "Caught something!!11" << std::endl;
       return default_value;
     }
     return default_value;

@@ -14,7 +14,7 @@
 #include <SaturationSolver.hpp>
 #include <FEFunction/FEFunction.hpp>
 #include <FEFunction/FEFunctionPVT.hpp>
-// #include <CellValues.hpp>
+// #include <CellValuesBase.hpp>
 
 #include <ExtraFEData.hpp>
 
@@ -99,6 +99,7 @@ namespace Wings
   } // eom
 
 
+
   template <int dim>
   void Simulator<dim>::run()
   {
@@ -127,6 +128,7 @@ namespace Wings
     }
     saturation_solver.relevant_solution[0] = saturation_solver.solution[0];
     pressure_solver.relevant_solution = pressure_solver.solution;
+    pressure_solver.old_solution = pressure_solver.solution;
 
 
     // double time = 1;
@@ -155,24 +157,24 @@ namespace Wings
     double time_step = model.min_time_step;
     model.update_well_controls(time);
 
-    CellValues::CellValuesBase<dim> cell_values_sf(model),
-                                    neighbor_values_sf(model);
-    CellValues::CellValuesMP<dim> cell_values_mp(model),
-                                  neighbor_values_mp(model);
+    CellValues::CellValuesBase<dim> cell_values_pressure(model),
+                                    neighbor_values_pressure(model);
     // pointer to cell values that are gonna be used
-    CellValues::CellValuesBase<dim>* p_cell_values = NULL;
-    CellValues::CellValuesBase<dim>* p_neighbor_values = NULL;
-    if (model.type == Model::ModelType::SingleLiquid)
-    {
-      p_cell_values = &cell_values_sf;
-      p_neighbor_values = &neighbor_values_sf;
-    }
-    else
-    {
+    CellValues::CellValuesBase<dim>* p_cell_values = &cell_values_pressure;
+    CellValues::CellValuesBase<dim>* p_neighbor_values = &neighbor_values_pressure;
+    // CellValues::CellValuesBase<dim>* p_cell_values = NULL;
+    // CellValues::CellValuesBase<dim>* p_neighbor_values = NULL;
+    // if (model.type == Model::ModelType::SingleLiquid)
+    // {
+    //   p_cell_values = &cell_values_sf;
+    //   p_neighbor_values = &neighbor_values_sf;
+    // }
+    // else
+    // {
 
-      p_cell_values = &cell_values_mp;
-      p_neighbor_values = &neighbor_values_mp;
-    }
+    //   p_cell_values = &cell_values_mp;
+    //   p_neighbor_values = &neighbor_values_mp;
+    // }
 
     model.locate_wells(pressure_solver.get_dof_handler());
     // std::vector<TrilinosWrappers::MPI::Vector*> saturation_solution =
@@ -202,21 +204,21 @@ namespace Wings
     // test pvt
     std::vector<double>      pvt_values_water(4);
     model.get_pvt_water(p, pvt_values_water);
-    const double Bw = pvt_values_water[0];
-    const double Cw = pvt_values_water[1];
-    const double muw = pvt_values_water[2];
-    std::cout << "mu_w " << muw << std::endl;
-    std::cout << "B_w " << Bw << std::endl;
-    std::cout << "c_w " << Cw << std::endl;
+    // const double Bw = pvt_values_water[0];
+    // const double Cw = pvt_values_water[1];
+    // const double muw = pvt_values_water[2];
+    // std::cout << "mu_w " << muw << std::endl;
+    // std::cout << "B_w " << Bw << std::endl;
+    // std::cout << "c_w " << Cw << std::endl;
 
     std::vector<double>      pvt_values_oil(4);
     model.get_pvt_oil(p, pvt_values_oil);
-    const double Bo = pvt_values_oil[0];
-    const double Co = pvt_values_oil[1];
-    const double muo = pvt_values_oil[2];
-    std::cout << "mu_o " << muo << std::endl;
-    std::cout << "B_o " << Bo << std::endl;
-    std::cout << "c_o " << Co << std::endl;
+    // const double Bo = pvt_values_oil[0];
+    // const double Co = pvt_values_oil[1];
+    // const double muo = pvt_values_oil[2];
+    // std::cout << "mu_o " << muo << std::endl;
+    // std::cout << "B_o " << Bo << std::endl;
+    // std::cout << "c_o " << Co << std::endl;
 
     {
       // test rel_perm
@@ -225,8 +227,8 @@ namespace Wings
       saturation[0] = 0.2;
       saturation[1] = 1-saturation[0];
       model.get_relative_permeability(saturation, rel_perm);
-      std::cout << "kw " << rel_perm[0] << std::endl;
-      std::cout << "ko " << rel_perm[1] << std::endl;
+      // std::cout << "kw " << rel_perm[0] << std::endl;
+      // std::cout << "ko " << rel_perm[1] << std::endl;
 
     }
 
@@ -255,7 +257,110 @@ namespace Wings
 
 
     const auto & system_matrix = pressure_solver.get_system_matrix();
-    system_matrix.print(std::cout, true);
+    // system_matrix.print(std::cout, true);
+
+    const double ft = model.units.length();
+    const double psi = model.units.pressure();
+    const double day = model.units.time();
+    const double t_factor = 6.33e-3;
+    const double tol = DefaultValues::small_number_balhoff;
+
+    const double D_entry = 307.84*ft*ft*ft/psi/day;
+    const double J_entry = 93361. * t_factor*ft*ft*ft/psi/day;
+    const double Tx = 36000 *t_factor*ft*ft*ft/psi/day;
+    const double Ty = 144000 *t_factor*ft*ft*ft/psi/day;
+    const double Q1 = -2000*model.units.us_oil_barrel/day;
+    const double Q2 = +3000*model.units.us_oil_barrel/day;
+    const double Q8 = J_entry * 800.*psi;
+
+    double m = 0; // numerical
+    double a = 0;  // analytical
+    int dof = 0;
+    // double dof1 = 0 , dof2 = 0;
+
+    // a11
+    dof = 0;
+    a = D_entry + Tx + Ty;
+    // a = Tx + Ty;
+    m = system_matrix(dof, dof);
+    // std::cout << "A_an(" << dof<< "," << dof<<") = " << a << std::endl;;
+    // std::cout << "A(" << dof<< "," << dof<<") = " << m << std::endl;;
+    // std::cout << Math::relative_difference(m, a) << std::endl;
+    AssertThrow(Math::relative_difference(m, a) < tol,
+                ExcMessage("Wrong entry in A("+std::to_string(dof) +
+                           ", "+std::to_string(dof)+")"));
+    // a22
+    dof = 1;
+    a = D_entry + Tx + 2*Ty;
+    m = system_matrix(dof, dof);
+    AssertThrow(Math::relative_difference(m, a) < tol,
+                ExcMessage("Wrong entry in A("+std::to_string(dof) +
+                           ", "+std::to_string(dof)+")"));
+    // a33
+    dof = 2;
+    a = D_entry + Tx + Ty;
+    m = system_matrix(dof, dof);
+    AssertThrow(Math::relative_difference(m, a) < tol,
+                ExcMessage("Wrong entry in A("+std::to_string(dof) +
+                           ", "+std::to_string(dof)+")"));
+    // a44
+    dof = 3;
+    a = D_entry + 2*Tx + Ty;
+    m = system_matrix(dof, dof);
+    // std::cout << "a11 = " << a << std::endl;;
+    // std::cout << "m11 = " << m << std::endl;;
+    // std::cout << relative_difference(m, a) << std::endl;
+    AssertThrow(Math::relative_difference(m, a) < tol,
+                ExcMessage("Wrong entry in A("+std::to_string(dof) +
+                           ", "+std::to_string(dof)+")"));
+    // a55
+    dof = 4;
+    a = D_entry + 2*Tx + 2*Ty;
+    m = system_matrix(dof, dof);
+    AssertThrow(Math::relative_difference(m, a) < tol,
+                ExcMessage("Wrong entry in A("+std::to_string(dof) +
+                           ", "+std::to_string(dof)+")"));
+    // a99
+    dof = 8;
+    a = D_entry + Tx + Ty + J_entry;
+    m = system_matrix(dof, dof);
+    // std::cout << "a11 = " << a << std::endl;;
+    // std::cout << "m11 = " << m << std::endl;;
+    // std::cout << relative_difference(m, a) << std::endl;
+    AssertThrow(Math::relative_difference(m, a) < tol,
+                ExcMessage("Wrong entry in A("+std::to_string(dof) +
+                           ", "+std::to_string(dof)+")"));
+
+    // RHS VECTOR
+    const auto & rhs_vector = pressure_solver.get_rhs_vector();
+    // system_matrix.print(std::cout, true);
+    // rhs_vector.print(std::cout, 3, true, false);
+
+    dof = 0;
+    a = D_entry*pressure_solver.old_solution[dof] + Q1;
+    m = rhs_vector(dof);
+    AssertThrow(Math::relative_difference(m, a) < tol,
+                ExcMessage("Wrong entry in b("+std::to_string(dof) + ")"));
+    dof = 1;
+    a = D_entry*pressure_solver.old_solution[dof];
+    m = rhs_vector(dof);
+    AssertThrow(Math::relative_difference(m, a) < tol,
+                ExcMessage("Wrong entry in b("+std::to_string(dof) + ")"));
+    dof = 4;
+    a = D_entry*pressure_solver.old_solution[dof] + Q2;
+    m = rhs_vector(dof);
+    AssertThrow(Math::relative_difference(m, a) < tol,
+                ExcMessage("Wrong entry in b("+std::to_string(dof) + ")"));
+    dof = 8;
+    a = D_entry*pressure_solver.old_solution[dof] + Q8;
+    // a = Q8;
+    m = rhs_vector(dof);
+    std::cout << "b_an(" << dof<< ") = " << a << std::endl;;
+    std::cout << "b(" << dof<< ") = " << m << std::endl;;
+    std::cout << Math::relative_difference(m, a) << std::endl;
+    AssertThrow(Math::relative_difference(m, a) < tol,
+                ExcMessage("Wrong entry in b("+std::to_string(dof) + ")"));
+
 
 
   } // eom

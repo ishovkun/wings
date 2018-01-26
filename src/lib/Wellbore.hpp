@@ -702,7 +702,6 @@ double Wellbore<dim>::compute_productivity(const double k1,
       2*M_PI*std::sqrt(k1*k2)*length/(std::log(r/radius) + control.skin);
   // std::cout << "pieceman, rwell " << r << "\t" << radius << std::endl << std::flush;
   // std::cout << "length " << length << std::endl << std::flush;
-  // std::cout << "log " << std::log(r/radius) << std::endl << std::flush;
   // std::cout << "other "<< 2*M_PI*std::sqrt(k1*k2)*length << std::endl;
   AssertThrow(j_ind >= 0,
               ExcMessage("productivity <0, probably Cell size is too small, pieceman formula not valid"));
@@ -734,7 +733,9 @@ Wellbore<dim>::get_J_and_Q(const CellIterator<dim> & cell,
 
   if (control.type == Schedule::WellControlType::pressure_control)
   {
-    std::cout << "control " << control.value << "\n";
+    // std::cout << "BHP " << control.value << "\n";
+    // std::cout << "J " << productivities[segment][phase] << "\t"
+    //           << "phase " << phase << std::endl;
     return std::make_pair(productivities[segment][phase],
                           control.value*productivities[segment][phase]);
   }
@@ -749,13 +750,20 @@ Wellbore<dim>::get_J_and_Q(const CellIterator<dim> & cell,
         control.value*productivities[segment][phase]/sum_phase_productivities;
 
     if (sum_phase_productivities > 0)
-      return std::make_pair(0.0, normalized_flux);
+      return std::make_pair(0.0, -normalized_flux);
     else
       return std::make_pair(0.0, 0.0);
   }
   else if (control.type == Schedule::flow_control_phase_1)
   {
     if (phase == 1)
+      return std::make_pair(0.0, control.value);
+    else
+      return std::make_pair(0.0, 0.0);
+  }
+  else if (control.type == Schedule::flow_control_phase_2)
+  {
+    if (phase == 2)
       return std::make_pair(0.0, control.value);
     else
       return std::make_pair(0.0, 0.0);

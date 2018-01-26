@@ -1,11 +1,12 @@
 # lib/CMakeLists.txt
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/FEFunction)
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/CellValues)
 
 ADD_LIBRARY(wings SHARED
   Simulator.hpp
   Reader.hpp
   SyntaxParser.hpp
-  CellValues.hpp
+  CellValues/CellValuesBase.hpp
   PressureSolver.hpp
   RelativePermeability.hpp
   ExtraFEData.hpp

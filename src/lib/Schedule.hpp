@@ -13,8 +13,8 @@ namespace Schedule
 
   const std::map<int, WellControlType> well_control_type_indexing =
   {
-    {0, WellControlType::flow_control_total},
-    {1, WellControlType::pressure_control},
+    {0, WellControlType::pressure_control},
+    {1, WellControlType::flow_control_total},
     {2, WellControlType::flow_control_phase_1},
     {3, WellControlType::flow_control_phase_2},
     {4, WellControlType::flow_control_phase_3}

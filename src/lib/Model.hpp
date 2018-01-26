@@ -423,7 +423,15 @@ inline
 void Model<dim>::get_relative_permeability(Vector<double>      &saturation,
                                            std::vector<double> &dst) const
 {
-  rel_perm.get_values(saturation, dst);
+  AssertThrow(dst.size() == n_phases(),
+              ExcDimensionMismatch(dst.size(), n_phases()));
+
+  if (type == SingleLiquid)
+    dst[0] = 1;
+  else if (type == WaterOil)
+    rel_perm.get_values(saturation, dst);
+  else
+    AssertThrow(false, ExcNotImplemented());
 }
 
 }  // end of namespace

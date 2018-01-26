@@ -332,13 +332,24 @@ namespace Parsers {
 
       // convert value units
       if (schedule_entry.control.type == Schedule::pressure_control)
+      {
         schedule_entry.control.value *= model.units.pressure();
+      }
 
       if (   model.type == Model::WaterOil
           || model.type == Model::SingleLiquid)
       {
         if (schedule_entry.control.type != Schedule::pressure_control)
           schedule_entry.control.value *= model.units.fluid_rate();
+      }
+      else if (model.type == Model::Blackoil)
+      {
+        if (schedule_entry.control.type == Schedule::flow_control_total
+            || schedule_entry.control.type == Schedule::flow_control_phase_1
+            || schedule_entry.control.type == Schedule::flow_control_phase_2)
+          schedule_entry.control.value *= model.units.fluid_rate();
+        if (schedule_entry.control.type == Schedule::flow_control_phase_3)
+          schedule_entry.control.value *= model.units.gas_rate();
       }
       else
       {

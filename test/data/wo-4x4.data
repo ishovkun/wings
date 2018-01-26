@@ -19,9 +19,9 @@ C, 0.5,
 
 Schedule
 # time well control value skin
-0, A, 0, 2000, 0;  # total flow control producer
-0, B, 2, 3000, 0;  # water flow control injector
-0, C, 1, 800, 0;   # pressure control
+0, A, 1, 2000, 0;  # producer
+0, B, 2, 3000, 0;  # water injector
+0, C, 0, 800, 0;   # pressure control
 /
 
 subsection Equation data
