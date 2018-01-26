@@ -209,11 +209,6 @@ namespace Parsers {
       model.min_time_step =
         parser.get_double(kwds.minimum_time_step, 1e-10) *
           model.units.time();
-      std::cout << "input = " <<
-          parser.get_double(kwds.minimum_time_step, 1e-10)
-                << std::endl;
-      std::cout << "dt0 = " << model.min_time_step << std::endl;
-      std::cout << "time units = " << model.units.time() << std::endl;
     }
   } // eom
 

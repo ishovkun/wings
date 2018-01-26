@@ -145,6 +145,7 @@ solve(CellValues::CellValuesSaturation<dim> &cell_values,
       }
 
       cell_values.update(cell, p, extra_values);
+      cell_values.update_wells(cell, p);
 
       // const double B_ii = cell_values.get_mass_matrix_entry();
       // double matrix_ii = B_ii/time_step + cell_values.get_J();
@@ -160,6 +161,10 @@ solve(CellValues::CellValuesSaturation<dim> &cell_values,
               cell_values.get_Q(0)
            )
           ;
+      // pcout << "cell " << cell->center() << std::endl;
+      // pcout <<  "dp entry" << cell_values.get_B(0) * (p - p_old) << std::endl;
+      // pcout << "Q " << time_step*cell_values.get_Q(0) << std::endl;
+
 
       cell->get_dof_indices(dof_indices);
       const unsigned int i = dof_indices[0];
