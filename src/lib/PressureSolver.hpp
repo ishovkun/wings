@@ -184,7 +184,6 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
       fe_values.get_function_values(relevant_solution, p_values);
 
       // std::cout << "cell: " << i << std::endl;
-      // double p_i = solution[i];
       const double p_old = p_old_values[0];
       const double p = p_values[0];
 
@@ -199,6 +198,7 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
 
       const double B_ii = cell_values.get_mass_matrix_entry();
       double matrix_ii = B_ii/time_step + cell_values.get_J();
+      // double matrix_ii = B_ii/time_step;
       double rhs_i = B_ii/time_step*p_old + cell_values.get_Q();
 
       cell->get_dof_indices(dof_indices);
@@ -206,9 +206,10 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
       // std::cout << "ind " << i
       //           << "\tcell" <<cell->center()
       //           << "\tBii/time_step = " << B_ii/time_step
-      //           << "\t p_old = 0: " <<( p_old == 0.0)
-      //           << "\tQ = " << cell_values.get_Q()
-      //           << std::endl;
+                // << "\t p_old = 0: " << p_old == 0.0)
+                // << "\tQ = " << cell_values.get_Q()
+                // << "\tJ = " << cell_values.get_J()
+                // << std::endl;
       for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
       {
         if (cell->at_boundary(f) == false)

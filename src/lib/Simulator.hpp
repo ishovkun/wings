@@ -160,11 +160,11 @@ namespace Wings
     FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
         saturation_function(pressure_solver.get_dof_handler(),
                             saturation_solver.relevant_solution);
-    {// test saturation values
-      Vector<double> tmp(2);
-      saturation_function.vector_value(Point<dim>{0,0,0}, tmp);
-      // pcout << "Sw " << tmp[0] << std::endl;
-    }
+    // {// test saturation values
+    //   Vector<double> tmp(2);
+    //   saturation_function.vector_value(Point<dim>{0,0,0}, tmp);
+    //   // pcout << "Sw " << tmp[0] << std::endl;
+    // }
 
     FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
         pressure_function(pressure_solver.get_dof_handler(),
@@ -251,11 +251,13 @@ namespace Wings
     // a11
     dof = 0;
     a = D_entry + Tx + Ty;
-    // a = Tx + Ty;
     m = system_matrix(dof, dof);
-    // std::cout << "A_an(" << dof<< "," << dof<<") = " << a << std::endl;;
-    // std::cout << "A(" << dof<< "," << dof<<") = " << m << std::endl;;
-    // std::cout << Math::relative_difference(m, a) << std::endl;
+    if (Math::relative_difference(m,a) > tol)
+    {
+      std::cout << "A_an(" << dof<< "," << dof<<") = " << a << std::endl;;
+      std::cout << "A(" << dof<< "," << dof<<") = " << m << std::endl;;
+      std::cout << Math::relative_difference(m, a) << std::endl;
+    }
     AssertThrow(Math::relative_difference(m, a) < tol,
                 ExcMessage("Wrong entry in A("+std::to_string(dof) +
                            ", "+std::to_string(dof)+")"));
@@ -263,6 +265,12 @@ namespace Wings
     dof = 1;
     a = D_entry + Tx + 2*Ty;
     m = system_matrix(dof, dof);
+    if (Math::relative_difference(m,a) > tol)
+    {
+      std::cout << "A_an(" << dof<< "," << dof<<") = " << a << std::endl;;
+      std::cout << "A(" << dof<< "," << dof<<") = " << m << std::endl;;
+      std::cout << Math::relative_difference(m, a) << std::endl;
+    }
     AssertThrow(Math::relative_difference(m, a) < tol,
                 ExcMessage("Wrong entry in A("+std::to_string(dof) +
                            ", "+std::to_string(dof)+")"));
@@ -309,6 +317,12 @@ namespace Wings
     dof = 0;
     a = D_entry*pressure_solver.old_solution[dof] + Q1;
     m = rhs_vector(dof);
+    if (Math::relative_difference(m,a) > tol)
+    {
+      pcout << "analyt " << a << "\t" << std::endl;
+      pcout << "numerical " << m << "\t" << std::endl;
+      pcout << "rel dirr " << Math::relative_difference(m, a) << "\t" << std::endl;
+    }
     AssertThrow(Math::relative_difference(m, a) < tol,
                 ExcMessage("Wrong entry in b("+std::to_string(dof) + ")"));
     dof = 1;

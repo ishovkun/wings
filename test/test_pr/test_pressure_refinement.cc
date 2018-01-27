@@ -338,8 +338,16 @@ namespace Wings
     A_ii = system_matrix(1, 1);
     AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 1_1"));
     // (2, 2)
+    // const auto & dfh = pressure_solver.get_dof_handler();
+    // typename DoFHandler<dim>::active_cell_iterator
+    //     cell = dfh.begin_active();
+    // cell++; // 1
+    // cell++; // 2
+    // std::cout << cell->center() << std::endl;
     A_ii_an = B/time_step + 2*T_coarse_coarse + 4*T_fine_coarse;
     A_ii = system_matrix(2, 2);
+    // std::cout << "a22 " << A_ii << std::endl;
+    // std::cout << "a22_an " << A_ii_an << std::endl;
     AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps, ExcMessage("wrong 2_2"));
     // (3, 3)
     A_ii_an = B/time_step + 2*T_coarse_coarse;

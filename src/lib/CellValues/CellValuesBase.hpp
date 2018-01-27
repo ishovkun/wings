@@ -101,8 +101,6 @@ CellValuesBase<dim>::update(const CellIterator<dim> &cell,
   this->So = 0;
   this->Sg = 0;
 
-
-
   if (model.has_phase(Model::Phase::Water))
   {
     if (model.n_phases() > 1)
@@ -112,14 +110,14 @@ CellValuesBase<dim>::update(const CellIterator<dim> &cell,
     }
     else
     {
-      this->Sw = 1;
+      this->Sw = 1.0;
     }
   }
 
   if (model.has_phase(Model::Phase::Oil))
   {
     if (model.type == Model::ModelType::WaterOil)
-      this->So = 1 - this->Sw;
+      this->So = 1.0 - this->Sw;
     else if (model.type == Model::ModelType::Blackoil)
       this->So = extra_values[1];
     saturation[1] = this->So;
@@ -134,11 +132,9 @@ CellValuesBase<dim>::update(const CellIterator<dim> &cell,
       saturation[2] = this->Sg;
   }
 
-
   // Phase-dependent values
   if (model.has_phase(Model::Phase::Water))
   {
-    auto & pvt_values_water = this->pvt_values_water;
     model.get_pvt_water(pressure, pvt_values_water);
     this->B_w = pvt_values_water[0];
     this->C_w = pvt_values_water[1];
@@ -147,6 +143,12 @@ CellValuesBase<dim>::update(const CellIterator<dim> &cell,
     c1w = this->phi * this->cell_volume / this->B_w;
     c1p = this->phi * this->Sw * this->C_w * this->cell_volume / this->B_w ;
     c1e = 0;
+    // std::cout << "phi = "<< this->phi << std::endl;
+    // std::cout << "Bw = "<< this->B_w << std::endl;
+    // std::cout << "Cw = "<< this->C_w << std::endl;
+    // std::cout << "mu_w = "<< this->mu_w << std::endl;
+    // std::cout << "S_w = "<< this->Sw << std::endl;
+    // std::cout << "V = "<< this->cell_volume << std::endl;
   }
   if (model.has_phase(Model::Phase::Oil))
   {
@@ -154,6 +156,10 @@ CellValuesBase<dim>::update(const CellIterator<dim> &cell,
     this->B_o = pvt_values_oil[0];
     this->C_o = pvt_values_oil[1];
     this->mu_o = pvt_values_oil[2];
+    // std::cout << "Bo = "<< this->B_o << std::endl;
+    // std::cout << "Co = "<< this->C_o << std::endl;
+    // std::cout << "mu_o = "<< this->mu_o << std::endl;
+    // std::cout << "S_o = "<< this->So << std::endl;
 
     c2o = this->phi * this->cell_volume / this->B_o;
     c2p = this->phi * So * this->C_o * this->cell_volume / this->B_o;
@@ -171,10 +177,9 @@ CellValuesBase<dim>::update(const CellIterator<dim> &cell,
 
   // Rel perm
   if (model.n_phases() == 1)
+    this->rel_perm[0] = 1;
+  if (model.n_phases() == 2)
     model.get_relative_permeability(saturation, this->rel_perm);
-  else
-    for (auto & kr : rel_perm)
-      kr = 1;
 
 } // eom
 
@@ -225,10 +230,6 @@ update_face_values(const CellValuesBase<dim> &neighbor_data,
 
   Vector<double> k_face(dim);
   Math::harmonic_mean(this->k, neighbor_data.k, k_face);
-  const double mu_w_face = Math::arithmetic_mean(this->mu_w, neighbor_data.mu_w);
-  const double B_w_face = Math::arithmetic_mean(this->B_w, neighbor_data.B_w);
-  const double mu_o_face = Math::arithmetic_mean(this->mu_o, neighbor_data.mu_o);
-  const double B_o_face = Math::arithmetic_mean(this->B_o, neighbor_data.B_o);
 
   // geometric data
   const auto & dx = (neighbor_data.cell_coord - this->cell_coord);
@@ -239,6 +240,8 @@ update_face_values(const CellValuesBase<dim> &neighbor_data,
   // face relative permeabilities
   if (model.has_phase(Model::Phase::Water))
   {
+    const double mu_w_face = Math::arithmetic_mean(this->mu_w, neighbor_data.mu_w);
+    const double B_w_face = Math::arithmetic_mean(this->B_w, neighbor_data.B_w);
     // potential for upwinding
     const double pot_w =
         this->pressure + model.density_sc_water()/this->B_w * model.gravity();
@@ -262,6 +265,8 @@ update_face_values(const CellValuesBase<dim> &neighbor_data,
 
   if (model.has_phase(Model::Phase::Oil))
   {
+    const double mu_o_face = Math::arithmetic_mean(this->mu_o, neighbor_data.mu_o);
+    const double B_o_face = Math::arithmetic_mean(this->B_o, neighbor_data.B_o);
     // potential for upwinding
     const double pot_o =
         this->pressure + model.density_sc_oil() / this->B_o * model.gravity();
@@ -284,7 +289,7 @@ update_face_values(const CellValuesBase<dim> &neighbor_data,
   if (model.has_phase(Model::Phase::Gas))
   {
     AssertThrow(false, ExcNotImplemented());
-    T_w_face = 0;
+    T_g_face = 0;
   }
 
 } // eom
@@ -375,6 +380,12 @@ CellValuesBase<dim>::get_mass_matrix_entry() const
   }
   else if (model.type == Model::ModelType::WaterOil)
   {
+    // std::cout << "c1p " << c1p << "\t" << std::endl;
+    // std::cout << "c1w " << c1w << "\t" << std::endl;
+    // std::cout << "c2p " << c2p << "\t" << std::endl;
+    // std::cout << "c2o " << c2o << "\t" << std::endl;
+    // std::cout << "B " << c2o/c1w*c1p + c2p << "\t" << std::endl;
+
     const double A = +c2o/c1w;
     B_mass = A*c1p + c2p;
   }
