@@ -14,8 +14,7 @@ template <int dim>
 class SaturationSolver
 {
  public:
-  SaturationSolver(const int                n_phases_,
-                   MPI_Comm                 &mpi_communicator_,
+  SaturationSolver(MPI_Comm                 &mpi_communicator_,
                    const DoFHandler<dim>    &dof_handler_,
                    const Model::Model<dim>  &model_,
                    ConditionalOStream       &pcout_);
@@ -43,13 +42,12 @@ class SaturationSolver
 
 template <int dim>
 SaturationSolver<dim>::
-SaturationSolver(const int                  n_phases_,
-                 MPI_Comm                   &mpi_communicator_,
+SaturationSolver(MPI_Comm                   &mpi_communicator_,
                  const DoFHandler<dim>      &dof_handler_,
                  const Model::Model<dim>    &model_,
                  ConditionalOStream         &pcout_)
     :
-    n_phases(n_phases_),
+    n_phases(model_.n_phases()),
     mpi_communicator(mpi_communicator_),
     dof_handler(dof_handler_),
     model(model_),

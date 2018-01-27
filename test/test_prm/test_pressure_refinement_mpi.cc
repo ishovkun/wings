@@ -15,8 +15,10 @@
 #include <Reader.hpp>
 #include <Wellbore.hpp>
 #include <PressureSolver.hpp>
+#include <SaturationSolver.hpp>
 #include <Parsers.hpp>
-#include <CellValues.hpp>
+#include <CellValues/CellValuesBase.hpp>
+#include <FEFunction/FEFunction.hpp>
 
 namespace Wings
 {
@@ -107,16 +109,23 @@ namespace Wings
 
     refine_mesh();
     // return;
+    FluidSolvers::SaturationSolver<dim>
+        saturation_solver(mpi_communicator,
+                          pressure_solver.get_dof_handler(),
+                          data, pcout);
+
     pressure_solver.setup_dofs();
+    saturation_solver.setup_dofs(pressure_solver.locally_owned_dofs,
+                                 pressure_solver.locally_relevant_dofs);
 
     // auto & well_A = data.wells[0];
     auto & well_B = data.wells[1];
     // auto & well_C = data.wells[2];
 
-    const auto & pressure_dof_handler = pressure_solver.get_dof_handler();
-    const auto & pressure_fe = pressure_solver.get_fe();
-    data.locate_wells(pressure_dof_handler, pressure_fe);
-    data.update_well_productivities();
+    // const auto & pressure_dof_handler = pressure_solver.get_dof_handler();
+    // const auto & pressure_fe = pressure_solver.get_fe();
+    data.locate_wells(pressure_solver.get_dof_handler());
+    // data.update_well_productivities();
 
     // for (auto & id : data.get_well_ids())
     // {
@@ -138,9 +147,12 @@ namespace Wings
     // // data
     const double k = data.get_permeability->value(Point<dim>(1,1,1), 1);
     const double phi = data.get_porosity->value(Point<dim>(1,1,1), 1);
-    const double mu = data.viscosity_water();
-    const double B_w = data.volume_factor_water();
-    const double cw = data.compressibility_water();
+    // const double mu = data.viscosity_water();
+    // const double B_w = data.volume_factor_water();
+    // const double cw = data.compressibility_water();
+    const double mu = 1e-3;
+    const double B_w = 1;
+    const double cw = 5e-10;
     const double h = 1;
     // Compute transmissibility and mass matrix entries
     const double T_coarse_coarse = 1./mu/B_w*(k/h)*h*h;
@@ -159,9 +171,13 @@ namespace Wings
     const double J_index_B = J_index_B_coarse + J_index_B_fine;
 
     const auto & j_ind_b = well_B.get_productivities();
-    double j_b_total = 0;
-    if (j_ind_b.size() > 0)
-      j_b_total = Math::sum(j_ind_b);
+    // double j_b_total = 0;
+    // if (j_ind_b.size() > 0)
+    //   j_b_total = Math::sum(j_ind_b);
+    double j_b_total =
+    j_ind_b[0][0] + j_ind_b[1][0] + j_ind_b[2][0] +
+        j_ind_b[3][0] + j_ind_b[4][0];
+
     j_b_total = Utilities::MPI::sum(j_b_total, mpi_communicator);
 
     // std::cout << "J_b true = " << J_index_B << "\t"
@@ -175,16 +191,35 @@ namespace Wings
     double time_step = data.min_time_step;
     // some init values
     pressure_solver.solution = 0;
-    pressure_solver.solution[0] = 1;
+    // pressure_solver.solution[0] = 1;
     pressure_solver.old_solution = pressure_solver.solution;
+    // const auto & lo_dofs = pressure_solver.locally_owned_dofs;
+    // if (std::find(lo_dofs.begin(), lo_dofs.end(), i) != lo_dofs.end())
+    //     AssertThrow(abs(rhs_vector[i]) < eps,
+    //                 ExcMessage("wrong rhs " + std::to_string(i)));
+
+    for (unsigned int i=0; i<saturation_solver.solution[0].size(); ++i)
+    {
+      saturation_solver.solution[0][i] =1;
+    }
+    saturation_solver.relevant_solution[0] = saturation_solver.solution[0];
 
     data.update_well_controls(time);
 
+    FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
+        pressure_function(pressure_solver.get_dof_handler(),
+                          pressure_solver.relevant_solution);
+    FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
+        saturation_function(pressure_solver.get_dof_handler(),
+                            saturation_solver.relevant_solution);
+
+    data.update_well_productivities(pressure_function, saturation_function);
+
     CellValues::CellValuesBase<dim>
       cell_values(data), neighbor_values(data);
-    pressure_solver.assemble_system(cell_values, neighbor_values, time_step);
+    pressure_solver.assemble_system(cell_values, neighbor_values, time_step,
+                                    saturation_solver.relevant_solution);
 
-    const auto & lo_dofs = pressure_solver.locally_owned_dofs;
     // -----------------------------------------------------------------------
     // RHS vector
     const auto & rhs_vector = pressure_solver.get_rhs_vector();

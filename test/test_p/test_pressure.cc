@@ -86,7 +86,7 @@ namespace WingTest
     read_mesh();
 
     FluidSolvers::SaturationSolver<dim>
-        saturation_solver(model.n_phases(), mpi_communicator,
+        saturation_solver(mpi_communicator,
                           pressure_solver.get_dof_handler(),
                           model, pcout);
 
