@@ -739,6 +739,7 @@ Wellbore<dim>::get_J_and_Q(const CellIterator<dim> & cell,
 
   if (control.type == Schedule::WellControlType::pressure_control)
   {
+    // std::cout << "cell " << cell->center() << std::endl;
     // std::cout << "BHP " << control.value << "\n";
     // std::cout << "J " << productivities[segment][phase] << "\t"
     //           << "phase " << phase << std::endl;

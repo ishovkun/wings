@@ -6,7 +6,7 @@
   the cell at (1.5, 2.5) is refined into 8 cells.
   Wells:
   B, horizontal, diagonally dissects two cells:
-  one coarse and one fine.
+  one coarse and one fine. B is a pressure control well.
   A, vertical, inactive, not tested
   C, horizontal, not tested
 
@@ -26,8 +26,10 @@
 #include <Reader.hpp>
 #include <Wellbore.hpp>
 #include <PressureSolver.hpp>
+#include <SaturationSolver.hpp>
 #include <Parsers.hpp>
-#include <CellValues.hpp>
+#include <CellValues/CellValuesBase.hpp>
+#include <FEFunction/FEFunction.hpp>
 
 namespace Wings
 {
@@ -49,7 +51,7 @@ namespace Wings
     MPI_Comm                                  mpi_communicator;
     parallel::distributed::Triangulation<dim> triangulation;
     ConditionalOStream                        pcout;
-    Model::Model<dim>                         data;
+    Model::Model<dim>                         model;
     FluidSolvers::PressureSolver<dim>         pressure_solver;
     std::string                               input_file;
   };
@@ -61,8 +63,8 @@ namespace Wings
     mpi_communicator(MPI_COMM_WORLD),
     triangulation(mpi_communicator),
     pcout(std::cout, (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)),
-    data(mpi_communicator, pcout),
-    pressure_solver(mpi_communicator, triangulation, data, pcout),
+    model(mpi_communicator, pcout),
+    pressure_solver(mpi_communicator, triangulation, model, pcout),
     input_file(input_file_name_)
   {}
 
@@ -73,9 +75,9 @@ namespace Wings
     GridIn<dim> gridin;
     gridin.attach_triangulation(triangulation);
     // std::cout << "Reading mesh file "
-    //           << data.mesh_file.string()
+    //           << model.mesh_file.string()
     //           << std::endl;
-    std::ifstream f(data.mesh_file.string());
+    std::ifstream f(model.mesh_file.string());
 
     // typename GridIn<dim>::Format format = GridIn<dim>::ucd;
     // gridin.read(f, format);
@@ -112,24 +114,34 @@ namespace Wings
   template <int dim>
   void WingsPressure<dim>::run()
   {
-    Parsers::Reader reader(pcout, data);
+    Parsers::Reader reader(pcout, model);
     reader.read_input(input_file, /* verbosity= */0);
     read_mesh();
     refine_mesh();
     // return;
-    pressure_solver.setup_dofs();
+    FluidSolvers::SaturationSolver<dim>
+        saturation_solver(model.n_phases(), mpi_communicator,
+                          pressure_solver.get_dof_handler(),
+                          model, pcout);
 
-    auto & well_A = data.wells[0];
-    auto & well_B = data.wells[1];
-    // auto & well_C = data.wells[2];
+    pressure_solver.setup_dofs();
+    saturation_solver.setup_dofs(pressure_solver.locally_owned_dofs,
+                                 pressure_solver.locally_relevant_dofs);
+
+    auto & well_A = model.wells[0];
+    auto & well_B = model.wells[1];
+    // auto & well_C = model.wells[2];
 
     // // true values that should be given by solution
-    // // data
-    const double k = data.get_permeability->value(Point<dim>(1,1,1), 1);
-    const double phi = data.get_porosity->value(Point<dim>(1,1,1), 1);
-    const double mu = data.viscosity_water();
-    const double B_w = data.volume_factor_water();
-    const double cw = data.compressibility_water();
+    // // model
+    const double k = model.get_permeability->value(Point<dim>(1,1,1), 1);
+    const double phi = model.get_porosity->value(Point<dim>(1,1,1), 1);
+    // const double mu = data.viscosity_water();
+    // const double B_w = data.volume_factor_water();
+    // const double cw = data.compressibility_water();
+    const double mu = 1e-3;
+    const double B_w = 1;
+    const double cw = 5e-10;
     const double h = 1;
     // Compute transmissibility and mass matrix entries
     const double T_coarse_coarse = 1./mu/B_w*(k/h)*h*h;
@@ -157,9 +169,9 @@ namespace Wings
     const double pieceman_radius_coarse = 0.28*std::sqrt(2*h*h)/2;
     const double pieceman_radius_fine = 0.28*std::sqrt(2*h/2*h/2)/2;
     const double J_index_B_coarse =
-        2*M_PI*k*well_B_length/2/(std::log(pieceman_radius_coarse/well_B_radius));
+        1./mu*2*M_PI*k*well_B_length/2/(std::log(pieceman_radius_coarse/well_B_radius));
     const double J_index_B_fine =
-        2*M_PI*k*well_B_length/2/(std::log(pieceman_radius_fine/well_B_radius));
+        1./mu*2*M_PI*k*well_B_length/2/(std::log(pieceman_radius_fine/well_B_radius));
     const double J_index_B = J_index_B_coarse + J_index_B_fine;
 
     // const double J_index_C =
@@ -171,20 +183,23 @@ namespace Wings
     const double delta = DefaultValues::small_number;
 
     // //  What code gives
-    const auto & pressure_dof_handler = pressure_solver.get_dof_handler();
-    const auto & pressure_fe = pressure_solver.get_fe();
-    data.locate_wells(pressure_dof_handler, pressure_fe);
-    data.update_well_productivities();
+    // const auto & pressure_dof_handler = pressure_solver.get_dof_handler();
+    model.locate_wells(pressure_solver.get_dof_handler());
 
     // some init values
     pressure_solver.solution = 0;
     pressure_solver.solution[0] = 1;
     pressure_solver.old_solution = pressure_solver.solution;
+    for (unsigned int i=0; i<saturation_solver.solution[0].size(); ++i)
+    {
+      saturation_solver.solution[0][i] =1;
+    }
+    saturation_solver.relevant_solution[0] = saturation_solver.solution[0];
 
     double time = 1;
-    double time_step = data.min_time_step;
+    double time_step = model.min_time_step;
 
-    data.update_well_controls(time);
+    model.update_well_controls(time);
 
     const auto & well_A_control = well_A.get_control();
     AssertThrow(well_A_control.value == 0.0,
@@ -195,14 +210,24 @@ namespace Wings
     AssertThrow(well_B_control.type == Schedule::WellControlType::pressure_control,
                 ExcMessage("Wrong control of well B"));
 
-    CellValues::CellValuesBase<dim>
-      cell_values(data), neighbor_values(data);
-    pressure_solver.assemble_system(cell_values, neighbor_values, time_step);
+    FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
+        pressure_function(pressure_solver.get_dof_handler(),
+                          pressure_solver.relevant_solution);
+    FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
+        saturation_function(pressure_solver.get_dof_handler(),
+                            saturation_solver.relevant_solution);
 
-    // for (auto & id : data.get_well_ids())
+    model.update_well_productivities(pressure_function, saturation_function);
+
+    CellValues::CellValuesBase<dim>
+      cell_values(model), neighbor_values(model);
+    pressure_solver.assemble_system(cell_values, neighbor_values, time_step,
+                                    saturation_solver.relevant_solution);
+
+    // for (auto & id : model.get_well_ids())
     // {
     //   std::cout << "well_id " << id << std::endl;
-    //   auto & well = data.wells[id];
+    //   auto & well = model.wells[id];
 
     //   std::cout << "Real locations"  << std::endl;
     //   for (auto & loc : well.get_locations())
@@ -226,7 +251,11 @@ namespace Wings
     // Cell J indices
     // Well b
     const auto & j_ind_b = well_B.get_productivities();
-    const double j_b_total = Math::sum(j_ind_b);
+    // const double j_b_total = Math::sum(j_ind_b);
+    const double j_b_total =
+        j_ind_b[0][0] + j_ind_b[1][0] + j_ind_b[2][0] +
+        j_ind_b[3][0] + j_ind_b[4][0];
+    // std::cout << "J_b size = " << j_ind_b.size() << std::endl;
     // std::cout << "J_b true = " << J_index_B << "\t"
     //           << "J_b = " << j_b_total
     //           << std::endl;
@@ -323,10 +352,16 @@ namespace Wings
     // (5, 5) Due to rounoff in well location there is addition from well B
     // Tolerance is geometric!
     A_ii_an = B/time_step + 3*T_coarse_coarse + 4*T_fine_coarse;
-    A_ii = system_matrix(5, 5);
+    int dof = 5;
+    A_ii = system_matrix(dof, dof);
     // std::cout << "a55 " << A_ii << std::endl;
     // std::cout << "a55_an " << A_ii_an << std::endl;
-    AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps_geo, ExcMessage("wrong 5_5"));
+    // AssertThrow(abs(A_ii - A_ii_an)/A_ii_an < eps_geo, ExcMessage("wrong 5_5"));
+    // std::cout << "rdiff = " << Math::relative_difference(A_ii, A_ii_an) << std::endl;
+    AssertThrow(Math::relative_difference(A_ii, A_ii_an) < DefaultValues::small_number_balhoff,
+                ExcMessage("Wrong entry in A("+std::to_string(dof) +
+                           ", "+std::to_string(dof)+")"));
+
     // (6, 6)
     A_ii_an = B/time_step + 2*T_coarse_coarse + 4*T_fine_coarse;
     A_ii = system_matrix(6, 6);
@@ -409,20 +444,30 @@ namespace Wings
     // indices that should be zero
     // indices 5 should be zero like geometric small value.
     // we compare it with index in cell 8
-    is = {1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14};
+    // tolerance here is geometric cause G may behave weird due to
+    // meshing
+    // is = {1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14};
+    is = {1, 2, 3, 4, 6, 7, 9, 10, 11, 12, 13, 14};
+    // std::cout << "rhs 1 = " << rhs_vector[1] << std::endl;
     for (auto &i : is)
-      AssertThrow(abs(rhs_vector[i]) < eps,
+    {
+      if (abs(rhs_vector[i]) > eps_geo)
+        std::cout << "b_an(" << i<< ") = " << rhs_vector[i] << std::endl;
+      AssertThrow(abs(rhs_vector[i]) < eps_geo,
                   ExcMessage("wrong rhs " + std::to_string(i)));
+    }
 
     // 8 coarse cell with wellbore
     // *well_B_control.value()
 
     const double pressure_B = well_B.get_control().value;
     // this guy exhists only in fine cells
-    const double g_vector_entry = data.density_sc_water()/B_w/B_w*data.gravity() *
+    const double g_vector_entry = model.density_sc_water()/B_w/B_w*model.gravity() *
         T_fine_fine * (h/2);
     // 8
     rhs_an = pressure_B * J_index_B_coarse;
+    // std::cout << "rhs 8 = " << rhs_vector[8] << std::endl << std::flush;
+    // std::cout << "rhs 8 an = " << rhs_an << std::endl << std::flush;
     AssertThrow(abs(rhs_vector[8] - rhs_an)/abs(rhs_an) < eps,
                 ExcMessage("rhs entry 8 is wrong"));
     // 15

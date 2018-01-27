@@ -203,6 +203,12 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
 
       cell->get_dof_indices(dof_indices);
       const unsigned int i = dof_indices[0];
+      // std::cout << "ind " << i
+      //           << "\tcell" <<cell->center()
+      //           << "\tBii/time_step = " << B_ii/time_step
+      //           << "\t p_old = 0: " <<( p_old == 0.0)
+      //           << "\tQ = " << cell_values.get_Q()
+      //           << std::endl;
       for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
       {
         if (cell->at_boundary(f) == false)
@@ -232,7 +238,7 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
 
             // distribute
             neighbor->get_dof_indices(dof_indices_neighbor);
-            unsigned int j = dof_indices_neighbor[0];
+            const unsigned int j = dof_indices_neighbor[0];
             const double T_face = cell_values.get_T_face();
             matrix_ii += T_face;
             rhs_i += cell_values.get_G_face();
@@ -254,10 +260,11 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
               fe_values.get_function_values(relevant_solution, p_values);
               const double p_neighbor = p_values[0];
               for (unsigned int c=0; c<model.n_phases() - 1; ++c)
+              {
                 fe_values.get_function_values(saturation[c], s_values[c]);
+                extra_values[c] = s_values[c][0];
+              }
 
-              neighbor->get_dof_indices(dof_indices_neighbor);
-              unsigned int j = dof_indices_neighbor[0];
               fe_subface_values.reinit(cell, f, subface);
               normal = fe_subface_values.normal_vector(0); // 0 is gauss point
               const double dS = fe_subface_values.JxW(0);
@@ -268,6 +275,8 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
               cell_values.update_face_values(neighbor_values, normal, dS);
 
               // distribute
+              neighbor->get_dof_indices(dof_indices_neighbor);
+              const unsigned int j = dof_indices_neighbor[0];
               const double T_face = cell_values.get_T_face();
               matrix_ii += T_face;
               rhs_i += cell_values.get_G_face();
