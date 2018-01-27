@@ -13,8 +13,7 @@
 #include <PressureSolver.hpp>
 #include <SaturationSolver.hpp>
 #include <FEFunction/FEFunction.hpp>
-#include <FEFunction/FEFunctionPVT.hpp>
-#include <ExtraFEData.hpp>
+// #include <FEFunction/FEFunctionPVT.hpp>
 
 namespace Wings
 {
@@ -130,26 +129,6 @@ namespace Wings
 
 
     // double time = 1;
-    const DoFHandler<dim> & pressure_dof_handler =
-      pressure_solver.get_dof_handler();
-    // std::vector< std::vector<TrilinosWrappers::MPI::Vector*> > extra_vectors(1);
-    // // std::vector< TrilinosWrappers::MPI::Vector* >
-    // //   extra_vectors;
-    // extra_vectors[0].push_back(&(saturation_solver.relevant_solution[0]));
-    // const int dim = 3;
-    ExtraFEData::ExtraFEData<dim> extra_data(std::vector<unsigned int> {{1}});
-    std::vector< const DoFHandler<dim>* > handlers =
-        {&pressure_dof_handler};
-
-    std::vector< std::vector<ExtraFEData::FEDerivativeOrder> > derivatives =
-        {{ExtraFEData::FEDerivativeOrder::values}};
-
-    std::vector< std::vector<TrilinosWrappers::MPI::Vector*> > extra_vectors
-        = {{&(saturation_solver.relevant_solution[0])}};
-    extra_data.set_data(handlers, extra_vectors, derivatives);
-
-    // QGauss<dim>  quadrature_formula(1);
-    // extra_data.make_fe_values(quadrature_formula);
 
     double time = 0;
     double time_step = model.min_time_step;

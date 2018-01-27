@@ -22,8 +22,11 @@
 #include <Model.hpp>
 #include <Reader.hpp>
 #include <PressureSolver.hpp>
+#include <SaturationSolver.hpp>
 #include <Parsers.hpp>
-#include <CellValues.hpp>
+#include <CellValues/CellValuesBase.hpp>
+#include <FEFunction/FEFunction.hpp>
+
 
 namespace WingTest
 {
@@ -43,7 +46,7 @@ namespace WingTest
     MPI_Comm                                  mpi_communicator;
     parallel::distributed::Triangulation<dim> triangulation;
     ConditionalOStream                        pcout;
-    Model::Model<dim>                         data;
+    Model::Model<dim>                         model;
     FluidSolvers::PressureSolver<dim>         pressure_solver;
     std::string                               input_file;
   };
@@ -55,8 +58,8 @@ namespace WingTest
     mpi_communicator(MPI_COMM_WORLD),
     triangulation(mpi_communicator),
     pcout(std::cout, (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)),
-    data(mpi_communicator, pcout),
-    pressure_solver(mpi_communicator, triangulation, data, pcout),
+    model(mpi_communicator, pcout),
+    pressure_solver(mpi_communicator, triangulation, model, pcout),
     input_file(input_file_name_)
   {}
 
@@ -66,7 +69,7 @@ namespace WingTest
   {
     GridIn<dim> gridin;
     gridin.attach_triangulation(triangulation);
-    std::ifstream f(data.mesh_file.string());
+    std::ifstream f(model.mesh_file.string());
 
     // typename GridIn<dim>::Format format = GridIn<dim>::ucd;
     // gridin.read(f, format);
@@ -77,23 +80,34 @@ namespace WingTest
   template <int dim>
   void TestSPO<dim>::run()
   {
-    Parsers::Reader reader(pcout, data);
+    Parsers::Reader reader(pcout, model);
     reader.read_input(input_file, /* verbosity= */0);
     // data.print_input();
     read_mesh();
-    pressure_solver.setup_dofs();
 
-    auto & well_A = data.wells[0];
-    auto & well_B = data.wells[1];
-    auto & well_C = data.wells[2];
+    FluidSolvers::SaturationSolver<dim>
+        saturation_solver(model.n_phases(), mpi_communicator,
+                          pressure_solver.get_dof_handler(),
+                          model, pcout);
+
+    pressure_solver.setup_dofs();
+    saturation_solver.setup_dofs(pressure_solver.locally_owned_dofs,
+                                 pressure_solver.locally_relevant_dofs);
+
+    auto & well_A = model.wells[0];
+    auto & well_B = model.wells[1];
+    auto & well_C = model.wells[2];
 
     // true values that should be given by solution
     // data
-    const double k = data.get_permeability->value(Point<dim>(1,1,1), 1);
-    const double phi = data.get_porosity->value(Point<dim>(1,1,1), 1);
-    const double mu = data.viscosity_water();
-    const double B_w = data.volume_factor_water();
-    const double cw = data.compressibility_water();
+    const double k = model.get_permeability->value(Point<dim>(1,1,1), 1);
+    const double phi = model.get_porosity->value(Point<dim>(1,1,1), 1);
+    // const double mu = model.viscosity_water();
+    // const double B_w = model.volume_factor_water();
+    // const double cw = model.compressibility_water();
+    const double mu = 1e-3;
+    const double B_w = 1;
+    const double cw = 5e-10;
     const double h = 1;
     // // Compute transmissibility and mass matrix entries
     const double T = 1./mu/B_w*(k/h)*h*h;
@@ -119,11 +133,11 @@ namespace WingTest
     const double well_C_radius = well_C.get_radius();
     const double pieceman_radius = 0.28*std::sqrt(2*h*h)/2;
     const double J_index_A =
-      2*M_PI*k*well_A_length / (std::log(pieceman_radius/well_A_radius));
+        1./mu*2*M_PI*k*well_A_length / (std::log(pieceman_radius/well_A_radius));
     const double J_index_B =
-      2*M_PI*k*well_B_length/ (std::log(pieceman_radius/well_B_radius));
+        1./mu*2*M_PI*k*well_B_length/ (std::log(pieceman_radius/well_B_radius));
     const double J_index_C =
-        2*M_PI*k*well_C_length/ (std::log(pieceman_radius/well_C_radius));
+        1./mu*2*M_PI*k*well_C_length/ (std::log(pieceman_radius/well_C_radius));
 
     // std::cout << "rB " << well_B_radius << std::endl;
     // std::cout << "rC " << well_C_radius << std::endl;
@@ -132,28 +146,41 @@ namespace WingTest
 
     //  What code gives
     const auto & pressure_dof_handler = pressure_solver.get_dof_handler();
-    const auto & pressure_fe = pressure_solver.get_fe();
-    data.locate_wells(pressure_dof_handler, pressure_fe);
-    data.update_well_productivities();
+    model.locate_wells(pressure_dof_handler);
 
     // some init values
     pressure_solver.solution = 0;
     pressure_solver.solution[0] = 1;
     pressure_solver.old_solution = pressure_solver.solution;
+    for (unsigned int i=0; i<saturation_solver.solution[0].size(); ++i)
+    {
+      saturation_solver.solution[0][i] =1;
+    }
+    saturation_solver.relevant_solution[0] = saturation_solver.solution[0];
+
 
     double time = 0;
-    double time_step = data.min_time_step;
+    double time_step = model.min_time_step;
 
-    data.update_well_controls(time);
+    FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
+        pressure_function(pressure_solver.get_dof_handler(),
+                          pressure_solver.relevant_solution);
+    FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
+        saturation_function(pressure_solver.get_dof_handler(),
+                            saturation_solver.relevant_solution);
+
+    model.update_well_productivities(pressure_function, saturation_function);
+    model.update_well_controls(time);
 
     CellValues::CellValuesBase<dim>
-      cell_values(data), neighbor_values(data);
-    pressure_solver.assemble_system(cell_values, neighbor_values, time_step);
+      cell_values(model), neighbor_values(model);
+    pressure_solver.assemble_system(cell_values, neighbor_values, time_step,
+                                    saturation_solver.relevant_solution);
 
-    // for (auto & id : data.get_well_ids())
+    // for (auto & id : model.get_well_ids())
     // {
     //   std::cout << "well_id " << id << std::endl;
-    //   auto & well = data.wells[id];
+    //   auto & well = model.wells[id];
 
     //   std::cout << "Real locations"  << std::endl;
     //   for (auto & loc : well.get_locations())
@@ -191,20 +218,26 @@ namespace WingTest
 
     // Cell J indices
     // Well a
-    const auto & j_ind_a = well_A.get_productivities();
+    const auto & j_ind_a_all = well_A.get_productivities();
+    std::vector<double> j_ind_a = {j_ind_a_all[0][0]};
     // std::cout << "Well A J index = " << j_ind_a[0] << std::endl;
     // std::cout << "J A true " << J_index_A << std::endl;
     AssertThrow(abs(J_index_A - j_ind_a[0])/j_ind_a[0] < delta,
                 ExcMessage("Wrong J index well A"));
     // Well b
     const auto & j_ind_b = well_B.get_productivities();
-    const double j_b_total = j_ind_b[0] + j_ind_b[1] + j_ind_b[2];
+    // const double j_b_total = j_ind_b[0][0] + j_ind_b[0][1] + j_ind_b[0][2];
+    const double j_b_total = j_ind_b[0][0] + j_ind_b[1][0] + j_ind_b[2][0];
+    // std::cout << "Well B J index = " << j_b_total << std::endl;
+    // std::cout << "J B true " << J_index_B << std::endl;
     AssertThrow(abs(J_index_B - j_b_total)/J_index_B <
                 DefaultValues::small_number_geometry*10,
                 ExcMessage("Wrong J index well B"));
     // Well c
     const auto & j_ind_c = well_C.get_productivities();
-    const double j_c_total = j_ind_c[0] + j_ind_c[1] + j_ind_c[2];
+    const double j_c_total = j_ind_c[0][0] + j_ind_c[1][0] + j_ind_c[2][0];
+    // std::cout << "Well c J index = " << j_c_total << std::endl;
+    // std::cout << "J c true " << J_index_C << std::endl;
     AssertThrow(abs(J_index_C - j_c_total)/J_index_C <
                 DefaultValues::small_number_geometry*10,
                 ExcMessage("Wrong J index well C"));
@@ -235,7 +268,7 @@ namespace WingTest
 
     const auto & rhs_vector = pressure_solver.get_rhs_vector();
     // rhs_vector.print(std::cout, 3, true, false);
-    const double rate_A = well_A.get_control().value;
+    const double rate_A = - well_A.get_control().value;
     // std::cout << "Rate A = " << rate_A << std::endl;
     // std::cout << "rhs_vector[4] = " << rhs_vector[4] << std::endl;
     AssertThrow(abs(rhs_vector[4] - rate_A)/rate_A<DefaultValues::small_number,
@@ -245,7 +278,7 @@ namespace WingTest
     AssertThrow(abs(rhs_vector[0] - rhs_0)/rhs_0<DefaultValues::small_number,
                 ExcMessage("rhs entry 0 is wrong"));
 
-    pressure_solver.solve();
+    // pressure_solver.solve();
     // std::cout << "Pressure solver " << n_pressure_iter << " steps" << std::endl;
 
     // pressure_solver.solution.print(std::cout, 3, true, false);

@@ -101,10 +101,19 @@ CellValuesBase<dim>::update(const CellIterator<dim> &cell,
   this->So = 0;
   this->Sg = 0;
 
+
+
   if (model.has_phase(Model::Phase::Water))
   {
-    this->Sw = extra_values[0];
-    saturation[0] = this->Sw;
+    if (model.n_phases() > 1)
+    {
+      this->Sw = extra_values[0];
+      saturation[0] = this->Sw;
+    }
+    else
+    {
+      this->Sw = 1;
+    }
   }
 
   if (model.has_phase(Model::Phase::Oil))
@@ -124,6 +133,7 @@ CellValuesBase<dim>::update(const CellIterator<dim> &cell,
     else if (model.type == Model::ModelType::Blackoil)
       saturation[2] = this->Sg;
   }
+
 
   // Phase-dependent values
   if (model.has_phase(Model::Phase::Water))
@@ -160,7 +170,11 @@ CellValuesBase<dim>::update(const CellIterator<dim> &cell,
   }
 
   // Rel perm
-  model.get_relative_permeability(saturation, this->rel_perm);
+  if (model.n_phases() == 1)
+    model.get_relative_permeability(saturation, this->rel_perm);
+  else
+    for (auto & kr : rel_perm)
+      kr = 1;
 
 } // eom
 

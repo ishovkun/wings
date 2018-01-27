@@ -30,7 +30,6 @@ Units                   Field /
 Permeability            bitmap perm4x4_homog.dat /
 Porosity                0.26 /
 Perm anisotropy         1, 1, 1 /
-
 Density water           1000 /
 Density oil             800 /
 
