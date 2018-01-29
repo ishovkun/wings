@@ -165,27 +165,11 @@ namespace Wings
     const double well_B_length = h*std::sqrt(2.);
     const double well_B_radius = well_B.get_radius();
     const double J_index_B_coarse =
-      2*M_PI*k*well_B_length/2/(std::log(pieceman_radius_coarse/well_B_radius));
+      1./mu*2*M_PI*k*well_B_length/2/(std::log(pieceman_radius_coarse/well_B_radius));
     const double J_index_B_fine =
-      2*M_PI*k*well_B_length/2/(std::log(pieceman_radius_fine/well_B_radius));
+      1./mu*2*M_PI*k*well_B_length/2/(std::log(pieceman_radius_fine/well_B_radius));
     const double J_index_B = J_index_B_coarse + J_index_B_fine;
 
-    const auto & j_ind_b = well_B.get_productivities();
-    // double j_b_total = 0;
-    // if (j_ind_b.size() > 0)
-    //   j_b_total = Math::sum(j_ind_b);
-    double j_b_total =
-    j_ind_b[0][0] + j_ind_b[1][0] + j_ind_b[2][0] +
-        j_ind_b[3][0] + j_ind_b[4][0];
-
-    j_b_total = Utilities::MPI::sum(j_b_total, mpi_communicator);
-
-    // std::cout << "J_b true = " << J_index_B << "\t"
-    //           << "J_b = " << j_b_total
-    //           << std::endl;
-    AssertThrow(abs(J_index_B - j_b_total)/J_index_B <
-                DefaultValues::small_number_geometry*10,
-                ExcMessage("Wrong J index well B"));
 
     double time = 1;
     double time_step = data.min_time_step;
@@ -193,16 +177,16 @@ namespace Wings
     pressure_solver.solution = 0;
     // pressure_solver.solution[0] = 1;
     pressure_solver.old_solution = pressure_solver.solution;
-    // const auto & lo_dofs = pressure_solver.locally_owned_dofs;
     // if (std::find(lo_dofs.begin(), lo_dofs.end(), i) != lo_dofs.end())
     //     AssertThrow(abs(rhs_vector[i]) < eps,
     //                 ExcMessage("wrong rhs " + std::to_string(i)));
 
-    for (unsigned int i=0; i<saturation_solver.solution[0].size(); ++i)
-    {
-      saturation_solver.solution[0][i] =1;
-    }
-    saturation_solver.relevant_solution[0] = saturation_solver.solution[0];
+    // for (unsigned int i=0; i<saturation_solver.solution[0].size(); ++i)
+    // {
+    //   saturation_solver.solution[0][i] =1;
+    // }
+    // saturation_solver.relevant_solution[0] = saturation_solver.solution[0];
+
 
     data.update_well_controls(time);
 
@@ -215,6 +199,28 @@ namespace Wings
 
     data.update_well_productivities(pressure_function, saturation_function);
 
+    const auto & j_ind_b = well_B.get_productivities();
+
+    // double j_b_total = 0;
+    //   j_b_total = Math::sum(j_ind_b);
+    double j_b_total = 0;
+    if (j_ind_b.size() > 0)
+    {
+      for (const auto & jj : j_ind_b)
+        j_b_total += jj[0];
+    }
+
+    j_b_total = Utilities::MPI::sum(j_b_total, mpi_communicator);
+
+    // std::cout << "J_b true = " << J_index_B << "\t"
+    //           << "J_b = " << j_b_total
+    //           << std::endl;
+    AssertThrow(abs(J_index_B - j_b_total)/J_index_B <
+                DefaultValues::small_number_geometry*10,
+                ExcMessage("Wrong J index well B"));
+    // pcout << "wells checked " << std::endl;
+
+
     CellValues::CellValuesBase<dim>
       cell_values(data), neighbor_values(data);
     pressure_solver.assemble_system(cell_values, neighbor_values, time_step,
@@ -225,18 +231,37 @@ namespace Wings
     const auto & rhs_vector = pressure_solver.get_rhs_vector();
     double rhs_an;
 
+    // const auto & dfh = pressure_solver.get_dof_handler();
+    // typename DoFHandler<dim>::active_cell_iterator
+    //     cell = dfh.begin_active();
+    // int index = 0;
+    // for (cell; cell<dfh.end(); ++cell)
+    // {
+    //   if (cell->is_locally_owned())
+    //     std::cout << index << "\t" << cell->center() << std::endl;
+    //   index++;
+    // }
+
     // indices that should be zero
     // indices 5 should be zero like geometric small value.
     // we compare it with index in cell 8
+    const auto & lo_dofs = pressure_solver.locally_owned_dofs;
     const double eps = DefaultValues::small_number;
-    std::vector<int> is = {1, 2, 3, 4, 5, 14, 15, 17, 18, 19, 20, 21, 22};
+    std::vector<int> is = {1, 2, 3, 4, 14, 15, 17, 18, 19, 20, 21, 22};
     for (const auto &i : is)
       if (std::find(lo_dofs.begin(), lo_dofs.end(), i) != lo_dofs.end())
-        AssertThrow(abs(rhs_vector[i]) < eps,
+      {
+        // std::cout << "dof = " << i << "\t"
+        //     << "rhs_num " << rhs_vector[i] << "\t"
+        //           << "rhs_an " << rhs_an << std::endl;
+        AssertThrow(abs(rhs_vector[i]) < DefaultValues::small_number_geometry,
                     ExcMessage("wrong rhs " + std::to_string(i)));
+      }
+
+    // index 5 has a small portion of the well and needs tesning!!!
 
     if (std::find(lo_dofs.begin(), lo_dofs.end(), 0) != lo_dofs.end())
-      AssertThrow(abs(rhs_vector[0]-B/time_step) < eps,
+      AssertThrow(abs(rhs_vector[0]-B/time_step) < DefaultValues::small_number_geometry,
                   ExcMessage("wrong rhs " + std::to_string(0)));
 
     // fine cell with  well B
@@ -254,8 +279,12 @@ namespace Wings
     dof = 7;
     rhs_an = -g_vector_entry + J_index_B_fine*pressure_B;
     if (std::find(lo_dofs.begin(), lo_dofs.end(), dof) != lo_dofs.end())
-      AssertThrow(abs(rhs_vector[dof] - rhs_an)/abs(rhs_an) < eps,
+    {
+      // std::cout << "rhs_num " << rhs_vector[dof] << "\t"
+      //           << "rhs_an " << rhs_an << std::endl;
+      AssertThrow(abs(rhs_vector[dof] - rhs_an)/abs(rhs_an) < DefaultValues::small_number_geometry,
                   ExcMessage("wrong rhs entry"+ std::to_string(dof)));
+    }
 
     dof = 9;
     rhs_an = +g_vector_entry;

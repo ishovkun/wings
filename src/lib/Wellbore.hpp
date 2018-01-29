@@ -660,12 +660,14 @@ update_productivity(const Function<dim> &get_pressure,
 
     const double j_ind = abs_productivity.norm();
 
-    // phase productivities
-    get_saturation.vector_value(cells[i]->center(), saturation);
     if (n_phases == 1)
       rel_perm[0] = 1;
     else
+    {
+      // phase productivities
+      get_saturation.vector_value(cells[i]->center(), saturation);
       relative_permeability.get_values(saturation, rel_perm);
+    }
 
     const double pressure = get_pressure.value(cells[i]->center());
     for (int p=0; p<n_phases; ++p)
