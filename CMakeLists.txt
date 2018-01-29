@@ -83,4 +83,5 @@ ENABLE_TESTING()
 ADD_SUBDIRECTORY(test/test_p)  # single pressure uncoupled with rate well
 ADD_SUBDIRECTORY(test/test_pr) # single pressure uncoupled with local refinement with bhp well
 ADD_SUBDIRECTORY(test/test_prm) # single pressure uncoupled with local refinement with bhp well and MPI
+ADD_SUBDIRECTORY(test/test_2p_balhoff) # single pressure uncoupled with local refinement with bhp well and MPI
 # ADD_SUBDIRECTORY(test)

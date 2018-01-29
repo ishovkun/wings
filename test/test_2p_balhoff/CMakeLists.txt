@@ -1,0 +1,4 @@
+
+SET(TEST_TARGET test_2p_balhoff)
+SET(TEST_LIBRARIES ${Boost_LIBRARIES} wings)
+DEAL_II_PICKUP_TESTS()
