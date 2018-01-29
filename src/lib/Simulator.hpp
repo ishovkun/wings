@@ -141,8 +141,15 @@ void Simulator<dim>::run()
   pressure_solver.setup_dofs();
 
   { // test permeability function
-    std::cout << model.get_permeability->value(Point<dim>(0.0, 0.0, 0.0))
-              << std::endl;
+    // first and last points have 1000 md perm, others - 50 md
+    const double md = model.units.permeability();
+    const double ft = model.units.length();
+    const double k1 = model.get_permeability->value(Point<dim>(0.0, 0.0, 0.0));
+    std::cout << k1/md << std::endl;
+    const double k2 = model.get_permeability->value(Point<dim>(100.0, 0.0, 0.0));
+    std::cout << k2/md << std::endl;
+    const double k3 = model.get_permeability->value(Point<dim>(510*ft, 0.0, 0.0));
+    std::cout << k3/md << std::endl;
   }
   // // if multiphase
   // saturation_solver.setup_dofs(pressure_solver.locally_owned_dofs,

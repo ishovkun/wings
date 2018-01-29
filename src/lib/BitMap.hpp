@@ -18,6 +18,7 @@ class BitMapFile
 {
  public:
   BitMapFile(const std::string &name);
+  double get_value(const double x) const;
   double get_value(const double x, const double y) const;
   double get_value(const double x,
                    const double y,
@@ -126,7 +127,7 @@ BitMapFile::BitMapFile(const std::string &name)
 double BitMapFile::get_pixel_value(const int i,
                                    const int j) const
 {
-  std::cout << "i = " << i << "\tj = " << j  << std::endl;
+  // std::cout << "i = " << i << "\tj = " << j  << std::endl;
   assert(i >= 0 && i < nx);
   assert(j >= 0 && j < ny);
   return bitmap_data[nx * (ny - 1 - j) + i];
@@ -148,18 +149,41 @@ double BitMapFile::get_pixel_value(const int i,
 
 
 
+double BitMapFile::get_value(const double x) const
+{
+  // normalized x and y
+  const double xn = (x-dimensions[0])/(dimensions[3]-dimensions[0]);
+  // pixel numbers
+  const int ix = std::min(std::max((int) (xn / hx), 0), nx - 2);
+  // normalized coordinates in unit square
+  const double xi  = std::max(std::min((xn-ix*hx)/hx, 1.), 0.);
+  std::cout << "xn " << xn << std::endl;
+  std::cout << "ix " << ix << std::endl;
+  std::cout << "xi " << xi << std::endl;
+  std::cout << "hx " << hx << std::endl;
+  std::cout << "exp " << (xn-ix*hx)/hx << std::endl;
+  // linear interpolation
+  return ((1-xi)*get_pixel_value(ix, 0)
+          +
+          xi*get_pixel_value(ix+1, 0));
+}  // eom
+
+
+
 double BitMapFile::get_value(const double x,
                              const double y) const
 {
   // normalized x and y
-  const double xn = (x-dimensions[0])/(dimensions[2]-dimensions[0]);
-  const double yn = (y-dimensions[1])/(dimensions[3]-dimensions[1]);
+  const double xn = (x-dimensions[0])/(dimensions[3]-dimensions[0]);
+  const double yn = (y-dimensions[1])/(dimensions[4]-dimensions[1]);
   // pixel numbers
   const int ix = std::min(std::max((int) (xn / hx), 0), nx - 2);
   const int iy = std::min(std::max((int) (yn / hy), 0), ny - 2);
   // normalized coordinates in unit square
-  const double xi  = std::min(std::max((xn-ix*hx)/hx, 1.), 0.);
-  const double eta = std::min(std::max((yn-iy*hy)/hy, 1.), 0.);
+  // const double xi  = std::min(std::max((xn-ix*hx)/hx, 1.), 0.);
+  // const double eta = std::min(std::max((yn-iy*hy)/hy, 1.), 0.);
+  const double xi  = std::max(std::min((xn-ix*hx)/hx, 1.), 0.);
+  const double eta = std::max(std::min((yn-iy*hy)/hy, 1.), 0.);
   // bilinear interpolation
   return ((1-xi)*(1-eta)*get_pixel_value(ix,iy)
           +
@@ -176,6 +200,8 @@ double BitMapFile::get_value(const double x,
                              const double y,
                              const double z) const
 {
+  if (ny == 1 && nz == 1)
+    return get_value(x);
   if (nz == 1)
     return get_value(x, y);
 
@@ -188,9 +214,12 @@ double BitMapFile::get_value(const double x,
   const int iy = std::min(std::max((int) (yn / hy), 0), ny - 2);
   const int iz = std::min(std::max((int) (zn / hz), 0), ny - 2);
   // normalized coordinates in unit cube
-  const double xi  = std::min(std::max((xn-ix*hx)/hx, 1.), 0.);
-  const double eta = std::min(std::max((yn-iy*hy)/hy, 1.), 0.);
-  const double zeta = std::min(std::max((zn-iz*hz)/hz, 1.), 0.);
+  // const double xi  = std::min(std::max((xn-ix*hx)/hx, 1.), 0.);
+  // const double eta = std::min(std::max((yn-iy*hy)/hy, 1.), 0.);
+  // const double zeta = std::min(std::max((zn-iz*hz)/hz, 1.), 0.);
+  const double xi  = std::max(std::min((xn-ix*hx)/hx, 1.), 0.);
+  const double eta = std::max(std::min((yn-iy*hy)/hy, 1.), 0.);
+  const double zeta = std::max(std::min((zn-iz*hz)/hz, 1.), 0.);
   // trilinear interpolation
   return
       (1-xi)*(1-eta)*(1-zeta)*get_pixel_value(ix, iy, iz)
