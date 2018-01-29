@@ -232,8 +232,12 @@ namespace Parsers {
       boost::filesystem::path data_file =
         boost::filesystem::path(input_file_name).parent_path() / kwd_list[1];
 
-      return new BitMap::BitMapFunction<dim>(data_file.string(),
-                                             anisotropy);
+      BitMap::BitMapFunction<dim>* bmf =
+          new BitMap::BitMapFunction<dim>(data_file.string(), anisotropy);
+
+      bmf->scale_coordinates(model.units.length());
+
+      return bmf;
     }
     else if (Parsers::is_number(entry) && kwd_list.size() == 1)
     { // create constant function
