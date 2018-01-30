@@ -157,11 +157,11 @@ double BitMapFile::get_value(const double x) const
   const int ix = std::min(std::max((int) (xn / hx), 0), nx - 2);
   // normalized coordinates in unit square
   const double xi  = std::max(std::min((xn-ix*hx)/hx, 1.), 0.);
-  std::cout << "xn " << xn << std::endl;
-  std::cout << "ix " << ix << std::endl;
-  std::cout << "xi " << xi << std::endl;
-  std::cout << "hx " << hx << std::endl;
-  std::cout << "exp " << (xn-ix*hx)/hx << std::endl;
+  // std::cout << "xn " << xn << std::endl;
+  // std::cout << "ix " << ix << std::endl;
+  // std::cout << "xi " << xi << std::endl;
+  // std::cout << "hx " << hx << std::endl;
+  // std::cout << "exp " << (xn-ix*hx)/hx << std::endl;
   // linear interpolation
   return ((1-xi)*get_pixel_value(ix, 0)
           +

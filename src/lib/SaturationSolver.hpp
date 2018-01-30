@@ -246,8 +246,13 @@ solve(CellValues::CellValuesSaturation<dim> &cell_values,
         } // end if face not at boundary
       }  // end face loop
 
+      const double Sw_old = extra_values[0];
+      if (Sw_old + solution_increment > 1.0)
+        solution_increment = 1.0 - Sw_old;
+      else if (Sw_old + solution_increment < 0.0)
+        solution_increment = - Sw_old;
       solution[0][i] += solution_increment;
-      solution[1][i] = 1.0 - solution[0][i];
+      solution[1][i] = 1.0 - (Sw_old + solution_increment);
     } // end cells loop
 
   solution[0].compress(VectorOperation::add);

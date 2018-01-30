@@ -1,3 +1,6 @@
+
+* General
+** Simulator should take model as an argument
 * Physics
 ** Multiphase
 *** DONE Input

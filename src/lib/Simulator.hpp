@@ -4,6 +4,10 @@
 #include <deal.II/grid/grid_in.h>
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/distributed/tria.h>
+#include <deal.II/numerics/data_out.h>
+#include <deal.II/numerics/data_out_dof_data.h>
+#include <deal.II/grid/grid_generator.h> // to create mesh
+#include <deal.II/grid/grid_out.h>
 
 // Custom modules
 #include <Model.hpp>
@@ -15,8 +19,6 @@
 #include <FEFunction/FEFunction.hpp>
 // #include <FEFunction/FEFunctionPVT.hpp>
 
-#include <deal.II/grid/grid_generator.h> // to create mesh
-#include <deal.II/grid/grid_out.h>
 
 
 namespace Wings
@@ -36,6 +38,9 @@ class Simulator
 
  private:
   void refine_mesh();
+  void field_report(const double time_step,
+                    const unsigned int time_step_number,
+                    const FluidSolvers::SaturationSolver<dim> &saturation_solver);
 
   MPI_Comm                                  mpi_communicator;
   parallel::distributed::Triangulation<dim> triangulation;
@@ -125,6 +130,35 @@ void Simulator<dim>::refine_mesh()
 
 
 template <int dim>
+void
+Simulator<dim>::
+field_report(const double time,
+             const unsigned int time_step_number,
+             const FluidSolvers::SaturationSolver<dim> &saturation_solver)
+{
+  DataOut<dim> data_out;
+
+  data_out.attach_dof_handler(pressure_solver.get_dof_handler());
+  data_out.add_data_vector(pressure_solver.relevant_solution, "pressure",
+                           DataOut<dim>::type_dof_data);
+  data_out.add_data_vector(saturation_solver.relevant_solution[0], "Sw",
+                           DataOut<dim>::type_dof_data);
+  data_out.build_patches();
+
+  std::ostringstream filename;
+  // filename << "./" << data.output_directory
+  //          << "/"  << data.data_set_name
+  //          << Utilities::int_to_string(time_step_number, 4)
+  //          << ".vtk";
+  filename << "solution."  << time_step_number << ".vtk";
+  std::ofstream output(filename.str().c_str());
+  data_out.write_vtk(output);
+}
+
+
+
+
+template <int dim>
 void Simulator<dim>::run()
 {
   Parsers::Reader reader(pcout, model);
@@ -140,37 +174,103 @@ void Simulator<dim>::run()
 
   pressure_solver.setup_dofs();
 
+  // tolerance for parameter check
+  const double tol_p  = DefaultValues::small_number;
   { // test permeability function
     // first and last points have 1000 md perm, others - 50 md
     const double md = model.units.permeability();
     const double ft = model.units.length();
     const double k1 = model.get_permeability->value(Point<dim>(0.0, 0.0, 0.0));
-    std::cout << k1/md << std::endl;
-    const double k2 = model.get_permeability->value(Point<dim>(100.0, 0.0, 0.0));
-    std::cout << k2/md << std::endl;
+    AssertThrow(Math::relative_difference(k1, 1000*md) < tol_p,
+                ExcMessage("bug in perm function"));
+    // std::cout << k1/md << std::endl;
+    const double k2 = model.get_permeability->value(Point<dim>(6*ft, 0.0, 0.0));
+    AssertThrow(Math::relative_difference(k2, 50*md) < tol_p,
+                ExcMessage("bug in perm function"));
+    // std::cout << k2/md << std::endl;
     const double k3 = model.get_permeability->value(Point<dim>(510*ft, 0.0, 0.0));
-    std::cout << k3/md << std::endl;
+    AssertThrow(Math::relative_difference(k3, 1000*md) < tol_p,
+                ExcMessage("bug in perm function"));
+    // std::cout << k3/md << std::endl;
   }
-  // // if multiphase
-  // saturation_solver.setup_dofs(pressure_solver.locally_owned_dofs,
-  //                              pressure_solver.locally_relevant_dofs);
+
+  // if multiphase
+  saturation_solver.setup_dofs(pressure_solver.locally_owned_dofs,
+                               pressure_solver.locally_relevant_dofs);
 
 
-  // // initial values
-  // for (unsigned int i=0; i<saturation_solver.solution[0].size(); ++i)
-  // {
-  //   saturation_solver.solution[0][i] =0.2;
-  //   pressure_solver.solution = 6894760;
-  // }
-  // saturation_solver.relevant_solution[0] = saturation_solver.solution[0];
-  // pressure_solver.relevant_solution = pressure_solver.solution;
-  // pressure_solver.old_solution = pressure_solver.solution;
+  // initial values
+  for (unsigned int i=0; i<saturation_solver.solution[0].size(); ++i)
+  {
+    saturation_solver.solution[0][i] =0.2;
+    pressure_solver.solution = 1000*model.units.pressure();
+  }
+  saturation_solver.relevant_solution[0] = saturation_solver.solution[0];
+  pressure_solver.relevant_solution = pressure_solver.solution;
+
+  model.locate_wells(pressure_solver.get_dof_handler());
+
+  CellValues::CellValuesBase<dim> cell_values_pressure(model),
+                                  neighbor_values_pressure(model);
+  CellValues::CellValuesSaturation<dim> cell_values_saturation(model);
+
+  FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
+      pressure_function(pressure_solver.get_dof_handler(),
+                        pressure_solver.relevant_solution);
+  FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
+      saturation_function(pressure_solver.get_dof_handler(),
+                          saturation_solver.relevant_solution);
+
+  double time = 0;
+  double time_step = model.min_time_step;
+  unsigned int time_step_number = 0;
+
+  while(time <= model.t_max)
+  {
+    time += time_step;
+    pressure_solver.old_solution = pressure_solver.solution;
+
+    pcout << "time " << time/model.units.time() << std::endl;
+    // pcout << "tmax " << model.t_max/model.units.time() << std::endl;
+    model.update_well_controls(time);
+    model.update_well_productivities(pressure_function, saturation_function);
+
+    { // solve for pressure
+      pressure_solver.assemble_system(cell_values_pressure, neighbor_values_pressure,
+                                      time_step,
+                                      saturation_solver.relevant_solution);
+      pressure_solver.solve();
+      pressure_solver.relevant_solution = pressure_solver.solution;
+    }
+
+    { // solve for saturation
+      saturation_solver.solve(cell_values_saturation,
+                              neighbor_values_pressure,
+                              time_step,
+                              pressure_solver.relevant_solution,
+                              pressure_solver.old_solution);
+      saturation_solver.relevant_solution[0] = saturation_solver.solution[0];
+      saturation_solver.relevant_solution[1] = saturation_solver.solution[1];
+    }
 
 
-  // // double time = 1;
+    {  // construct dimensionless parameters and get saturation profile
+      auto & injector = model.wells[0];
+      const double q_rate = injector.get_control().value;
+      const double ft = model.units.length();
+      const double area = 25*50*ft*ft;
+      const double length = 510*ft;
+      const double phi = model.get_porosity->value(Point<dim>(0,0,0));
+      const double dimensionless_time =
+          q_rate*time/area/length/phi;
+      pcout << "td = " << dimensionless_time << std::endl;
+    }
 
-  // double time = 0;
-  // double time_step = model.min_time_step;
+    field_report(time, time_step_number, saturation_solver);
+
+    time_step_number++;
+  }
+
   // model.update_well_controls(time);
 
   // CellValues::CellValuesBase<dim> cell_values_pressure(model),

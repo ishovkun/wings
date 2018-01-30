@@ -209,6 +209,9 @@ namespace Parsers {
       model.min_time_step =
         parser.get_double(kwds.minimum_time_step, 1e-10) *
           model.units.time();
+      model.t_max =
+          parser.get_double(kwds.t_max) *
+          model.units.time();
     }
   } // eom
 
