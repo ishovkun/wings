@@ -19,8 +19,10 @@ class RelativePermeability
   void get_values(const dealii::Vector<double> &saturation,
                   std::vector<double>          &dst) const;
 
+  // variables
+  double Sw_crit, So_rw;
  private:
-  double Sw_crit, So_rw, k_rw0, k_ro0, nw, no;
+  double k_rw0, k_ro0, nw, no;
 };
 
 

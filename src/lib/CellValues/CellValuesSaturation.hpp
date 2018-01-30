@@ -67,7 +67,7 @@ CellValuesSaturation<dim>::get_B(const int phase) const
     AssertThrow(false, ExcNotImplemented());
 
   return result;
-}  // end get_T_face
+}  // end get_B
 
 
 
@@ -92,7 +92,7 @@ CellValuesSaturation<dim>::get_Q(const int phase) const
     AssertThrow(false, ExcNotImplemented());
 
   return result;
-}  // end get_T_face
+}  // end get_Q
 
 
 
@@ -110,9 +110,9 @@ CellValuesSaturation<dim>::get_T_face(const int phase) const
   else if (this->model.type == Model::ModelType::WaterOil)
   {
     if (phase == 0)
-      result = this->T_w_face * pressure_difference / this->c1w;
+      result = - this->T_w_face * pressure_difference / this->c1w;
     else
-      result = this->T_o_face * pressure_difference / this->c2o;
+      result = - this->T_o_face * pressure_difference / this->c2o;
   }
   else
     AssertThrow(false, ExcNotImplemented());
@@ -143,6 +143,6 @@ CellValuesSaturation<dim>::get_G_face(const int phase) const
     AssertThrow(false, ExcNotImplemented());
 
   return result;
-}  // end get_T_face
+}  // end get_B_face
 
 }  // end of namespace

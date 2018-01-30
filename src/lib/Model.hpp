@@ -100,6 +100,8 @@ class Model
   get_pvt_table_water() const {return pvt_table_water;}
   const Interpolation::LookupTable &
   get_pvt_table_oil() const {return pvt_table_oil;}
+  double residual_saturation_water() const;
+  double residual_saturation_oil() const;
 
   // update methods
   void update_well_controls(const double time);
@@ -432,6 +434,26 @@ void Model<dim>::get_relative_permeability(Vector<double>      &saturation,
     rel_perm.get_values(saturation, dst);
   else
     AssertThrow(false, ExcNotImplemented());
+}
+
+
+
+template <int dim>
+inline
+double Model<dim>::residual_saturation_water() const
+{
+  // std::cout << rel_perm.Sw_crit << std::endl;
+  return rel_perm.Sw_crit;
+}
+
+
+
+template <int dim>
+inline
+double Model<dim>::residual_saturation_oil() const
+{
+  // std::cout << rel_perm.So_rw;
+  return rel_perm.So_rw;
 }
 
 }  // end of namespace

@@ -246,11 +246,15 @@ solve(CellValues::CellValuesSaturation<dim> &cell_values,
         } // end if face not at boundary
       }  // end face loop
 
+      // assert that we are in bounds
       const double Sw_old = extra_values[0];
-      if (Sw_old + solution_increment > 1.0)
-        solution_increment = 1.0 - Sw_old;
-      else if (Sw_old + solution_increment < 0.0)
-        solution_increment = - Sw_old;
+      const double So_rw = model.residual_saturation_oil();
+      const double Sw_crit = model.residual_saturation_water();
+      if (Sw_old + solution_increment > (1.0 - So_rw))
+        solution_increment = (1.0 - So_rw) - Sw_old;
+      else if (Sw_old + solution_increment < Sw_crit)
+        solution_increment = Sw_crit - Sw_old;
+
       solution[0][i] += solution_increment;
       solution[1][i] = 1.0 - (Sw_old + solution_increment);
     } // end cells loop
