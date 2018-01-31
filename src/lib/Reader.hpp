@@ -128,7 +128,7 @@ namespace Parsers {
         Tensor<1,dim> no_anisotropy = Parsers::convert<dim>(default_anisotropy);
         Tensor<1,dim> anisotropy = Parsers::convert<dim>
             (parser.get_double_list(kwds.permeability_anisotropy, ",",
-                                  default_anisotropy));
+                                    default_anisotropy));
         // apply units
         anisotropy *= model.units.permeability();
         model.get_permeability =
@@ -342,7 +342,7 @@ namespace Parsers {
           || model.type == Model::SingleLiquid)
       {
         if (schedule_entry.control.type != Schedule::pressure_control)
-          schedule_entry.control.value *= model.units.fluid_rate();
+          schedule_entry.control.value *= model.units.fluid_rate();  //
       }
       else if (model.type == Model::Blackoil)
       {

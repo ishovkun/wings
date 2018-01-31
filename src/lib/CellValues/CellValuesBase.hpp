@@ -140,8 +140,8 @@ CellValuesBase<dim>::update(const CellIterator<dim> &cell,
     this->C_w = pvt_values_water[1];
     this->mu_w = pvt_values_water[2];
 
-    c1w = this->phi * this->cell_volume / this->B_w;
-    c1p = this->phi * this->Sw * this->C_w * this->cell_volume / this->B_w ;
+    c1w = this->phi * this->cell_volume / this->B_w; // = d12
+    c1p = this->phi * this->Sw * this->C_w * this->cell_volume / this->B_w ; // = d11
     c1e = 0;
     // std::cout << "phi = "<< this->phi << std::endl;
     // std::cout << "Bw = "<< this->B_w << std::endl;
@@ -149,6 +149,13 @@ CellValuesBase<dim>::update(const CellIterator<dim> &cell,
     // std::cout << "mu_w = "<< this->mu_w << std::endl;
     // std::cout << "S_w = "<< this->Sw << std::endl;
     // std::cout << "V = "<< this->cell_volume << std::endl;
+    // if (cell->center()[0] < 1.5)
+    // {
+    //   std::cout << "c1p = "<< c1p << std::endl;
+    //   std::cout << "c1w = "<< c1w << std::endl;
+    //   std::cout << "c1p/c1w = "<< c1p/c1w << std::endl;
+    // }
+
   }
   if (model.has_phase(Model::Phase::Oil))
   {
@@ -214,7 +221,12 @@ update_wells(const CellIterator<dim> &cell,
 
   for (unsigned int phase = 0; phase < this->model.n_phases(); ++phase)
     for (const auto & well : model.wells)
+    {
       vector_Q_phase[phase] += well.get_flow_rate(cell, pressure, phase);
+
+      // if (cell->center()[0] < 1.5)
+      //   std::cout << "Q" << phase << " = " << vector_Q_phase[phase] << std::flush << std::endl;
+    }
 }  // eom
 
 
@@ -228,12 +240,24 @@ update_face_values(const CellValuesBase<dim> &neighbor_data,
 {
   const auto & model = this->model;
 
-  Vector<double> k_face(dim);
-  Math::harmonic_mean(this->k, neighbor_data.k, k_face);
-
   // geometric data
   const auto & dx = (neighbor_data.cell_coord - this->cell_coord);
   const double distance = dx.norm();
+
+  // obtain face absolute transmissibility
+  Vector<double> k_face(dim);
+  // Math::harmonic_mean(this->k, neighbor_data.k, k_face);
+  // dirty hack to make harmonic mean work with irregular grid
+  const double dx1 = cell_volume/face_area;
+  const double dx2 = 2*(distance - dx1/2);
+  Math::harmonic_mean(this->k, neighbor_data.k, dx1, dx2, k_face);
+
+  double T_abs_face = 0;
+  for (int d=0; d<dim; ++d)
+    if (abs(dx[d]/distance) > DefaultValues::small_number)
+      T_abs_face += (k_face[d]*abs(face_normal[d]/dx[d]))*face_area;
+
+
   // AssertThrow(distance > DefaultValues::small_number,
   //             ExcMessage("Cells too close"));
 
@@ -244,20 +268,29 @@ update_face_values(const CellValuesBase<dim> &neighbor_data,
     const double B_w_face = Math::arithmetic_mean(this->B_w, neighbor_data.B_w);
     // potential for upwinding
     const double pot_w =
-        this->pressure + model.density_sc_water()/this->B_w * model.gravity();
+        this->pressure
+        +
+        model.density_sc_water()/this->B_w * model.gravity() *
+        this->cell_coord[2];
     const double pot_w_neighbor =
         neighbor_data.pressure +
-        model.density_sc_water()/neighbor_data.B_w*model.gravity();
+        model.density_sc_water()/neighbor_data.B_w*model.gravity() *
+        this->cell_coord[2];
     // upwind relperms
     const double k_rw_face = Math::upwind(this->rel_perm[0],
                                           neighbor_data.rel_perm[0],
                                           pot_w, pot_w_neighbor);
+    // if (cell_coord[0] < 1.5)
+    // {
+    //   std:: cout << "Sw = " << this->Sw << std::endl;
+    //   std::cout << "krw" << " = " << k_rw_face << std::flush << std::endl;
+    // }
 
-    T_w_face = 0;
-    for (int d=0; d<dim; ++d)
-      if (abs(dx[d]/distance) > DefaultValues::small_number)
-        T_w_face += 1./mu_w_face/B_w_face *
-            (k_face[d]*k_rw_face*face_normal[d]/dx[d])*face_area;
+    T_w_face = T_abs_face*k_rw_face/mu_w_face/B_w_face;
+    // for (int d=0; d<dim; ++d)
+    //   if (abs(dx[d]/distance) > DefaultValues::small_number)
+    //     T_w_face += 1./mu_w_face/B_w_face *
+    //         (k_face[d]*k_rw_face*abs(face_normal[d]/dx[d]))*face_area;
 
     G_w_face = model.density_sc_water()/B_w_face/B_w_face/mu_w_face *
         model.gravity()*k_face[2]*k_rw_face*face_normal[2]*face_area;
@@ -267,23 +300,44 @@ update_face_values(const CellValuesBase<dim> &neighbor_data,
   {
     const double mu_o_face = Math::arithmetic_mean(this->mu_o, neighbor_data.mu_o);
     const double B_o_face = Math::arithmetic_mean(this->B_o, neighbor_data.B_o);
+
     // potential for upwinding
     const double pot_o =
-        this->pressure + model.density_sc_oil() / this->B_o * model.gravity();
+        this->pressure
+        +
+        model.density_sc_oil() / this->B_o * model.gravity() *
+        this->cell_coord[2];
+
     const double pot_o_neighbor =
-        neighbor_data.pressure +
-        model.density_sc_oil()/neighbor_data.B_o*model.gravity();
+        neighbor_data.pressure
+        +
+        model.density_sc_oil()/neighbor_data.B_o*model.gravity() *
+        this->cell_coord[2];
     // upwind relperms
     const double k_ro_face = Math::upwind(this->rel_perm[1],
                                           neighbor_data.rel_perm[1],
                                           pot_o, pot_o_neighbor);
-    T_o_face = 0;
-    for (int d=0; d<dim; ++d)
-      if (abs(dx[d]/distance) > DefaultValues::small_number)
-        T_o_face += 1./mu_o_face/B_o_face *
-            (k_face[d]*k_ro_face*face_normal[d]/dx[d])*face_area;
+
+    T_o_face = T_abs_face*k_ro_face/mu_o_face/B_o_face;
+    // for (int d=0; d<dim; ++d)
+    //   if (abs(dx[d]/distance) > DefaultValues::small_number)
+    //     T_o_face += 1./mu_o_face/B_o_face *
+    //         (k_face[d]*k_ro_face*abs(face_normal[d]/dx[d]))*face_area;
     G_o_face = model.density_sc_oil()/B_o_face/B_o_face/mu_o_face *
         model.gravity()*k_face[2]*k_ro_face*face_normal[2]*face_area;
+
+    // if (cell_coord[0] < 1.5)
+    // if (cell_coord[0] > 1.5 && cell_coord[0] < 3.0)
+    // {
+    //   std::cout << "i = " << 1 << std::endl;
+    //   std::cout << "neighbor = " << neighbor_data.cell_coord[0] << std::endl;
+    //   std:: cout << "So = " << this->So << std::endl;
+    //   std::cout << "kro" << " = " << k_ro_face << std::flush << std::endl;
+    //   std::cout << "face_area" << " = " << face_area << std::endl;
+    //   std::cout << "face_normal" << " = " << face_normal << std::endl;
+    //   std::cout << "To_face" << " = " << T_o_face << std::endl;
+    //   std::cout << "k_face" << " = " << k_face << std::endl;
+    // }
   }
 
   if (model.has_phase(Model::Phase::Gas))
@@ -305,7 +359,7 @@ CellValuesBase<dim>::get_J() const
   if (model.type == Model::ModelType::SingleLiquid)
     J = vector_J_phase[0];
   else if (model.type == Model::ModelType::WaterOil)
-    J = vector_J_phase[0] + this->B_o/this->B_w*vector_J_phase[1];
+    J = +c2o/c1w*vector_J_phase[0] + vector_J_phase[1];
   else
     AssertThrow(false, ExcNotImplemented());
 
@@ -321,9 +375,15 @@ CellValuesBase<dim>::get_Q() const
 {
   double Q = 0;
   if (model.type == Model::ModelType::SingleLiquid)
+  {
     Q = vector_Q_phase[0];
+  }
   else if (model.type == Model::ModelType::WaterOil)
-    Q = vector_Q_phase[0] + this->B_o/this->B_w*vector_Q_phase[1];
+  {
+    // Q = vector_Q_phase[0] + this->B_o/this->B_w*vector_Q_phase[1];
+    Q = +c2o/c1w*vector_Q_phase[0] + vector_Q_phase[1];
+  }
+
   else
     AssertThrow(false, ExcNotImplemented());
 
@@ -341,7 +401,14 @@ CellValuesBase<dim>::get_T_face() const
   if (model.type == Model::ModelType::SingleLiquid)
     T_face = T_w_face;
   else if (model.type == Model::ModelType::WaterOil)
-    T_face = -c2o/c1w * T_w_face + T_o_face;
+  {
+    // if (cell_coord[0] < 1.5)
+    // {
+    //   std::cout << "Tw(0,) = " << T_w_face << std::endl;
+    //   std::cout << "To(0,) = " << T_o_face << std::endl;
+    // }
+    T_face = +c2o/c1w * T_w_face + T_o_face;
+  }
   else
     AssertThrow(false, ExcNotImplemented());
 
@@ -359,7 +426,7 @@ CellValuesBase<dim>::get_G_face() const
   if (model.type == Model::ModelType::SingleLiquid)
     G_face = G_w_face;
   else if (model.type == Model::ModelType::WaterOil)
-    G_face = -c2o/c1w * G_w_face + G_o_face;
+    G_face = +c2o/c1w * G_w_face + G_o_face;
   else
     AssertThrow(false, ExcNotImplemented());
 
@@ -380,14 +447,24 @@ CellValuesBase<dim>::get_mass_matrix_entry() const
   }
   else if (model.type == Model::ModelType::WaterOil)
   {
-    // std::cout << "c1p " << c1p << "\t" << std::endl;
-    // std::cout << "c1w " << c1w << "\t" << std::endl;
-    // std::cout << "c2p " << c2p << "\t" << std::endl;
-    // std::cout << "c2o " << c2o << "\t" << std::endl;
-    // std::cout << "B " << c2o/c1w*c1p + c2p << "\t" << std::endl;
+    // if (cell_coord[0] < 1.5)
+    // {
+    //   std::cout << "c1p " << c1p << "\t" << std::endl;
+    //   std::cout << "c1w " << c1w << "\t" << std::endl;
+    //   std::cout << "c2p " << c2p << "\t" << std::endl;
+    //   std::cout << "c2o " << c2o << "\t" << std::endl;
+    //   std::cout << "B " << c2o/c1w*c1p + c2p << "\t" << std::endl;
+    // }
+    // if (cell_coord[0] > 1.5 && cell_coord[0] < 3.0)
+    // {
+    //   std::cout << "c1p " << c1p << "\t" << std::endl;
+    //   std::cout << "c1w " << c1w << "\t" << std::endl;
+    //   std::cout << "c2p " << c2p << "\t" << std::endl;
+    //   std::cout << "c2o " << c2o << "\t" << std::endl;
+    //   std::cout << "B " << c2o/c1w*c1p + c2p << "\t" << std::endl;
+    // }
 
-    const double A = +c2o/c1w;
-    B_mass = A*c1p + c2p;
+    B_mass = c2o/c1w * c1p + c2p;
   }
   else if (model.type == Model::ModelType::Blackoil)
   {

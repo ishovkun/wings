@@ -42,7 +42,7 @@ CellValuesSaturation<dim>::update_face_values(const CellValuesBase<dim> &neighbo
                                               const double               dS)
 {
   CellValuesBase<dim>::update_face_values(neighbor_data, face_normal, dS);
-  pressure_difference = this->pressure - neighbor_data.pressure;
+  pressure_difference = CellValuesBase<dim>::pressure - neighbor_data.pressure;
 }  // end update_face_values
 
 
@@ -52,16 +52,22 @@ double
 CellValuesSaturation<dim>::get_B(const int phase) const
 {
   double result = 0;
-  if (this->model.type == Model::ModelType::SingleLiquid)
+  if (CellValuesBase<dim>::model.type == Model::ModelType::SingleLiquid)
   {
     AssertThrow(false, ExcMessage("Cannot solve for single phase"));
   }
-  else if (this->model.type == Model::ModelType::WaterOil)
+  else if (CellValuesBase<dim>::model.type == Model::ModelType::WaterOil)
   {
     if (phase == 0)
-      result = this->c1p / this->c1w;
+    {
+      // std::cout << "CellValuesBase<dim>::c1p = "<< CellValuesBase<dim>::c1p << std::endl;
+      // std::cout << "CellValuesBase<dim>::c1w = "<< CellValuesBase<dim>::c1w << std::endl;
+      result = CellValuesBase<dim>::c1p / CellValuesBase<dim>::c1w;
+    }
     else
-      result = this->c2p / this->c1p;
+    {
+      result = CellValuesBase<dim>::c2p / CellValuesBase<dim>::c2o;
+    }
   }
   else
     AssertThrow(false, ExcNotImplemented());
@@ -84,9 +90,9 @@ CellValuesSaturation<dim>::get_Q(const int phase) const
   else if (this->model.type == Model::ModelType::WaterOil)
   {
     if (phase == 0)
-      result = this->vector_Q_phase[0] / this->c1w;
+      result = CellValuesBase<dim>::vector_Q_phase[0] / CellValuesBase<dim>::c1w;
     else
-      result = this->vector_Q_phase[1] / this->c1p;
+      result = CellValuesBase<dim>::vector_Q_phase[1] / CellValuesBase<dim>::c2o;
   }
   else
     AssertThrow(false, ExcNotImplemented());
@@ -103,16 +109,16 @@ double
 CellValuesSaturation<dim>::get_T_face(const int phase) const
 {
   double result = 0;
-  if (this->model.type == Model::ModelType::SingleLiquid)
+  if (CellValuesBase<dim>::model.type == Model::ModelType::SingleLiquid)
   {
     AssertThrow(false, ExcMessage("Cannot solve for single phase"));
   }
-  else if (this->model.type == Model::ModelType::WaterOil)
+  else if (CellValuesBase<dim>::model.type == Model::ModelType::WaterOil)
   {
     if (phase == 0)
-      result = - this->T_w_face * pressure_difference / this->c1w;
+      result = - CellValuesBase<dim>::T_w_face * pressure_difference / CellValuesBase<dim>::c1w;
     else
-      result = - this->T_o_face * pressure_difference / this->c2o;
+      result = - CellValuesBase<dim>::T_o_face * pressure_difference / CellValuesBase<dim>::c2o;
   }
   else
     AssertThrow(false, ExcNotImplemented());
@@ -128,16 +134,16 @@ double
 CellValuesSaturation<dim>::get_G_face(const int phase) const
 {
   double result = 0;
-  if (this->model.type == Model::ModelType::SingleLiquid)
+  if (CellValuesBase<dim>::model.type == Model::ModelType::SingleLiquid)
   {
     AssertThrow(false, ExcMessage("Cannot solve for single phase"));
   }
-  else if (this->model.type == Model::ModelType::WaterOil)
+  else if (CellValuesBase<dim>::model.type == Model::ModelType::WaterOil)
   {
     if (phase == 0)
-      result = this->G_w_face / this->c1w;
+      result = CellValuesBase<dim>::G_w_face / CellValuesBase<dim>::c1w;
     else
-      result = this->T_o_face / this->c2o;
+      result = CellValuesBase<dim>::T_o_face / CellValuesBase<dim>::c2o;
   }
   else
     AssertThrow(false, ExcNotImplemented());

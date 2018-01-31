@@ -43,15 +43,17 @@ namespace Units
         gravity_constant = 9.80665;
  public:
     const double
-      pounds_per_square_inch = 6894.76,
-      pounds_mass = 0.453592,
-      centipoise = 1e-3,
-      feet = 0.3048,
-      day = 60*60*24,
-      us_oil_barrel =  0.158987295,
-      darcy = 9.869233e-13,
-      milidarcy = darcy*1e-3,
-      standard_cubic_feet = feet*feet*feet;
+        pounds_per_square_inch = 6894.76,
+        pounds_mass = 0.453592,
+        centipoise = 1e-3,
+        feet = 0.3048,
+        day = 60*60*24,
+        darcy = 9.869233e-13,
+        milidarcy = darcy*1e-3,
+        standard_cubic_feet = feet*feet*feet,
+        us_oil_barrel =  0.158987294928;
+        /* us_oil_barrel =  5.61*standard_cubic_feet; */
+
   };
 
 

@@ -168,6 +168,8 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
   // this one stores both saturation values and geomechanics
   std::vector<double>  extra_values(model.n_phases() - 1);
 
+  const unsigned int q_point = 0;
+
   typename DoFHandler<dim>::active_cell_iterator
       cell = dof_handler.begin_active(),
       endc = dof_handler.end();
@@ -182,27 +184,26 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
       fe_values.reinit(cell);
       fe_values.get_function_values(old_solution, p_old_values);
       fe_values.get_function_values(relevant_solution, p_values);
-
-      // std::cout << "cell: " << i << std::endl;
-      const double p_old = p_old_values[0];
-      const double p = p_values[0];
-
       for (unsigned int c=0; c<model.n_phases() - 1; ++c)
       {
         fe_values.get_function_values(saturation[c], s_values[c]);
-        extra_values[c] = s_values[c][0];
+        extra_values[c] = s_values[c][q_point];
       }
+
+      // std::cout << "cell: " << i << std::endl;
+      const double p = p_values[q_point];
+      const double p_old = p_old_values[q_point];
 
       cell_values.update(cell, p, extra_values);
       cell_values.update_wells(cell);
 
       const double B_ii = cell_values.get_mass_matrix_entry();
       double matrix_ii = B_ii/time_step + cell_values.get_J();
-      // double matrix_ii = B_ii/time_step;
       double rhs_i = B_ii/time_step*p_old + cell_values.get_Q();
+      double t_entry = 0;
 
       cell->get_dof_indices(dof_indices);
-      const unsigned int i = dof_indices[0];
+      const unsigned int i = dof_indices[q_point];
       // std::cout << "ind " << i
       //           << "\tcell" <<cell->center()
       //           << "\tBii/time_step = " << B_ii/time_step
@@ -223,14 +224,14 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
             fe_face_values.reinit(cell, f);
 
             fe_values.get_function_values(relevant_solution, p_values);
-            const double p_neighbor = p_values[0];
             for (unsigned int c=0; c<model.n_phases() - 1; ++c)
             {
               fe_values.get_function_values(saturation[c], s_values[c]);
-              extra_values[c] = s_values[c][0];
+              extra_values[c] = s_values[c][q_point];
             }
+            const double p_neighbor = p_values[q_point];
 
-            normal = fe_face_values.normal_vector(0); // 0 is gauss point
+            normal = fe_face_values.normal_vector(q_point);
             const double dS = cell->face(f)->measure();  // face area
 
             // assemble local matrix and distribute
@@ -239,9 +240,10 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
 
             // distribute
             neighbor->get_dof_indices(dof_indices_neighbor);
-            const unsigned int j = dof_indices_neighbor[0];
+            const unsigned int j = dof_indices_neighbor[q_point];
             const double T_face = cell_values.get_T_face();
             matrix_ii += T_face;
+            t_entry += T_face;
             rhs_i += cell_values.get_G_face();
             system_matrix.add(i, j, -T_face);
           }
@@ -259,16 +261,17 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
               fe_face_values.reinit(cell, f);
 
               fe_values.get_function_values(relevant_solution, p_values);
-              const double p_neighbor = p_values[0];
               for (unsigned int c=0; c<model.n_phases() - 1; ++c)
               {
                 fe_values.get_function_values(saturation[c], s_values[c]);
                 extra_values[c] = s_values[c][0];
               }
 
+              const double p_neighbor = p_values[q_point];
+
               fe_subface_values.reinit(cell, f, subface);
-              normal = fe_subface_values.normal_vector(0); // 0 is gauss point
-              const double dS = fe_subface_values.JxW(0);
+              normal = fe_subface_values.normal_vector(q_point);
+              const double dS = fe_subface_values.JxW(q_point);
 
               // update neighbor
               neighbor_values.update(neighbor, p_neighbor, extra_values);
@@ -277,9 +280,10 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
 
               // distribute
               neighbor->get_dof_indices(dof_indices_neighbor);
-              const unsigned int j = dof_indices_neighbor[0];
+              const unsigned int j = dof_indices_neighbor[q_point];
               const double T_face = cell_values.get_T_face();
               matrix_ii += T_face;
+              t_entry += T_face;
               rhs_i += cell_values.get_G_face();
               system_matrix.add(i, j, -T_face);
             }
@@ -290,6 +294,38 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
 
       system_matrix.add(i, i, matrix_ii);
       rhs_vector[i] += rhs_i;
+
+      // pcout << "i = " << i << std::endl;
+      // if (i == 0)
+      // {
+      //   pcout << "\nPRESSURE"<< std::endl;
+      //   pcout << "A(0, 0) = "<< system_matrix(i, i) << std::endl;
+      //   pcout << "B(0, 0) = "<< B_ii/time_step << std::endl;
+      //   pcout << "T(0, 0) = "<< t_entry << std::endl;
+      //   pcout << "Q(0) = "<< cell_values.get_Q() << std::endl;
+      //   pcout << "rhs(0) = "<< rhs_i << std::endl;
+      //   pcout << std::endl;
+      // }
+      // if (i == 1)
+      // {
+      //   pcout << "\nPRESSURE"<< std::endl;
+      //   pcout << "A(1, 1) = "<< system_matrix(i, i) << std::endl;
+      //   pcout << "B(1, 1) = "<< B_ii/time_step << std::endl;
+      //   pcout << "T(1, 1) = "<< t_entry << std::endl;
+      //   pcout << "Q(1) = "<< cell_values.get_Q() << std::endl;
+      //   pcout << "rhs(1) = "<< rhs_i << std::endl;
+      //   pcout << std::endl;
+      // }
+      // if (i == 101)
+      // {
+      //   pcout << "\nPRESSURE"<< std::endl;
+      //   pcout << "A(101, 101) = "<< system_matrix(i, i) << std::endl;
+      //   pcout << "B(101, 101) = "<< B_ii/time_step << std::endl;
+      //   pcout << "T(101, 101) = "<< t_entry << std::endl;
+      //   pcout << "Q(101) = "<< cell_values.get_Q() << std::endl;
+      //   pcout << "rhs(101) = "<< rhs_i << std::endl;
+      //   pcout << std::endl;
+      // }
 
       // std::cout << "------------------------------\n";
     } // end local cells
@@ -307,17 +343,24 @@ PressureSolver<dim>::solve()
   if (tol == 0.0)
     tol = 1e-10;
   SolverControl solver_control(1000, tol);
-  TrilinosWrappers::SolverCG::AdditionalData additional_data_cg;
-  TrilinosWrappers::SolverCG
-      solver(solver_control, additional_data_cg);
 
-  // LA::MPI::PreconditionAMG preconditioner;
-  TrilinosWrappers::PreconditionAMG::AdditionalData additional_data_amg;
-  TrilinosWrappers::PreconditionAMG preconditioner;
-  preconditioner.initialize(system_matrix, additional_data_amg);
-  solver.solve(system_matrix, solution, rhs_vector, preconditioner);
+  // { // iterative solver
+  //   TrilinosWrappers::SolverCG::AdditionalData additional_data_cg;
+  //   TrilinosWrappers::SolverCG
+  //       solver(solver_control, additional_data_cg);
+  //   TrilinosWrappers::PreconditionAMG::AdditionalData additional_data_amg;
+  //   TrilinosWrappers::PreconditionAMG preconditioner;
+  //   preconditioner.initialize(system_matrix, additional_data_amg);
+  //   solver.solve(system_matrix, solution, rhs_vector, preconditioner);
+  // }
+
+  { // direct solver
+    TrilinosWrappers::SolverDirect
+        solver(solver_control, TrilinosWrappers::SolverDirect::AdditionalData());
+    solver.solve(system_matrix, solution, rhs_vector);
+  }
   return solver_control.last_step();
-}
+} // eom
 
 
 

@@ -766,9 +766,14 @@ Wellbore<dim>::get_J_and_Q(const CellIterator<dim> & cell,
   else if (control.type == Schedule::flow_control_phase_1)
   {
     if (phase == 0)
+    {
+      // std::cout << "injecting " << control.value << std::endl;
       return std::make_pair(0.0, control.value);
+    }
     else
+    {
       return std::make_pair(0.0, 0.0);
+    }
   }
   else if (control.type == Schedule::flow_control_phase_2)
   {

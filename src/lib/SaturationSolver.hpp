@@ -114,13 +114,17 @@ solve(CellValues::CellValuesSaturation<dim> &cell_values,
   // objects to store local data
   Tensor<1, dim>       normal;
   std::vector<double>  p_values(quadrature_formula.size()),
-      p_old_values(quadrature_formula.size());
+                       p_old_values(quadrature_formula.size());
 
   std::vector< std::vector<double> >  s_values(model.n_phases()-1);
   for (auto & c: s_values)
     c.resize(face_quadrature_formula.size());
 
   std::vector<double>  extra_values(model.n_phases() - 1);
+
+  const double So_rw = model.residual_saturation_oil();
+  const double Sw_crit = model.residual_saturation_water();
+  const unsigned int q_point = 0;
 
   typename DoFHandler<dim>::active_cell_iterator
       cell = dof_handler.begin_active(),
@@ -132,32 +136,36 @@ solve(CellValues::CellValuesSaturation<dim> &cell_values,
       fe_values.reinit(cell);
       fe_values.get_function_values(old_pressure_solution, p_old_values);
       fe_values.get_function_values(pressure_solution, p_values);
-
-      const double p_old = p_old_values[0];
-      const double p = p_values[0];
-
       for (unsigned int c=0; c<model.n_phases() - 1; ++c)
       {
         fe_values.get_function_values(relevant_solution[c], s_values[c]);
         extra_values[c] = s_values[c][0];
       }
 
+      const double p_old = p_old_values[q_point];
+      const double p = p_values[q_point];
+      const double Sw_old = extra_values[q_point];
+
+      // std::cout << "value1 c1w = " << cell_values.c1p << std::endl;
+      // std::cout << "value1 c1p = " << cell_values.c1w << std::endl;
       cell_values.update(cell, p, extra_values);
+      // std::cout << "value2 c1p = " << cell_values.c1p << std::endl;
+      // std::cout << "value2 c1w = " << cell_values.c1w << std::endl;
+      // std::cout << "value2 c1p/c1w = " << cell_values.c1p / cell_values.c1w << std::endl;
+      // std::cout << "value_weird c1p/c1w = " << cell_values.get_B(0) << std::endl;
       cell_values.update_wells(cell, p);
 
       // const double B_ii = cell_values.get_mass_matrix_entry();
       // double matrix_ii = B_ii/time_step + cell_values.get_J();
       // double rhs_i = B_ii/time_step*p_old + cell_values.get_Q();
       double solution_increment =
-          time_step *
-          (
-              -
-              cell_values.get_B(0) * (p - p_old)/ time_step
-              // -
-              // cell_values.get_E() * ( div_e - div_e_old ) / time_step
-              +
-              cell_values.get_Q(0)
-           )
+          -
+          cell_values.get_B(0) * (p - p_old)
+          +
+          // -
+          // cell_values.get_E() * ( div_e - div_e_old )
+          +
+          time_step * cell_values.get_Q(0)
           ;
       // pcout << "cell " << cell->center() << std::endl;
       // pcout <<  "dp entry" << cell_values.get_B(0) * (p - p_old) << std::endl;
@@ -165,7 +173,8 @@ solve(CellValues::CellValuesSaturation<dim> &cell_values,
 
 
       cell->get_dof_indices(dof_indices);
-      const unsigned int i = dof_indices[0];
+      const unsigned int i = dof_indices[q_point];
+
       for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
       {
         if (cell->at_boundary(f) == false)
@@ -179,14 +188,14 @@ solve(CellValues::CellValuesSaturation<dim> &cell_values,
             fe_face_values.reinit(cell, f);
 
             fe_values.get_function_values(pressure_solution, p_values);
-            const double p_neighbor = p_values[0];
             for (unsigned int c=0; c<model.n_phases() - 1; ++c)
             {
               fe_values.get_function_values(relevant_solution[c], s_values[c]);
-              extra_values[c] = s_values[c][0];
+              extra_values[c] = s_values[c][q_point];
             }
+            const double p_neighbor = p_values[q_point];
 
-            normal = fe_face_values.normal_vector(0); // 0 is gauss point
+            normal = fe_face_values.normal_vector(q_point);
             const double dS = cell->face(f)->measure();  // face area
 
             // assemble local matrix and distribute
@@ -202,6 +211,12 @@ solve(CellValues::CellValuesSaturation<dim> &cell_values,
                  )
                 ;
 
+            // if (i == 0)
+            // {
+            //   pcout << "Tw = " << time_step*cell_values.get_T_face(0) << std::endl;
+            //   pcout << "To = " << time_step*cell_values.get_T_face(1) << std::endl;
+            // }
+
           }
           else if ((cell->neighbor(f)->level() == cell->level()) &&
                    (cell->neighbor(f)->has_children() == true))
@@ -214,16 +229,16 @@ solve(CellValues::CellValuesSaturation<dim> &cell_values,
                   = cell->neighbor_child_on_subface(f, subface);
 
               fe_values.reinit(neighbor);
-              fe_face_values.reinit(cell, f);
+              // fe_face_values.reinit(cell, f);
+              fe_subface_values.reinit(cell, f, subface);
 
               fe_values.get_function_values(pressure_solution, p_values);
-              const double p_neighbor = p_values[0];
-              for (unsigned int c=0; c<model.n_phases() - 1; ++c)
+              const double p_neighbor = p_values[q_point];
+              for (unsigned int c=0; c<model.n_phases()-1; ++c)
                 fe_values.get_function_values(relevant_solution[c], s_values[c]);
 
-              fe_subface_values.reinit(cell, f, subface);
-              normal = fe_subface_values.normal_vector(0); // 0 is gauss point
-              const double dS = fe_subface_values.JxW(0);
+              normal = fe_subface_values.normal_vector(q_point); // 0 is gauss point
+              const double dS = fe_subface_values.JxW(q_point);
 
               // update neighbor
               neighbor_values.update(neighbor, p_neighbor, extra_values);
@@ -247,20 +262,31 @@ solve(CellValues::CellValuesSaturation<dim> &cell_values,
       }  // end face loop
 
       // assert that we are in bounds
-      const double Sw_old = extra_values[0];
-      const double So_rw = model.residual_saturation_oil();
-      const double Sw_crit = model.residual_saturation_water();
       if (Sw_old + solution_increment > (1.0 - So_rw))
         solution_increment = (1.0 - So_rw) - Sw_old;
       else if (Sw_old + solution_increment < Sw_crit)
         solution_increment = Sw_crit - Sw_old;
 
-      solution[0][i] += solution_increment;
+      if (i == 0)
+      {
+        pcout << "\nSATURATION"<< std::endl;
+        pcout << "dp = "<< p - p_old << std::endl;
+        pcout << "dSw = " << solution_increment << std::endl;
+        pcout << "Qw = " << time_step*cell_values.get_Q(0) << std::endl;
+        pcout << "Tw = " << cell_values.get_T_face(0) << std::endl;
+        pcout << "C1P/C1W = " << cell_values.get_B(0)
+              << std::endl;
+
+        pcout << std::endl;
+      }
+      solution[0][i] = Sw_old + solution_increment;
       solution[1][i] = 1.0 - (Sw_old + solution_increment);
     } // end cells loop
 
-  solution[0].compress(VectorOperation::add);
-  solution[1].compress(VectorOperation::add);
+  // solution[0].compress(VectorOperation::add);
+  // solution[1].compress(VectorOperation::add);
+  solution[0].compress(VectorOperation::insert);
+  solution[1].compress(VectorOperation::insert);
 }
 
 

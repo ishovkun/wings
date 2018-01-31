@@ -5,8 +5,11 @@ namespace Math
 using namespace dealii;
 
 
+
 void harmonic_mean(const Vector<double> &v1,
                    const Vector<double> &v2,
+                   const double         dx1,
+                   const double         dx2,
                    Vector<double>       &out)
 {
   AssertThrow(v1.size() == v2.size(),
@@ -17,8 +20,17 @@ void harmonic_mean(const Vector<double> &v1,
     if (v1[i] == 0.0 || v2[i] == 0.0)
       out[i] = 0;
     else
-      out[i] = 2./(1./v1[i] + 1./v2[i]);
+      out[i] = (dx1 + dx2)/(dx1/v1[i] + dx2/v2[i]);
   }
+}  // eom
+
+
+
+void harmonic_mean(const Vector<double> &v1,
+                   const Vector<double> &v2,
+                   Vector<double>       &out)
+{
+  harmonic_mean(v1, v2, 1.0, 1.0, out);
 }  // eom
 
 

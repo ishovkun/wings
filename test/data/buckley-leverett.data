@@ -1,0 +1,55 @@
+subsection Mesh
+
+Global refinement steps    1 /
+Adaptive refinement steps  1 /
+Mesh file                  3x3x1.msh /
+
+subsection Well data
+
+Wells
+# name r coords
+A, 0.25,
+2.5, 0.0, 0.0;
+B, 0.25,
+507.5, 0.0, 0.0;
+/
+
+Schedule
+# time well control value skin
+0,     A,    2,     50,   0;  # water injector
+0,     B,    1,     50,   0;  # producer
+/
+
+subsection Equation data
+Model                   WaterOil /
+Units                   Field /
+Permeability            bitmap bl-perm.dat /
+Perm anisotropy         1, 1, 1 /
+Porosity                0.25 /
+Density water           62.4 /
+Density oil             53 /
+
+PVT water
+# p Bw    Cw    mu_w      R_wg
+10, 1.11, 1e-6, 0.383211, 0 /
+
+PVT oil
+# p Bo    Co    mu_o  R_s
+01, 1.11, 1e-6, 1.03, 0.0;
+/
+
+Rel perm water
+# Sw_crit k_rw0 nw
+0.2,      0.3,  2 /
+
+Rel perm oil
+# So_rw k_ro0 no
+0.4,    0.8,  2 /
+
+subsection Solver
+# Minimum time step    0.1 /
+Minimum time step    1 /
+# T max                350 /
+T max                100 /
+FSS tolerance        1e-8 /
+Max FSS steps        30 /

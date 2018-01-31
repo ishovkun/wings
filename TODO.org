@@ -1,6 +1,8 @@
 
 * General
 ** Simulator should take model as an argument
+** DONE Harmonic Mean for transmissibility should take cell sizes into account
+   CLOSED: [2018-01-31 Wed 12:15]
 * Physics
 ** Multiphase
 *** DONE Input
@@ -10,7 +12,9 @@
 *** solver
 *** Saturation impes solver asssembly
 *** One base class for multiphase and geomechanics
-*** Inheritance for pressure value and saturation values
+*** DONE Inheritance for pressure value and saturation values
+    CLOSED: [2018-01-30 Tue 10:34]
+*** normalize wells by segment in phase controlled injectors
 ** Geomechanics
 *** Elasticity
 *** Plasticity
@@ -21,7 +25,8 @@
    CLOSED: [2018-01-25 Thu 23:57]
 ** Output units
 ** Field report geometry Units
-** Units in bitmap
+** DONE Units in bitmap
+   CLOSED: [2018-01-30 Tue 10:34]
 * Adaptive mesh refinement
 ** DONE PressureSolver and Wells work with refined mesh
    CLOSED: [2017-12-22 Fri 18:36]
@@ -49,4 +54,4 @@ Use cell->point_inside() to check if wellbore is in a cell
 ** I am calculating face transmissibilities twice!
 ** Pieceman formula valid only for r << r_pieceman
    add check as a runtime parameter!!!!
-** DONE G vector
+** TODO G vector

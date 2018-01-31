@@ -423,6 +423,39 @@ namespace Wings
       saturation_solver.relevant_solution[1] = saturation_solver.solution[1];
     }
 
+    // new part
+    const double D2_0 = 307.8380*ft*ft*ft/psi/day;
+    const double D2_4 = 307.7886*ft*ft*ft/psi/day;
+
+    // a11
+    dof = 0;
+    a = D2_0 + 1.7999*1e5*t_factor*ft*ft*ft/psi/day;
+    m = system_matrix(dof, dof);
+    if (Math::relative_difference(m,a) > tol)
+    {
+      std::cout << "A_an(" << dof<< "," << dof<<") = " << a << std::endl;;
+      std::cout << "A(" << dof<< "," << dof<<") = " << m << std::endl;;
+      std::cout << Math::relative_difference(m, a) << std::endl;
+    }
+    AssertThrow(Math::relative_difference(m, a) < tol,
+                ExcMessage("Wrong entry in A("+std::to_string(dof) +
+                           ", "+std::to_string(dof)+")"));
+    // a44
+    dof = 4;
+    a = D2_4 + 3.5926*1e5*t_factor*ft*ft*ft/psi/day;
+    m = system_matrix(dof, dof);
+    if (Math::relative_difference(m,a) > tol)
+    {
+      std::cout << "A_an(" << dof<< "," << dof<<") = " << a << std::endl;;
+      std::cout << "A(" << dof<< "," << dof<<") = " << m << std::endl;;
+      std::cout << Math::relative_difference(m, a) << std::endl;
+    }
+    AssertThrow(Math::relative_difference(m, a) < tol,
+                ExcMessage("Wrong entry in A("+std::to_string(dof) +
+                           ", "+std::to_string(dof)+")"));
+
+    // end new part
+
     //                 0     3   6     1    4    7   2    5    8
     // P_an_balhoff = {970, 974, 947, 976, 977, 932, 978, 968, 896};
     P_an = {970, 976, 978, 974, 977, 968, 947, 932, 896};
