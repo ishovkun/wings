@@ -234,10 +234,9 @@ void Simulator<dim>::run()
     sat[0] = 0.2;
     sat[1] = 0.8;
     model.get_relative_permeability(sat, rperm);
-    AssertThrow(rperm[0] < DefaultValues::small_number,
-                ExcMessage("bug in rel perm"));
-    AssertThrow(Math::relative_difference(rperm[1], 0.8)  < DefaultValues::small_number,
-                ExcMessage("bug in rel perm"));
+    pcout << "krw = " << rperm[0] << "\t"
+          << "kro = " << rperm[1] << std::endl;
+    // return;
   }
 
   double time = 0;
@@ -297,7 +296,7 @@ void Simulator<dim>::run()
     const double phi = model.get_porosity->value(Point<dim>(0,0,0));
     const double dimensionless_time =
         q_rate*time/area/length/phi;
-    // pcout << "td = " << dimensionless_time << std::endl;
+    pcout << "td = " << dimensionless_time << std::endl;
   }
 
 } // eom
@@ -309,31 +308,19 @@ void
 Simulator<dim>::
 compare_with_analytics(FluidSolvers::SaturationSolver<dim> &saturation_solver)
 {
-  const double ft = model.units.length();
-  // const double area = 25*50*ft*ft;
-  const double length = 510*ft;
+  std::string fname = "../test/test_buckley/analytical.txt";
+  std::ifstream f(fname.c_str());
+  std::stringstream buffer;
+  buffer << f.rdbuf();
+  std::string input_text = buffer.str();
+  std::vector<double> analytical =
+      Parsers::parse_string_list<double>(input_text, "\n");
 
   // std::cout << "size = " << analytical.size() <<std::endl;
-  const auto & dof_handler= pressure_solver.get_dof_handler();
-
-  typename DoFHandler<dim>::active_cell_iterator
-      cell = dof_handler.begin_active(),
-      endc = dof_handler.end();
-
-  unsigned int i = 0;
-
-  std::ofstream f;
-  f.open ("numerical.txt");
-  f << "x\tSw";
-  for (; cell!=endc; ++cell)
-  {
-    const double x = cell->center()[0]/length;
-    const double Sw = saturation_solver.solution[0][i];
-    f << x << "\t" << Sw << std::endl;
-    i++;
-  }
-  f.close();
-
+  for (unsigned int i=1; i<saturation_solver.solution[0].size(); ++i)
+    pcout << analytical[i-1] << "\t"
+          << saturation_solver.solution[0][i]
+          << std::endl;
 }  // end compare_with_analytics
 
 } // end of namespace

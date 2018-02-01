@@ -65,6 +65,7 @@ DEAL_II_SETUP_TARGET(wings-pressure)
 ADD_CUSTOM_TARGET(debug
   COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Debug ${CMAKE_SOURCE_DIR}
   COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target all
+  COMMAND ${CMAKE_COMMAND} -DBUILD_BENCHMARKS=OFF ${CMAKE_SOURCE_DIR}
   COMMENT "Switch CMAKE_BUILD_TYPE to Debug"
   )
 
@@ -84,4 +85,19 @@ ADD_SUBDIRECTORY(test/test_p)  # single pressure uncoupled with rate well
 ADD_SUBDIRECTORY(test/test_pr) # single pressure uncoupled with local refinement with bhp well
 ADD_SUBDIRECTORY(test/test_prm) # single pressure uncoupled with local refinement with bhp well and MPI
 ADD_SUBDIRECTORY(test/test_2p_balhoff) # single pressure uncoupled with local refinement with bhp well and MPI
-# ADD_SUBDIRECTORY(test)
+
+# COMMAND python ${CMAKE_SOURCE_DIR}/benchmarks/test_buckley/buckley_leverett.py
+# set(BUILD_BENCHMARKS OFF)
+# set(BUILD_BENCHMARKS ON)
+
+ADD_CUSTOM_TARGET(benchmark
+  COMMENT "Setting target benchmark"
+  COMMAND ${CMAKE_COMMAND} -DBUILD_BENCHMARKS=ON ${CMAKE_SOURCE_DIR}
+  )
+
+if (BUILD_BENCHMARKS)
+  ADD_SUBDIRECTORY(${CMAKE_SOURCE_DIR}/benchmarks)
+endif()
+
+IF(BUILD_BENCHMARKS)
+ENDIF()

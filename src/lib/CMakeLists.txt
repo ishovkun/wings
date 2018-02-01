@@ -1,4 +1,6 @@
 # lib/CMakeLists.txt
+MESSAGE("including library wings")
+
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/FEFunction)
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/CellValues)
 

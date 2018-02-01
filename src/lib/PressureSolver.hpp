@@ -344,21 +344,21 @@ PressureSolver<dim>::solve()
     tol = 1e-10;
   SolverControl solver_control(1000, tol);
 
-  // { // iterative solver
-  //   TrilinosWrappers::SolverCG::AdditionalData additional_data_cg;
-  //   TrilinosWrappers::SolverCG
-  //       solver(solver_control, additional_data_cg);
-  //   TrilinosWrappers::PreconditionAMG::AdditionalData additional_data_amg;
-  //   TrilinosWrappers::PreconditionAMG preconditioner;
-  //   preconditioner.initialize(system_matrix, additional_data_amg);
-  //   solver.solve(system_matrix, solution, rhs_vector, preconditioner);
-  // }
-
-  { // direct solver
-    TrilinosWrappers::SolverDirect
-        solver(solver_control, TrilinosWrappers::SolverDirect::AdditionalData());
-    solver.solve(system_matrix, solution, rhs_vector);
+  { // iterative solver
+    TrilinosWrappers::SolverCG::AdditionalData additional_data_cg;
+    TrilinosWrappers::SolverCG
+        solver(solver_control, additional_data_cg);
+    TrilinosWrappers::PreconditionAMG::AdditionalData additional_data_amg;
+    TrilinosWrappers::PreconditionAMG preconditioner;
+    preconditioner.initialize(system_matrix, additional_data_amg);
+    solver.solve(system_matrix, solution, rhs_vector, preconditioner);
   }
+
+  // { // direct solver
+  //   TrilinosWrappers::SolverDirect
+  //       solver(solver_control, TrilinosWrappers::SolverDirect::AdditionalData());
+  //   solver.solve(system_matrix, solution, rhs_vector);
+  // }
   return solver_control.last_step();
 } // eom
 

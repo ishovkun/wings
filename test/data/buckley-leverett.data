@@ -31,11 +31,12 @@ Density oil             53 /
 
 PVT water
 # p Bw    Cw    mu_w      R_wg
-10, 1.11, 1e-6, 0.383211, 0 /
+10, 1, 1e-6, 0.383211, 0 /
 
 PVT oil
 # p Bo    Co    mu_o  R_s
-01, 1.11, 1e-6, 1.03, 0.0;
+# 01, 1.11, 1e-6, 1.03, 0.0;
+01, 1.00, 1e-6, 1.03, 0.0;
 /
 
 Rel perm water
