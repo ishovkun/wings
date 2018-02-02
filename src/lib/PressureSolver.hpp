@@ -191,16 +191,22 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
       }
 
       // std::cout << "cell: " << i << std::endl;
-      const double p = p_values[q_point];
-      const double p_old = p_old_values[q_point];
+      const double pressure_value = p_values[q_point];
+      const double pressure_value_old = p_old_values[q_point];
 
-      cell_values.update(cell, p, extra_values);
+      cell_values.update(cell, pressure_value, extra_values);
       cell_values.update_wells(cell);
 
-      const double B_ii = cell_values.get_mass_matrix_entry();
-      double matrix_ii = B_ii/time_step + cell_values.get_J();
-      double rhs_i = B_ii/time_step*p_old + cell_values.get_Q();
-      double t_entry = 0;
+      // const double B_ii = cell_values.get_mass_matrix_entry();
+      // double matrix_ii = B_ii/time_step + cell_values.get_J();
+      // double rhs_i = B_ii/time_step*p_old + cell_values.get_Q();
+      // double t_entry = 0;
+      // new API
+      double matrix_ii = cell_values.get_matrix_cell_entry(time_step);
+      double rhs_i = cell_values.get_rhs_cell_entry(time_step,
+                                                    pressure_value_old);
+      // for debugging only
+      // double face_entry = 0;
 
       cell->get_dof_indices(dof_indices);
       const unsigned int i = dof_indices[q_point];
@@ -241,11 +247,15 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
             // distribute
             neighbor->get_dof_indices(dof_indices_neighbor);
             const unsigned int j = dof_indices_neighbor[q_point];
-            const double T_face = cell_values.get_T_face();
-            matrix_ii += T_face;
-            t_entry += T_face;
-            rhs_i += cell_values.get_G_face();
-            system_matrix.add(i, j, -T_face);
+            // const double T_face = cell_values.get_T_face();
+            // matrix_ii += T_face;
+            // t_entry += T_face;
+            // rhs_i += cell_values.get_G_face();
+            // system_matrix.add(i, j, -T_face);
+            const double face_entry = cell_values.get_matrix_face_entry();
+            matrix_ii += face_entry;
+            rhs_i += cell_values.get_rhs_face_entry();
+            system_matrix.add(i, j, -face_entry);
           }
           else if ((cell->neighbor(f)->level() == cell->level()) &&
                    (cell->neighbor(f)->has_children() == true))
@@ -258,7 +268,8 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
                   = cell->neighbor_child_on_subface(f, subface);
 
               fe_values.reinit(neighbor);
-              fe_face_values.reinit(cell, f);
+              fe_subface_values.reinit(cell, f, subface);
+              // fe_face_values.reinit(cell, f);
 
               fe_values.get_function_values(relevant_solution, p_values);
               for (unsigned int c=0; c<model.n_phases() - 1; ++c)
@@ -268,8 +279,6 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
               }
 
               const double p_neighbor = p_values[q_point];
-
-              fe_subface_values.reinit(cell, f, subface);
               normal = fe_subface_values.normal_vector(q_point);
               const double dS = fe_subface_values.JxW(q_point);
 
@@ -281,11 +290,15 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
               // distribute
               neighbor->get_dof_indices(dof_indices_neighbor);
               const unsigned int j = dof_indices_neighbor[q_point];
-              const double T_face = cell_values.get_T_face();
-              matrix_ii += T_face;
-              t_entry += T_face;
-              rhs_i += cell_values.get_G_face();
-              system_matrix.add(i, j, -T_face);
+              // const double T_face = cell_values.get_T_face();
+              // matrix_ii += T_face;
+              // t_entry += T_face;
+              // rhs_i += cell_values.get_G_face();
+              // system_matrix.add(i, j, -T_face);
+              const double face_entry = cell_values.get_matrix_face_entry();
+              matrix_ii += face_entry;
+              rhs_i += cell_values.get_rhs_face_entry();
+              system_matrix.add(i, j, -face_entry);
             }
           } // end case neighbor is finer
 

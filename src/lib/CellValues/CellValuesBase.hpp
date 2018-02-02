@@ -28,11 +28,12 @@ namespace CellValues
     virtual void update_face_values(const CellValuesBase<dim> &neighbor_data,
                                     const Tensor<1,dim>       &face_normal,
                                     const double               dS);
-    double get_mass_matrix_entry() const;
-    double get_J() const;
-    double get_Q() const;
-    double get_T_face() const;
-    double get_G_face() const;
+    // methods for pressure solver
+    virtual double get_matrix_cell_entry(const double time_step) const;
+    virtual double get_rhs_cell_entry(const double time_step,
+                              const double old_solution) const;
+    virtual double get_matrix_face_entry() const;
+    virtual double get_rhs_face_entry() const;
 
    public:
     const Model::Model<dim> & model;
@@ -351,129 +352,117 @@ update_face_values(const CellValuesBase<dim> &neighbor_data,
 
 
 template <int dim>
-inline
 double
-CellValuesBase<dim>::get_J() const
+CellValuesBase<dim>::
+get_matrix_cell_entry(const double time_step) const
 {
-  double J = 0;
-  if (model.type == Model::ModelType::SingleLiquid)
-    J = vector_J_phase[0];
-  else if (model.type == Model::ModelType::WaterOil)
-    J = +c2o/c1w*vector_J_phase[0] + vector_J_phase[1];
-  else
-    AssertThrow(false, ExcNotImplemented());
-
-  return J;
-}
-
-
-
-template <int dim>
-inline
-double
-CellValuesBase<dim>::get_Q() const
-{
-  double Q = 0;
-  if (model.type == Model::ModelType::SingleLiquid)
-  {
-    Q = vector_Q_phase[0];
-  }
-  else if (model.type == Model::ModelType::WaterOil)
-  {
-    // Q = vector_Q_phase[0] + this->B_o/this->B_w*vector_Q_phase[1];
-    Q = +c2o/c1w*vector_Q_phase[0] + vector_Q_phase[1];
-  }
-
-  else
-    AssertThrow(false, ExcNotImplemented());
-
-  return Q;
-}
-
-
-
-template <int dim>
-inline
-double
-CellValuesBase<dim>::get_T_face() const
-{
-  double T_face = 0;
-  if (model.type == Model::ModelType::SingleLiquid)
-    T_face = T_w_face;
-  else if (model.type == Model::ModelType::WaterOil)
-  {
-    // if (cell_coord[0] < 1.5)
-    // {
-    //   std::cout << "Tw(0,) = " << T_w_face << std::endl;
-    //   std::cout << "To(0,) = " << T_o_face << std::endl;
-    // }
-    T_face = +c2o/c1w * T_w_face + T_o_face;
-  }
-  else
-    AssertThrow(false, ExcNotImplemented());
-
-  return T_face;
-}
-
-
-
-template <int dim>
-inline
-double
-CellValuesBase<dim>::get_G_face() const
-{
-  double G_face = 0;
-  if (model.type == Model::ModelType::SingleLiquid)
-    G_face = G_w_face;
-  else if (model.type == Model::ModelType::WaterOil)
-    G_face = +c2o/c1w * G_w_face + G_o_face;
-  else
-    AssertThrow(false, ExcNotImplemented());
-
-  return G_face;
-}
-
-
-template <int dim>
-double
-CellValuesBase<dim>::get_mass_matrix_entry() const
-{
-  double B_mass = 0;
+  double entry = 0;
   const auto & model = this->model;
   if (model.type == Model::ModelType::SingleLiquid)
   {
-    // return cell_volume/this->B_w*(phi*C_w);
-    B_mass = c1p;
+    // B_mass = c1p;
+    // J = vector_J_phase[0];
+    entry += c1p/time_step;
+    entry += vector_J_phase[0];
   }
   else if (model.type == Model::ModelType::WaterOil)
   {
-    // if (cell_coord[0] < 1.5)
-    // {
-    //   std::cout << "c1p " << c1p << "\t" << std::endl;
-    //   std::cout << "c1w " << c1w << "\t" << std::endl;
-    //   std::cout << "c2p " << c2p << "\t" << std::endl;
-    //   std::cout << "c2o " << c2o << "\t" << std::endl;
-    //   std::cout << "B " << c2o/c1w*c1p + c2p << "\t" << std::endl;
-    // }
-    // if (cell_coord[0] > 1.5 && cell_coord[0] < 3.0)
-    // {
-    //   std::cout << "c1p " << c1p << "\t" << std::endl;
-    //   std::cout << "c1w " << c1w << "\t" << std::endl;
-    //   std::cout << "c2p " << c2p << "\t" << std::endl;
-    //   std::cout << "c2o " << c2o << "\t" << std::endl;
-    //   std::cout << "B " << c2o/c1w*c1p + c2p << "\t" << std::endl;
-    // }
+    // B_mass = c2o/c1w * c1p + c2p;
+    // J = +c2o/c1w*vector_J_phase[0] + vector_J_phase[1];
+    entry += (c2o/c1w * c1p + c2p)/time_step;
+    entry += +c2o/c1w*vector_J_phase[0] + vector_J_phase[1];
 
-    B_mass = c2o/c1w * c1p + c2p;
   }
   else if (model.type == Model::ModelType::Blackoil)
   {
     const double A = c2o/c1w * (c3g-c3w)/(c3g-c3o);
     const double B = c2o / (c3g - c3o);
-    B_mass = A*c1p + c2p + B*c3p;
-  }
-  return B_mass;
-}
+    // B_mass = A*c1p + c2p + B*c3p;
+    entry += (A*c1p + c2p + B*c3p)/time_step;
 
+    // need to get equations for J
+    AssertThrow(false, ExcNotImplemented());
+  }
+  return entry;
+} // eom
+
+
+
+template <int dim>
+double
+CellValuesBase<dim>::
+get_rhs_cell_entry(const double time_step,
+                   const double old_solution) const
+{
+  // double rhs_i = B_ii/time_step*p_old + cell_values.get_Q();
+  double entry = 0;
+  const auto & model = this->model;
+  if (model.type == Model::ModelType::SingleLiquid)
+  {
+    // B_mass = c1p;
+    // J = vector_J_phase[0];
+    entry += c1p * old_solution/time_step; // B matrix
+    entry += vector_Q_phase[0];  // Q vector
+  }
+  else if (model.type == Model::ModelType::WaterOil)
+  {
+    // B_mass = c2o/c1w * c1p + c2p;
+    // J = +c2o/c1w*vector_J_phase[0] + vector_J_phase[1];
+    entry += (c2o/c1w * c1p + c2p)*old_solution/time_step;  // B matrix
+    entry += +c2o/c1w*vector_Q_phase[0] + vector_Q_phase[1]; // Q vector
+
+  }
+  else if (model.type == Model::ModelType::Blackoil)
+  {
+    const double A = c2o/c1w * (c3g-c3w)/(c3g-c3o);
+    const double B = c2o / (c3g - c3o);
+    // B_mass = A*c1p + c2p + B*c3p;
+    entry += (A*c1p + c2p + B*c3p)*old_solution/time_step;  // B matrix
+
+    // need to get equations for J and Q
+    AssertThrow(false, ExcNotImplemented());
+  }
+  return entry;
+} // eom
+
+
+
+template <int dim>
+inline
+double
+CellValuesBase<dim>::get_matrix_face_entry() const
+{
+  double entry = 0;
+  if (model.type == Model::ModelType::SingleLiquid)
+    entry += T_w_face;
+  else if (model.type == Model::ModelType::WaterOil)
+  {
+    entry += +c2o/c1w * T_w_face + T_o_face;
+  }
+  else
+    AssertThrow(false, ExcNotImplemented());
+
+  return entry;
+} // eom
+
+
+
+template <int dim>
+inline
+double
+CellValuesBase<dim>::get_rhs_face_entry() const
+{
+  double entry = 0;
+  if (model.type == Model::ModelType::SingleLiquid)
+    entry += G_w_face;
+  else if (model.type == Model::ModelType::WaterOil)
+  {
+    entry += +c2o/c1w * G_w_face + G_o_face;
+  }
+  else
+    AssertThrow(false, ExcNotImplemented());
+
+  return entry;
+} // eom
 
 }  // end of namespace

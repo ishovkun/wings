@@ -105,6 +105,7 @@ void Simulator<dim>::read_mesh()
 }  // eom
 
 
+
 template <int dim>
 void Simulator<dim>::refine_mesh()
 {
@@ -156,8 +157,7 @@ field_report(const double time,
   filename << "solution/solution."  << time_step_number << ".vtk";
   std::ofstream output(filename.str().c_str());
   data_out.write_vtk(output);
-}
-
+}  // eom
 
 
 
@@ -280,25 +280,25 @@ void Simulator<dim>::run()
   } // end time loop
 
 
-  compare_with_analytics(saturation_solver);
+  // compare_with_analytics(saturation_solver);
 
-  {  // construct dimensionless parameters and get saturation profile
-    auto & injector = model.wells[0];
-    const double q_rate = injector.get_control().value;
-    const double ft = model.units.length();
-    const double area = 25*50*ft*ft;
-    const double length = 510*ft;
-    // const auto & cell = pressure_solver
-    //     .get_dof_handler()
-    //     .begin_active();
-    // const auto volume = cell->measure()*triangulation.n_cells();
-    // pcout << "V = " << volume << std::endl;
-    // pcout << "V1 = " << area*length << std::endl;
-    const double phi = model.get_porosity->value(Point<dim>(0,0,0));
-    const double dimensionless_time =
-        q_rate*time/area/length/phi;
-    // pcout << "td = " << dimensionless_time << std::endl;
-  }
+  // {  // construct dimensionless parameters and get saturation profile
+  //   auto & injector = model.wells[0];
+  //   const double q_rate = injector.get_control().value;
+  //   const double ft = model.units.length();
+  //   const double area = 25*50*ft*ft;
+  //   const double length = 510*ft;
+  //   // const auto & cell = pressure_solver
+  //   //     .get_dof_handler()
+  //   //     .begin_active();
+  //   // const auto volume = cell->measure()*triangulation.n_cells();
+  //   // pcout << "V = " << volume << std::endl;
+  //   // pcout << "V1 = " << area*length << std::endl;
+  //   const double phi = model.get_porosity->value(Point<dim>(0,0,0));
+  //   const double dimensionless_time =
+  //       q_rate*time/area/length/phi;
+  //   // pcout << "td = " << dimensionless_time << std::endl;
+  // }
 
 } // eom
 

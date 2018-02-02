@@ -267,18 +267,18 @@ solve(CellValues::CellValuesSaturation<dim> &cell_values,
       else if (Sw_old + solution_increment < Sw_crit)
         solution_increment = Sw_crit - Sw_old;
 
-      if (i == 0)
-      {
-        pcout << "\nSATURATION"<< std::endl;
-        pcout << "dp = "<< p - p_old << std::endl;
-        pcout << "dSw = " << solution_increment << std::endl;
-        pcout << "Qw = " << time_step*cell_values.get_Q(0) << std::endl;
-        pcout << "Tw = " << cell_values.get_T_face(0) << std::endl;
-        pcout << "C1P/C1W = " << cell_values.get_B(0)
-              << std::endl;
+      // if (i == 0)
+      // {
+      //   pcout << "\nSATURATION"<< std::endl;
+      //   pcout << "dp = "<< p - p_old << std::endl;
+      //   pcout << "dSw = " << solution_increment << std::endl;
+      //   pcout << "Qw = " << time_step*cell_values.get_Q(0) << std::endl;
+      //   pcout << "Tw = " << cell_values.get_T_face(0) << std::endl;
+      //   pcout << "C1P/C1W = " << cell_values.get_B(0)
+      //         << std::endl;
 
-        pcout << std::endl;
-      }
+      //   pcout << std::endl;
+      // }
       solution[0][i] = Sw_old + solution_increment;
       solution[1][i] = 1.0 - (Sw_old + solution_increment);
     } // end cells loop
