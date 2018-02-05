@@ -30,6 +30,7 @@ namespace CellValues
     /* Update wellbore rates.
      * This method actually gets real rates for both flow- and pressure-
      * controlled wellbores.
+     */
     virtual void update_wells(const CellIterator<dim> &cell,
                               const double pressure);
     /* Update storage vectors and values for the current face */
