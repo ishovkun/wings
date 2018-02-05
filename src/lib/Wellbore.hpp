@@ -24,12 +24,6 @@ using namespace dealii;
 template <int dim>
 using CellIterator = typename DoFHandler<dim>::active_cell_iterator;
 
-// template <int dim>
-// using RelPermMemberFunc = typename
-//     (void RelativePermeability::*get_values)(const               double,
-//                                              const               double,
-//                                              std::vector<double> &dst));
-
 
 template <int dim>
 class Wellbore : public Function<dim>
@@ -41,49 +35,104 @@ class Wellbore : public Function<dim>
            const Function<dim>                                  &get_permeability,
            const RelativePermeability                           &relative_permeability,
            const std::vector<const Interpolation::LookupTable*> &pvt_tables);
+
   // set data methods
+  // set control method (pressure, flow), control value, etc.
   void set_control(const Schedule::WellControl& control_);
   // access methods
   double                                  get_radius() const;
+  // get current controlling parameters
   const Schedule::WellControl           & get_control();
+  // get cells where the wellbore is placed
   const  std::vector<CellIterator<dim>> & get_cells();
+  // get true coordinates of the welbore
   const  std::vector< Point<dim> >      & get_locations();
+  // vector of phase productivities for each cell
   std::vector< std::vector<double> >    & get_productivities();
 
   // update methods
+  /*
+   * this method places the wellbore into cells closest to the
+   * geographical locations.
+   * If only one point is assigned for the wellbore, then it occupies a
+   * single cell and the wellbore is considered vertical.
+   * If a wellbore is initialized with more than one point,
+   * it is considered to consists of segments.
+   */
   void locate(const DoFHandler<dim>& dof_handler);
+  /*
+   * get matrix and rhs entries for pressure solver.
+   * rhs (Q) entry:
+   * is a specified flow rate normalized by phase productivity indices
+   * and productivities of other cell containing the wellbore.
+   * If it's a pressure-controled wellbore, the method returns the
+   * phase productivity index multiplied by the bottom-hole pressure.
+   * matrix (J) entry:
+   * is zero for a rate-controlled well.
+   * is equal to j-index for a pressure-controlled well.
+   */
   std::pair<double,double> get_J_and_Q(const CellIterator<dim> & cell,
                                        const unsigned int        phase = 0) const;
+  // get true flow rate for a phase in the current cell
   double get_flow_rate(const CellIterator<dim> & cell,
                        const double              cell_pressure,
                        const unsigned int        phase = 0) const;
+  /*
+   * compute productivity indices for each cell.
+   * Additionally, computed the segment-wise sum of productivities
+   * for each phase (for further distribution between segments)
+   */
   void update_productivity(const Function<dim> &get_pressure,
                            const Function<dim> &get_saturation);
+  /*
+   * This method is a modification of the deal.ii method to check
+   * whether a point is inside a cell. It allows for some hard-coded
+   * tolerance on the face because sometimes the deal.ii method
+   * sometimes lies (when the point is on the cell edge).
+   */
   static bool point_inside_cell(const CellIterator<dim> &cell,
                                 const Point<dim>        &p);
 
 
  private:
+  // equation for the absolute (non-phase) productivity index
   double compute_productivity(const double k1, const double k2,
                               const double dx1, const double dx2,
                               const double length) const;
+  /*
+   * assuming the point is in the cell, compute
+   * the length of the wellbore in this cell
+   */
   double get_segment_length(const Point<dim>                       &start,
                             const CellIterator<dim>                &cell,
                             const Tensor<1,dim>                    &tangent,
                             const std::pair<Point<dim>,Point<dim>> &end_points);
-  std::vector< Tensor<1,dim> >
-  get_cell_sizes(const std::vector<CellIterator<dim>> &cells_) const;
-
+  /*
+   * compute a triplet dx, dy, dz for the cell.
+   * Haven't checked how it works for non-orthogonal cells.
+   */
   void get_cell_size(FEFaceValues<dim> &fe_face_values,
                      const CellIterator<dim> &cell,
                      Tensor<1,dim> &h) const;
+  /*
+   * Same as the previous method but for a vector of cells
+   */
+  std::vector< Tensor<1,dim> >
+  get_cell_sizes(const std::vector<CellIterator<dim>> &cells_) const;
 
-  int  find_cell(const CellIterator<dim> & cell) const;
+  // Check if the list of wellbore cells contains the cell
+  int find_cell(const CellIterator<dim> & cell) const;
+  /*
+   * Used in locating the cell.
+   * Tells whether the well should be placed in the current cell or the wellbore.
+   * Useful for wells located exactly on between two cells.
+   */
   bool neighbor_is_farther(const Tensor<1,dim> &cell_to_wellbore,
                            const Tensor<1,dim> &neighbor_to_wellbore,
                            const unsigned int  cell_index,
                            const unsigned int  neighbor_index,
                            const double        tolerance) const;
+  // Checks if a vector is aligned with a face
   bool aligned_with_face(const Tensor<1,dim> &cell_to_wellbore,
                          const Tensor<1,dim> &face_normal) const;
 

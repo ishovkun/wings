@@ -18,15 +18,23 @@ class SaturationSolver
                    const DoFHandler<dim>    &dof_handler_,
                    const Model::Model<dim>  &model_,
                    ConditionalOStream       &pcout_);
+  /*
+   * setup degrees of freedom for the current triangulation
+   * and allocate memory for solution vectors
+   */
   void setup_dofs(IndexSet &locally_owned_dofs,
                   IndexSet &locally_relevant_dofs);
   void
+  /*
+   * update current solution with IMPES method
+   */
   solve(CellValues::CellValuesSaturation<dim> &cell_values,
         CellValues::CellValuesBase<dim>       &neighbor_values,
         const double                           time_step,
         const TrilinosWrappers::MPI::Vector   &pressure_solution,
         const TrilinosWrappers::MPI::Vector   &old_pressure_solution);
 
+  // Variabled
   const unsigned int                        n_phases;
  private:
   MPI_Comm                                  &mpi_communicator;
@@ -53,6 +61,7 @@ SaturationSolver(MPI_Comm                   &mpi_communicator_,
     model(model_),
     pcout(pcout_)
 {}
+
 
 
 template <int dim>
@@ -155,22 +164,17 @@ solve(CellValues::CellValuesSaturation<dim> &cell_values,
       // std::cout << "value_weird c1p/c1w = " << cell_values.get_B(0) << std::endl;
       cell_values.update_wells(cell, p);
 
-      // const double B_ii = cell_values.get_mass_matrix_entry();
-      // double matrix_ii = B_ii/time_step + cell_values.get_J();
-      // double rhs_i = B_ii/time_step*p_old + cell_values.get_Q();
       double solution_increment =
-          -
-          cell_values.get_B(0) * (p - p_old)
-          +
-          // -
-          // cell_values.get_E() * ( div_e - div_e_old )
-          +
-          time_step * cell_values.get_Q(0)
-          ;
-      // pcout << "cell " << cell->center() << std::endl;
-      // pcout <<  "dp entry" << cell_values.get_B(0) * (p - p_old) << std::endl;
-      // pcout << "Q " << time_step*cell_values.get_Q(0) << std::endl;
-
+          cell_values.get_rhs_cell_entry(time_step, p, p_old, 0);
+      // double solution_increment =
+      //     -
+      //     cell_values.get_B(0) * (p - p_old)
+      //     +
+      //     // -
+      //     // cell_values.get_E() * ( div_e - div_e_old )
+      //     +
+      //     time_step * cell_values.get_Q(0)
+      //     ;
 
       cell->get_dof_indices(dof_indices);
       const unsigned int i = dof_indices[q_point];
@@ -202,14 +206,14 @@ solve(CellValues::CellValuesSaturation<dim> &cell_values,
             neighbor_values.update(neighbor, p_neighbor, extra_values);
             cell_values.update_face_values(neighbor_values, normal, dS);
 
-            solution_increment +=
-            time_step *
-                (
-                    cell_values.get_T_face(0)
-                    -
-                    cell_values.get_G_face(0)
-                 )
-                ;
+            solution_increment += cell_values.get_rhs_face_entry(time_step, 0);
+            // time_step *
+            //     (
+            //         cell_values.get_T_face(0)
+            //         -
+            //         cell_values.get_G_face(0)
+            //      )
+            //     ;
 
             // if (i == 0)
             // {
@@ -247,14 +251,15 @@ solve(CellValues::CellValuesSaturation<dim> &cell_values,
               cell_values.update_face_values(neighbor_values, normal, dS);
 
               // distribute
-              solution_increment +=
-                  time_step *
-                  (
-                      cell_values.get_T_face(0)
-                      -
-                      cell_values.get_G_face(0)
-                   )
-                  ;
+              solution_increment += cell_values.get_rhs_face_entry(time_step, 0);
+              // solution_increment +=
+              //     time_step *
+              //     (
+              //         cell_values.get_T_face(0)
+              //         -
+              //         cell_values.get_G_face(0)
+              //      )
+              //     ;
             }
           } // end case neighbor is finer
 

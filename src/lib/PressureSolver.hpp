@@ -38,12 +38,16 @@ class PressureSolver
                  const Model::Model<dim>                   &model_,
                  ConditionalOStream                        &pcout_);
   ~PressureSolver();
-
+  /* setup degrees of freedom for the current triangulation
+   * and allocate memory for solution vectors
+   */
   void setup_dofs();
+  // Fill system matrix and rhs vector
   void assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
                        CellValues::CellValuesBase<dim>                  &neighbor_values,
                        const double                                      time_step,
                        const std::vector<TrilinosWrappers::MPI::Vector> &saturation);
+  // solve linear system syste_matrix*solution= rhs_vector
   unsigned int solve();
   // accessing private members
   const TrilinosWrappers::SparseMatrix& get_system_matrix();
@@ -60,14 +64,8 @@ class PressureSolver
   ConditionalOStream                        &pcout;
 
   // Matrices and vectors
-  // TrilinosWrappers::SparsityPattern         sparsity_pattern;
   TrilinosWrappers::SparseMatrix            system_matrix;
   std::vector<IndexSet>                     owned_partitioning;
-
-
-  // SparsityPattern
-  // typedef MeshWorker::DoFInfo<dim> DoFInfo;
-  // typedef MeshWorker::IntegrationInfo<dim> CellInfo;
 
  public:
   TrilinosWrappers::MPI::Vector solution, old_solution, rhs_vector;
