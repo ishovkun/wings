@@ -4,6 +4,10 @@
 #include <Math.hpp>
 // #include <DefaultValues.cc>
 
+#if defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Woverloaded-virtual"
+#endif  // defined(__GNUC__)
+
 namespace CellValues
 {
   using namespace dealii;
