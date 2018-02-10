@@ -13,7 +13,6 @@
 #include <BitMap.hpp>
 #include <Units.h>
 #include <Tensors.hpp>
-#include <Keywords.h>
 #include <LookupTable.hpp>
 #include <RelativePermeability.hpp>
 
@@ -121,7 +120,6 @@ class Model
     n_adaptive_steps;
   std::vector<std::pair<double,double>>  local_prerefinement_region;
   Units::Units                           units;
-  Keywords::Keywords                     keywords;
   boost::filesystem::path                mesh_file;
   std::vector< Wellbore<dim> > wells;
   Schedule::Schedule                     schedule;

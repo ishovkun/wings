@@ -91,18 +91,17 @@ def bl(relperm, fvisc, tD, n_points):
     return Sw1, xD
 
 
-corey_brooks = {
-    # s_crit, kr_0, N
-    'water': [0.2, 0.3, 2],
-    'oil':   [0.4, 1.0, 2],
-}
-
 
 if __name__ == "__main__":
     wvisc = 0.38*1e-3
     ovisc = 1.03*1e-3
     tD = 0.177905
     n_points = 102
+    corey_brooks = {
+        # s_crit, kr_0, N
+        'water': [0.2, 0.3, 2],
+        'oil':   [0.4, 1.0, 2],
+    }
     np.set_printoptions(edgeitems=1000,
                         linewidth=1000)
     result = bl(corey_brooks, [wvisc, ovisc], tD, n_points)

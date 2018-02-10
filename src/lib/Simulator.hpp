@@ -12,6 +12,7 @@
 // Custom modules
 #include <Model.hpp>
 #include <Reader.hpp>
+#include <OutputHelper.hpp>
 
 // #include <Wellbore.hpp>
 #include <PressureSolver.hpp>
@@ -35,8 +36,6 @@ class Simulator
   void read_mesh();
   void create_mesh();
   void run();
-  void
-  compare_with_analytics(FluidSolvers::SaturationSolver<dim> &saturation_solver);
 
 
  private:
@@ -51,6 +50,7 @@ class Simulator
   Model::Model<dim>                         model;
   FluidSolvers::PressureSolver<dim>         pressure_solver;
   std::string                               input_file;
+  Output::OutputHelper<dim>                 output_helper;
   // TimerOutput                               computing_timer;
 };
 
@@ -63,7 +63,8 @@ Simulator<dim>::Simulator(std::string input_file_name_)
     pcout(std::cout, (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)),
     model(mpi_communicator, pcout),
     pressure_solver(mpi_communicator, triangulation, model, pcout),
-    input_file(input_file_name_)
+    input_file(input_file_name_),
+    output_helper(mpi_communicator, triangulation)
     // ,computing_timer(mpi_communicator, pcout,
     //                 TimerOutput::summary, TimerOutput::wall_times)
 {}
@@ -98,6 +99,7 @@ void Simulator<dim>::read_mesh()
   gridin.attach_triangulation(triangulation);
   std::ifstream f(model.mesh_file.string());
 
+  pcout << "Mesh file " << model.mesh_file << std::endl;
   // typename GridIn<dim>::format format = gridin<dim>::ucd;
   // gridin.read(f, format);
   gridin.read_msh(f);
@@ -149,14 +151,8 @@ field_report(const double time,
                            DataOut<dim>::type_dof_data);
   data_out.build_patches();
 
-  std::ostringstream filename;
-  // filename << "./" << data.output_directory
-  //          << "/"  << data.data_set_name
-  //          << Utilities::int_to_string(time_step_number, 4)
-  //          << ".vtk";
-  filename << "solution/solution."  << time_step_number << ".vtk";
-  std::ofstream output(filename.str().c_str());
-  data_out.write_vtk(output);
+  output_helper.write_output(time, time_step_number, data_out);
+
 }  // eom
 
 
@@ -166,9 +162,11 @@ void Simulator<dim>::run()
 {
   Parsers::Reader reader(pcout, model);
   reader.read_input(input_file, /* verbosity= */0);
+  output_helper.set_case_name("solution");
 
-  // read_mesh();
-  create_mesh();
+
+  read_mesh();
+  // create_mesh();
 
   FluidSolvers::SaturationSolver<dim>
       saturation_solver(mpi_communicator,
@@ -249,8 +247,7 @@ void Simulator<dim>::run()
     time += time_step;
     pressure_solver.old_solution = pressure_solver.solution;
 
-    // pcout << "time " << time/model.units.time() << std::endl;
-    // pcout << "tmax " << model.t_max/model.units.time() << std::endl;
+    pcout << "time " << time << std::endl;
     model.update_well_controls(time);
     model.update_well_productivities(pressure_function, saturation_function);
 
@@ -276,64 +273,9 @@ void Simulator<dim>::run()
     field_report(time, time_step_number, saturation_solver);
 
     time_step_number++;
-    // if (time_step_number == 2) return;
   } // end time loop
-
-
-  // compare_with_analytics(saturation_solver);
-
-  // {  // construct dimensionless parameters and get saturation profile
-  //   auto & injector = model.wells[0];
-  //   const double q_rate = injector.get_control().value;
-  //   const double ft = model.units.length();
-  //   const double area = 25*50*ft*ft;
-  //   const double length = 510*ft;
-  //   // const auto & cell = pressure_solver
-  //   //     .get_dof_handler()
-  //   //     .begin_active();
-  //   // const auto volume = cell->measure()*triangulation.n_cells();
-  //   // pcout << "V = " << volume << std::endl;
-  //   // pcout << "V1 = " << area*length << std::endl;
-  //   const double phi = model.get_porosity->value(Point<dim>(0,0,0));
-  //   const double dimensionless_time =
-  //       q_rate*time/area/length/phi;
-  //   // pcout << "td = " << dimensionless_time << std::endl;
-  // }
 
 } // eom
 
-
-
-template<int dim>
-void
-Simulator<dim>::
-compare_with_analytics(FluidSolvers::SaturationSolver<dim> &saturation_solver)
-{
-  const double ft = model.units.length();
-  // const double area = 25*50*ft*ft;
-  const double length = 510*ft;
-
-  // std::cout << "size = " << analytical.size() <<std::endl;
-  const auto & dof_handler= pressure_solver.get_dof_handler();
-
-  typename DoFHandler<dim>::active_cell_iterator
-      cell = dof_handler.begin_active(),
-      endc = dof_handler.end();
-
-  unsigned int i = 0;
-
-  std::ofstream f;
-  f.open ("numerical.txt");
-  f << "x\tSw";
-  for (; cell!=endc; ++cell)
-  {
-    const double x = cell->center()[0]/length;
-    const double Sw = saturation_solver.solution[0][i];
-    f << x << "\t" << Sw << std::endl;
-    i++;
-  }
-  f.close();
-
-}  // end compare_with_analytics
 
 } // end of namespace

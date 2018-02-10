@@ -91,8 +91,10 @@ ADD_SUBDIRECTORY(test/test_2p_balhoff) # single pressure uncoupled with local re
 # set(BUILD_BENCHMARKS ON)
 
 ADD_CUSTOM_TARGET(benchmark
-  COMMENT "Setting target benchmark"
-  COMMAND ${CMAKE_COMMAND} -DBUILD_BENCHMARKS=ON ${CMAKE_SOURCE_DIR}
+  COMMENT "Running benchmarks"
+	COMMAND ${CMAKE_BINARY_DIR}/wings-pressure ${CMAKE_SOURCE_DIR}/benchmarks/buckley_leverett/buckley-leverett.data
+	COMMAND python ${CMAKE_SOURCE_DIR}/benchmarks/buckley_leverett/plot_bl.py ${CMAKE_BINARY_DIR}/solution/solution.pvd
+  # COMMAND ${CMAKE_COMMAND} -DBUILD_BENCHMARKS=ON ${CMAKE_SOURCE_DIR}
   )
 
 if (BUILD_BENCHMARKS)

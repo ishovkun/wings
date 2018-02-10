@@ -9,3 +9,5 @@ src/lib/liblib.a
 wings-pressure
 compile_commands.json
 build/
+*.pyc
+Testing

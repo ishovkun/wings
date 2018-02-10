@@ -27,6 +27,7 @@ ADD_LIBRARY(wings SHARED
   DefaultValues.h
   LookupTable.hpp
   Wellbore.hpp
+  OutputHelper.hpp
 )
 
 DEAL_II_SETUP_TARGET(wings)

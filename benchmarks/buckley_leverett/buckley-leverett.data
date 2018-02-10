@@ -2,7 +2,7 @@ subsection Mesh
 
 Global refinement steps    1 /
 Adaptive refinement steps  1 /
-Mesh file                  3x3x1.msh /
+Mesh file                  buckley_leverett.msh /
 
 subsection Well data
 

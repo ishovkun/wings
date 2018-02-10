@@ -80,45 +80,45 @@ namespace Parsers {
     Parsers::strip_comments(input_text, "#");
     if (verbosity > 1)
       std::cout << input_text << std::endl;
-    Keywords::Keywords kwds;
+    // Keywords::Keywords kwds;
     SyntaxParser parser(input_text);
     { // Mesh
-      parser.enter_subsection(kwds.section_mesh);
+      parser.enter_subsection(Keywords::section_mesh);
       model.initial_refinement_level =
-        parser.get_int(kwds.global_refinement_steps, 0);
+        parser.get_int(Keywords::global_refinement_steps, 0);
       model.n_adaptive_steps =
-        parser.get_int(kwds.adaptive_refinement_steps, 0);
+        parser.get_int(Keywords::adaptive_refinement_steps, 0);
       model.mesh_file =
         boost::filesystem::path(fname).parent_path() /
-        parser.get(kwds.mesh_file);
+        parser.get(Keywords::mesh_file);
       // std::cout << model.mesh_file << std::endl;
     }
     {  // equation data
-      parser.enter_subsection(kwds.section_equation_data);
-      std::string model_type_str = parser.get(kwds.model_type);
+      parser.enter_subsection(Keywords::section_equation_data);
+      std::string model_type_str = parser.get(Keywords::model_type);
       // std::cout << model_type_str << std::endl;
 
       Model::ModelType model_type(Model::ModelType::SingleLiquid);
-      if (model_type_str == kwds.model_single_liquid)
+      if (model_type_str == Keywords::model_single_liquid)
         model_type = Model::ModelType::SingleLiquid;
-      else if (model_type_str == kwds.model_water_oil)
+      else if (model_type_str == Keywords::model_water_oil)
         model_type = Model::ModelType::WaterOil;
-      // else if (model_type_str == kwds.model_single_gas)
+      // else if (model_type_str == Keywords::model_single_gas)
       //   model_type = Model::ModelType::SingleGas;
-      // else if (model_type_str == kwds.model_water_gas)
+      // else if (model_type_str == Keywords::model_water_gas)
       //   model_type = Model::ModelType::WaterGas;
-      // else if (model_type_str == kwds.model_blackoil)
+      // else if (model_type_str == Keywords::model_blackoil)
       //   model_type = Model::ModelType::Blackoil;
       else
-        AssertThrow(false, ExcMessage("Wrong entry in " + kwds.model_type));
+        AssertThrow(false, ExcMessage("Wrong entry in " + Keywords::model_type));
 
       model.set_model_type(model_type);
 
       { // units
-        const auto & tmp = parser.get(kwds.unit_system);
-        if (tmp == kwds.si_units)
+        const auto & tmp = parser.get(Keywords::unit_system);
+        if (tmp == Keywords::si_units)
           model.units.set_system(Units::UnitSystem::si_units);
-        else if (tmp == kwds.field_units)
+        else if (tmp == Keywords::field_units)
           model.units.set_system(Units::UnitSystem::field_units);
       }
 
@@ -127,20 +127,20 @@ namespace Parsers {
         std::vector<double> default_anisotropy{1,1,1};
         Tensor<1,dim> no_anisotropy = Parsers::convert<dim>(default_anisotropy);
         Tensor<1,dim> anisotropy = Parsers::convert<dim>
-            (parser.get_double_list(kwds.permeability_anisotropy, ",",
+            (parser.get_double_list(Keywords::permeability_anisotropy, ",",
                                     default_anisotropy));
         // apply units
         anisotropy *= model.units.permeability();
         model.get_permeability =
-          get_function(kwds.permeability, anisotropy, parser);
+          get_function(Keywords::permeability, anisotropy, parser);
 
         model.get_porosity =
-          get_function(kwds.porosity, no_anisotropy, parser);
+          get_function(Keywords::porosity, no_anisotropy, parser);
       }
 
       if (model.has_phase(Model::Phase::Water))
       {
-        auto tmp = parser.get_matrix(kwds.pvt_water, ";", ",");
+        auto tmp = parser.get_matrix(Keywords::pvt_water, ";", ",");
         // tmp.print_formatted(std::cout);
         AssertThrow(tmp.n() == model.n_pvt_water_columns,
                     ExcDimensionMismatch(tmp.n(), model.n_pvt_water_columns));
@@ -154,14 +154,14 @@ namespace Parsers {
         Interpolation::LookupTable pvt_water_table(tmp);
         model.set_pvt_water(pvt_water_table);
         // density
-        double rho_w = parser.get_double(kwds.density_sc_water);
+        double rho_w = parser.get_double(Keywords::density_sc_water);
         rho_w *= model.units.density();
         model.set_density_sc_w(rho_w);
       }
 
       if (model.has_phase(Model::Phase::Oil))
       {
-        auto tmp = parser.get_matrix(kwds.pvt_oil, ";", ",");
+        auto tmp = parser.get_matrix(Keywords::pvt_oil, ";", ",");
         // deadoil: p Bo Co mu_o
         AssertThrow(tmp.n() == model.n_pvt_oil_columns,
                     ExcDimensionMismatch(tmp.n(), model.n_pvt_oil_columns));
@@ -175,7 +175,7 @@ namespace Parsers {
         Interpolation::LookupTable pvt_oil_table(tmp);
         model.set_pvt_oil(pvt_oil_table);
 
-        double rho_o = parser.get_double(kwds.density_sc_oil);
+        double rho_o = parser.get_double(Keywords::density_sc_oil);
         rho_o *= model.units.density();
         model.set_density_sc_o(rho_o);
       }  // end two-phase case
@@ -184,9 +184,9 @@ namespace Parsers {
       {
         // Relative permeability
         const auto & rel_perm_water =
-            parser.get_double_list(kwds.rel_perm_water, ",");
+            parser.get_double_list(Keywords::rel_perm_water, ",");
         const auto & rel_perm_oil =
-            parser.get_double_list(kwds.rel_perm_oil, ",");
+            parser.get_double_list(Keywords::rel_perm_oil, ",");
         AssertThrow(rel_perm_water.size() == 3,
                     ExcDimensionMismatch(rel_perm_water.size(), 3));
         AssertThrow(rel_perm_oil.size() == 3,
@@ -200,17 +200,17 @@ namespace Parsers {
     } // end equation data
 
     {  // wells
-      parser.enter_subsection(kwds.section_wells);
-      assign_wells(kwds.well_parameters, parser);
-      assign_schedule(kwds.well_schedule, parser);
+      parser.enter_subsection(Keywords::section_wells);
+      assign_wells(Keywords::well_parameters, parser);
+      assign_schedule(Keywords::well_schedule, parser);
     }
     {  // solver
-      parser.enter_subsection(kwds.section_solver);
+      parser.enter_subsection(Keywords::section_solver);
       model.min_time_step =
-        parser.get_double(kwds.minimum_time_step, 1e-10) *
+        parser.get_double(Keywords::minimum_time_step, 1e-10) *
           model.units.time();
       model.t_max =
-          parser.get_double(kwds.t_max) *
+          parser.get_double(Keywords::t_max) *
           model.units.time();
     }
   } // eom
