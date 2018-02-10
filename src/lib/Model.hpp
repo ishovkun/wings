@@ -93,6 +93,7 @@ class Model
   void get_relative_permeability(Vector<double>      &saturation,
                                  std::vector<double> &dst) const;
   int get_well_id(const std::string& well_name) const;
+  std::pair<double,double> get_saturation_limits(const int phase) const;
 
   const Interpolation::LookupTable &
   get_pvt_table_water() const {return pvt_table_water;}
@@ -452,5 +453,31 @@ double Model<dim>::residual_saturation_oil() const
   // std::cout << rel_perm.So_rw;
   return rel_perm.So_rw;
 }
+
+
+
+template <int dim>
+inline
+std::pair<double,double>
+Model<dim>::get_saturation_limits(const int phase) const
+{
+  AssertThrow(phase < n_phases(), ExcMessage("Wrong phase index"));
+  if (n_phases() == 1)
+  {
+    return std::make_pair(0.0, 1.0);
+  }
+  else if (fluid_model == FluidModelType::DeadOil)
+  {
+    if (phase == 0)
+      return std::make_pair(rel_perm.Sw_crit, 1.0 - rel_perm.So_rw);
+    else
+      return std::make_pair(rel_perm.So_rw, 1.0 - rel_perm.Sw_crit);
+  }
+  else
+    AssertThrow(false, ExcNotImplemented());
+
+  // to supress warning
+  return std::make_pair(0.0, 1.0);
+}  // eom
 
 }  // end of namespace

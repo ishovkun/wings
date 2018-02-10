@@ -11,7 +11,8 @@ ADD_LIBRARY(wings SHARED
   CellValues/CellValuesBase.hpp
   CellValues/CellValuesSaturation.hpp
   PressureSolver.hpp
-	PoroElasticSolver.hpp
+  SolverIMPES.hpp
+	ElasticSolver.hpp
   RelativePermeability.hpp
   ExtraFEData.hpp
   FEFunction/FEFunction.hpp

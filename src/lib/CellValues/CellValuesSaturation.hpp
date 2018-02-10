@@ -34,6 +34,10 @@ class CellValuesSaturation : public CellValuesBase<dim>
    */
   virtual double get_rhs_face_entry(const double time_step,
                                     const int phase) const;
+  /*
+   * This class considers rhs entry a saturation increment
+   */
+  virtual double check_rhs_entry(const double entry) const;
   // Variables
  private:
   double pressure_difference;

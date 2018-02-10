@@ -4,9 +4,6 @@
 #include <Math.hpp>
 // #include <DefaultValues.cc>
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic ignored "-Woverloaded-virtual"
-#endif  // defined(__GNUC__)
 
 namespace CellValues
 {
@@ -50,7 +47,9 @@ namespace CellValues
      * should be called once after update_values()
      */
     virtual double get_rhs_cell_entry(const double time_step,
-                              const double old_solution) const;
+                                      const double pressure,
+                                      const double old_pressure,
+                                      const int phase = 0) const;
     /* Get a matrix entry corresponding to the cell.
      * should be called once after update_values()
      */
@@ -58,7 +57,8 @@ namespace CellValues
     /* Get a rhs entry corresponding to the face.
      * should be called once per face after update_face_values()
      */
-    virtual double get_rhs_face_entry() const;
+    virtual double get_rhs_face_entry(const double /* time_step */,
+                                      const int /* phase */) const;
 
    public:
     const Model::Model<dim> & model;      // reference to the model object
@@ -418,23 +418,26 @@ template <int dim>
 double
 CellValuesBase<dim>::
 get_rhs_cell_entry(const double time_step,
-                   const double old_solution) const
+                   const double pressure,
+                   const double,
+                   const int) const
 {
-  // double rhs_i = B_ii/time_step*p_old + cell_values.get_Q();
+  // two last variables are ignored (used in children)
+
   double entry = 0;
   const auto & model = this->model;
   if (model.fluid_model == Model::FluidModelType::Liquid)
   {
     // B_mass = c1p;
     // J = vector_J_phase[0];
-    entry += c1p * old_solution/time_step; // B matrix
+    entry += c1p * pressure/time_step; // B matrix
     entry += vector_Q_phase[0];  // Q vector
   }
   else if (model.fluid_model == Model::FluidModelType::DeadOil)
   {
     // B_mass = c2o/c1w * c1p + c2p;
     // J = +c2o/c1w*vector_J_phase[0] + vector_J_phase[1];
-    entry += (c2o/c1w * c1p + c2p)*old_solution/time_step;  // B matrix
+    entry += (c2o/c1w * c1p + c2p)*pressure/time_step;  // B matrix
     entry += +c2o/c1w*vector_Q_phase[0] + vector_Q_phase[1]; // Q vector
 
   }
@@ -443,7 +446,7 @@ get_rhs_cell_entry(const double time_step,
     const double A = c2o/c1w * (c3g-c3w)/(c3g-c3o);
     const double B = c2o / (c3g - c3o);
     // B_mass = A*c1p + c2p + B*c3p;
-    entry += (A*c1p + c2p + B*c3p)*old_solution/time_step;  // B matrix
+    entry += (A*c1p + c2p + B*c3p)*pressure/time_step;  // B matrix
 
     // need to get equations for J and Q
     AssertThrow(false, ExcNotImplemented());
@@ -476,7 +479,8 @@ CellValuesBase<dim>::get_matrix_face_entry() const
 template <int dim>
 inline
 double
-CellValuesBase<dim>::get_rhs_face_entry() const
+CellValuesBase<dim>::get_rhs_face_entry(const double,
+                                        const int) const
 {
   double entry = 0;
   if (model.fluid_model == Model::FluidModelType::Liquid)

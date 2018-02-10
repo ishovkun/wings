@@ -15,9 +15,10 @@
 #include <OutputHelper.hpp>
 
 // #include <Wellbore.hpp>
-#include <PressureSolver.hpp>
-#include <SaturationSolver.hpp>
-#include <PoroElasticSolver.hpp>
+#include <SolverIMPES.hpp>
+// #include <PressureSolver.hpp>
+// #include <SaturationSolver.hpp>
+#include <ElasticSolver.hpp>
 #include <FEFunction/FEFunction.hpp>
 // #include <FEFunction/FEFunctionPVT.hpp>
 
@@ -41,15 +42,15 @@ class Simulator
 
  private:
   void refine_mesh();
-  void field_report(const double time_step,
-                    const unsigned int time_step_number,
-                    const FluidSolvers::SaturationSolver<dim> &saturation_solver);
+  // void field_report(const double time_step,
+  //                   const unsigned int time_step_number,
+  //                   const FluidSolvers::SaturationSolver<dim> &saturation_solver);
 
   MPI_Comm                                  mpi_communicator;
   parallel::distributed::Triangulation<dim> triangulation;
   ConditionalOStream                        pcout;
   Model::Model<dim>                         model;
-  FluidSolvers::PressureSolver<dim>         pressure_solver;
+  // FluidSolvers::PressureSolver<dim>         pressure_solver;
   std::string                               input_file;
   Output::OutputHelper<dim>                 output_helper;
   // TimerOutput                               computing_timer;
@@ -63,7 +64,7 @@ Simulator<dim>::Simulator(std::string input_file_name_)
     triangulation(mpi_communicator),
     pcout(std::cout, (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)),
     model(mpi_communicator, pcout),
-    pressure_solver(mpi_communicator, triangulation, model, pcout),
+    // pressure_solver(mpi_communicator, triangulation, model, pcout),
     input_file(input_file_name_),
     output_helper(mpi_communicator, triangulation)
     // ,computing_timer(mpi_communicator, pcout,
@@ -136,25 +137,25 @@ void Simulator<dim>::refine_mesh()
 
 
 
-template <int dim>
-void
-Simulator<dim>::
-field_report(const double time,
-             const unsigned int time_step_number,
-             const FluidSolvers::SaturationSolver<dim> &saturation_solver)
-{
-  DataOut<dim> data_out;
+// template <int dim>
+// void
+// Simulator<dim>::
+// field_report(const double time,
+//              const unsigned int time_step_number,
+//              const FluidSolvers::SaturationSolver<dim> &saturation_solver)
+// {
+//   DataOut<dim> data_out;
 
-  data_out.attach_dof_handler(pressure_solver.get_dof_handler());
-  data_out.add_data_vector(pressure_solver.relevant_solution, "pressure",
-                           DataOut<dim>::type_dof_data);
-  data_out.add_data_vector(saturation_solver.relevant_solution[0], "Sw",
-                           DataOut<dim>::type_dof_data);
-  data_out.build_patches();
+//   data_out.attach_dof_handler(pressure_solver.get_dof_handler());
+//   data_out.add_data_vector(pressure_solver.relevant_solution, "pressure",
+//                            DataOut<dim>::type_dof_data);
+//   data_out.add_data_vector(saturation_solver.relevant_solution[0], "Sw",
+//                            DataOut<dim>::type_dof_data);
+//   data_out.build_patches();
 
-  output_helper.write_output(time, time_step_number, data_out);
+//   output_helper.write_output(time, time_step_number, data_out);
 
-}  // eom
+// }  // eom
 
 
 
@@ -171,15 +172,17 @@ void Simulator<dim>::run()
 
   output_helper.prepare_output_directories();
 
-  FluidSolvers::SaturationSolver<dim>
-      saturation_solver(mpi_communicator,
-                        pressure_solver.get_dof_handler(),
-                        model, pcout);
+  FluidSolvers::SolverIMPES<dim>(mpi_communicator, triangulation, model, pcout);
 
-  SolidSolvers::PoroElasticSolver<dim>
-      solid_solver(mpi_communicator, triangulation, model, pcout);
+  // FluidSolvers::SaturationSolver<dim>
+  //     saturation_solver(mpi_communicator,
+  //                       pressure_solver.get_dof_handler(),
+  //                       model, pcout);
 
-  pressure_solver.setup_dofs();
+  // SolidSolvers::ElasticSolver<dim>
+  //     solid_solver(mpi_communicator, triangulation, model, pcout);
+
+  // pressure_solver.setup_dofs();
 
   // // if multiphase
   // saturation_solver.setup_dofs(pressure_solver.locally_owned_dofs,

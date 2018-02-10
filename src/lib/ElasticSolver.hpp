@@ -8,14 +8,14 @@ using namespace dealii;
 
 
 template <int dim>
-class PoroElasticSolver
+class ElasticSolver
 {
  public:
-  PoroElasticSolver(MPI_Comm                                  &mpi_communicator,
+  ElasticSolver(MPI_Comm                                  &mpi_communicator,
                     parallel::distributed::Triangulation<dim> &triangulation,
                     const Model::Model<dim>                   &model,
                     ConditionalOStream                        &pcout);
-  ~PoroElasticSolver();
+  ~ElasticSolver();
   void set_coupling();
   /* setup degrees of freedom for the current triangulation
    * and allocate memory for solution vectors */
@@ -52,8 +52,8 @@ class PoroElasticSolver
 
 
 template <int dim>
-PoroElasticSolver<dim>::
-PoroElasticSolver(MPI_Comm                                  &mpi_communicator,
+ElasticSolver<dim>::
+ElasticSolver(MPI_Comm                                  &mpi_communicator,
                   parallel::distributed::Triangulation<dim> &triangulation,
                   const Model::Model<dim>                   &model,
                   ConditionalOStream                        &pcout)
@@ -69,7 +69,7 @@ PoroElasticSolver(MPI_Comm                                  &mpi_communicator,
 
 
 template <int dim>
-PoroElasticSolver<dim>::~PoroElasticSolver()
+ElasticSolver<dim>::~ElasticSolver()
 {
   dof_handler.clear();
 } // eom
@@ -79,7 +79,7 @@ PoroElasticSolver<dim>::~PoroElasticSolver()
 
 template <int dim>
 void
-PoroElasticSolver<dim>::setup_dofs()
+ElasticSolver<dim>::setup_dofs()
 {
   dof_handler.distribute_dofs(fe);
 
@@ -112,7 +112,7 @@ PoroElasticSolver<dim>::setup_dofs()
 
 // template <int dim>
 // void
-// PoroElasticSolver<dim>::assmeble_system()
+// ElasticSolver<dim>::assmeble_system()
 // {
 //   QGauss<dim>   pressure_quadrature_formula(1);
 //   QGauss<dim>   quadrature_formula(fe.degree() + 1);
