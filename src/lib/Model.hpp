@@ -21,9 +21,8 @@ namespace Model
 {
 using namespace dealii;
 
-enum ModelType {SingleLiquid, SingleGas, WaterOil, WaterGas, Blackoil,
-                SingleLiquidElasticity, SingleGasElasticity,
-                WaterOilElasticity, WaterGasElasticity, BlackoilElasticity};
+enum FluidModelType {Liquid, SingleGas, /* WaterOil = */ DeadOil,
+                     WaterGas, Blackoil};
 
 enum PVTType {Constant, Table, Correlation};
 
@@ -61,7 +60,7 @@ class Model
   // *get_porosity;
 
   // adding data
-  void set_model_type(ModelType type);
+  void set_fluid_model(FluidModelType type);
   void set_pvt_water(Interpolation::LookupTable &table);
   void set_pvt_oil(Interpolation::LookupTable &table);
   void set_pvt_gas(Interpolation::LookupTable &table);
@@ -128,7 +127,7 @@ class Model
     t_max;
   int                                    max_fss_steps;
 
-  ModelType                              type;
+  FluidModelType                         fluid_model;
   ModelConfig                            config;
  protected:
   std::string                            mesh_file_name,
@@ -365,14 +364,14 @@ void Model<dim>::get_pvt_oil(const double        pressure,
 
 
 template <int dim>
-void Model<dim>::set_model_type(ModelType model_type)
+void Model<dim>::set_fluid_model(FluidModelType model_type)
 {
   phases.clear();
-  type = model_type;
+  fluid_model = model_type;
 
-  if (model_type == ModelType::SingleLiquid)
+  if (fluid_model == FluidModelType::Liquid)
     phases.push_back(Phase::Water);
-  else if (model_type == WaterOil)
+  else if (fluid_model == DeadOil)
   {
     phases.push_back(Phase::Water);
     phases.push_back(Phase::Oil);
@@ -426,9 +425,9 @@ void Model<dim>::get_relative_permeability(Vector<double>      &saturation,
   AssertThrow(dst.size() == n_phases(),
               ExcDimensionMismatch(dst.size(), n_phases()));
 
-  if (type == SingleLiquid)
+  if (fluid_model == Liquid)
     dst[0] = 1;
-  else if (type == WaterOil)
+  else if (fluid_model == DeadOil)
     rel_perm.get_values(saturation, dst);
   else
     AssertThrow(false, ExcNotImplemented());

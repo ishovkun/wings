@@ -25,7 +25,7 @@ Schedule
 /
 
 subsection Equation data
-Model                   WaterOil /
+Fluid model             DeadOil /
 Units                   Field /
 Permeability            bitmap perm4x4_homog.dat /
 Porosity                0.26 /

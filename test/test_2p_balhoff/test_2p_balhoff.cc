@@ -141,7 +141,7 @@ namespace Wings
     CellValues::CellValuesBase<dim>* p_neighbor_values = &neighbor_values_pressure;
     // CellValues::CellValuesBase<dim>* p_cell_values = NULL;
     // CellValues::CellValuesBase<dim>* p_neighbor_values = NULL;
-    // if (model.type == Model::ModelType::SingleLiquid)
+    // if (model.fluid_model == Model::FluidModelType::Liquid)
     // {
     //   p_cell_values = &cell_values_sf;
     //   p_neighbor_values = &neighbor_values_sf;
@@ -351,7 +351,7 @@ namespace Wings
 
     CellValues::CellValuesSaturation<dim> cell_values_saturation(model);
 
-    if (model.type != Model::ModelType::SingleLiquid)
+    if (model.fluid_model != Model::FluidModelType::Liquid)
     {
       saturation_solver.solve(cell_values_saturation,
                               neighbor_values_pressure,
@@ -412,7 +412,7 @@ namespace Wings
 
     pressure_solver.solve();
     pressure_solver.relevant_solution = pressure_solver.solution;
-    if (model.type != Model::ModelType::SingleLiquid)
+    if (model.fluid_model != Model::FluidModelType::Liquid)
     {
       saturation_solver.solve(cell_values_saturation,
                               neighbor_values_pressure,

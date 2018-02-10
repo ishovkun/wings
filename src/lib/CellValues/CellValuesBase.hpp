@@ -143,9 +143,9 @@ CellValuesBase<dim>::update(const CellIterator<dim> &cell,
 
   if (model.has_phase(Model::Phase::Oil))
   {
-    if (model.type == Model::ModelType::WaterOil)
+    if (model.fluid_model == Model::FluidModelType::DeadOil)
       this->So = 1.0 - this->Sw;
-    else if (model.type == Model::ModelType::Blackoil)
+    else if (model.fluid_model == Model::FluidModelType::Blackoil)
       this->So = extra_values[1];
     saturation[1] = this->So;
   }
@@ -153,9 +153,9 @@ CellValuesBase<dim>::update(const CellIterator<dim> &cell,
   if (model.has_phase(Model::Phase::Gas))
   {
     this->Sg = 1 - this->Sw - this->So;
-    if (model.type == Model::ModelType::WaterGas)
+    if (model.fluid_model == Model::FluidModelType::WaterGas)
       saturation[1] = this->Sg;
-    else if (model.type == Model::ModelType::Blackoil)
+    else if (model.fluid_model == Model::FluidModelType::Blackoil)
       saturation[2] = this->Sg;
   }
 
@@ -384,14 +384,14 @@ get_matrix_cell_entry(const double time_step) const
 {
   double entry = 0;
   const auto & model = this->model;
-  if (model.type == Model::ModelType::SingleLiquid)
+  if (model.fluid_model == Model::FluidModelType::Liquid)
   {
     // B_mass = c1p;
     // J = vector_J_phase[0];
     entry += c1p/time_step;
     entry += vector_J_phase[0];
   }
-  else if (model.type == Model::ModelType::WaterOil)
+  else if (model.fluid_model == Model::FluidModelType::DeadOil)
   {
     // B_mass = c2o/c1w * c1p + c2p;
     // J = +c2o/c1w*vector_J_phase[0] + vector_J_phase[1];
@@ -399,7 +399,7 @@ get_matrix_cell_entry(const double time_step) const
     entry += +c2o/c1w*vector_J_phase[0] + vector_J_phase[1];
 
   }
-  else if (model.type == Model::ModelType::Blackoil)
+  else if (model.fluid_model == Model::FluidModelType::Blackoil)
   {
     const double A = c2o/c1w * (c3g-c3w)/(c3g-c3o);
     const double B = c2o / (c3g - c3o);
@@ -423,14 +423,14 @@ get_rhs_cell_entry(const double time_step,
   // double rhs_i = B_ii/time_step*p_old + cell_values.get_Q();
   double entry = 0;
   const auto & model = this->model;
-  if (model.type == Model::ModelType::SingleLiquid)
+  if (model.fluid_model == Model::FluidModelType::Liquid)
   {
     // B_mass = c1p;
     // J = vector_J_phase[0];
     entry += c1p * old_solution/time_step; // B matrix
     entry += vector_Q_phase[0];  // Q vector
   }
-  else if (model.type == Model::ModelType::WaterOil)
+  else if (model.fluid_model == Model::FluidModelType::DeadOil)
   {
     // B_mass = c2o/c1w * c1p + c2p;
     // J = +c2o/c1w*vector_J_phase[0] + vector_J_phase[1];
@@ -438,7 +438,7 @@ get_rhs_cell_entry(const double time_step,
     entry += +c2o/c1w*vector_Q_phase[0] + vector_Q_phase[1]; // Q vector
 
   }
-  else if (model.type == Model::ModelType::Blackoil)
+  else if (model.fluid_model == Model::FluidModelType::Blackoil)
   {
     const double A = c2o/c1w * (c3g-c3w)/(c3g-c3o);
     const double B = c2o / (c3g - c3o);
@@ -459,9 +459,9 @@ double
 CellValuesBase<dim>::get_matrix_face_entry() const
 {
   double entry = 0;
-  if (model.type == Model::ModelType::SingleLiquid)
+  if (model.fluid_model == Model::FluidModelType::Liquid)
     entry += T_w_face;
-  else if (model.type == Model::ModelType::WaterOil)
+  else if (model.fluid_model == Model::FluidModelType::DeadOil)
   {
     entry += +c2o/c1w * T_w_face + T_o_face;
   }
@@ -479,9 +479,9 @@ double
 CellValuesBase<dim>::get_rhs_face_entry() const
 {
   double entry = 0;
-  if (model.type == Model::ModelType::SingleLiquid)
+  if (model.fluid_model == Model::FluidModelType::Liquid)
     entry += G_w_face;
-  else if (model.type == Model::ModelType::WaterOil)
+  else if (model.fluid_model == Model::FluidModelType::DeadOil)
   {
     entry += +c2o/c1w * G_w_face + G_o_face;
   }

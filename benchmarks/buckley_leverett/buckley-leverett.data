@@ -21,7 +21,7 @@ Schedule
 /
 
 subsection Equation data
-Model                   WaterOil /
+Fluid model             DeadOil /
 Units                   Field /
 Permeability            bitmap bl-perm.dat /
 Perm anisotropy         1, 1, 1 /

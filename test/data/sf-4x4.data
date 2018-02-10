@@ -25,7 +25,7 @@ Schedule
 
 subsection Equation data
 
-Model                   SingleLiquid /
+Fluid model             Liquid /
 Units                   Metric /
 # Young modulus         1e8 /
 # Poisson ratio         0.3 /

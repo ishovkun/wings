@@ -1,5 +1,4 @@
 #pragma once
-// #include <deal.II/base/function.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/base/function.h>
 #include <deal.II/base/parameter_handler.h>
@@ -98,21 +97,15 @@ namespace Parsers {
       std::string model_type_str = parser.get(Keywords::model_type);
       // std::cout << model_type_str << std::endl;
 
-      Model::ModelType model_type(Model::ModelType::SingleLiquid);
+      Model::FluidModelType model_type(Model::FluidModelType::Liquid);
       if (model_type_str == Keywords::model_single_liquid)
-        model_type = Model::ModelType::SingleLiquid;
+        model_type = Model::FluidModelType::Liquid;
       else if (model_type_str == Keywords::model_water_oil)
-        model_type = Model::ModelType::WaterOil;
-      // else if (model_type_str == Keywords::model_single_gas)
-      //   model_type = Model::ModelType::SingleGas;
-      // else if (model_type_str == Keywords::model_water_gas)
-      //   model_type = Model::ModelType::WaterGas;
-      // else if (model_type_str == Keywords::model_blackoil)
-      //   model_type = Model::ModelType::Blackoil;
+        model_type = Model::FluidModelType::DeadOil;
       else
         AssertThrow(false, ExcMessage("Wrong entry in " + Keywords::model_type));
 
-      model.set_model_type(model_type);
+      model.set_fluid_model(model_type);
 
       { // units
         const auto & tmp = parser.get(Keywords::unit_system);
@@ -180,7 +173,7 @@ namespace Parsers {
         model.set_density_sc_o(rho_o);
       }  // end two-phase case
 
-      if (model.type == Model::WaterOil)
+      if (model.fluid_model == Model::DeadOil)
       {
         // Relative permeability
         const auto & rel_perm_water =
@@ -338,13 +331,13 @@ namespace Parsers {
         schedule_entry.control.value *= model.units.pressure();
       }
 
-      if (   model.type == Model::WaterOil
-          || model.type == Model::SingleLiquid)
+      if (   model.fluid_model == Model::DeadOil
+             || model.fluid_model == Model::Liquid)
       {
         if (schedule_entry.control.type != Schedule::pressure_control)
           schedule_entry.control.value *= model.units.fluid_rate();  //
       }
-      else if (model.type == Model::Blackoil)
+      else if (model.fluid_model == Model::Blackoil)
       {
         if (schedule_entry.control.type == Schedule::flow_control_total
             || schedule_entry.control.type == Schedule::flow_control_phase_1

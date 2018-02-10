@@ -15,6 +15,7 @@ class PoroElasticSolver
                     parallel::distributed::Triangulation<dim> &triangulation,
                     const Model::Model<dim>                   &model,
                     ConditionalOStream                        &pcout);
+  ~PoroElasticSolver();
   void set_coupling();
   /* setup degrees of freedom for the current triangulation
    * and allocate memory for solution vectors */
@@ -68,8 +69,7 @@ PoroElasticSolver(MPI_Comm                                  &mpi_communicator,
 
 
 template <int dim>
-PoroElasticSolver<dim>::
-~PoroElasticSolver()
+PoroElasticSolver<dim>::~PoroElasticSolver()
 {
   dof_handler.clear();
 } // eom
@@ -110,38 +110,38 @@ PoroElasticSolver<dim>::setup_dofs()
 
 
 
-template <int dim>
-void
-PoroElasticSolver<dim>::assmeble_system()
-{
-  QGauss<dim>   pressure_quadrature_formula(1);
-  QGauss<dim>   quadrature_formula(fe.degree() + 1);
+// template <int dim>
+// void
+// PoroElasticSolver<dim>::assmeble_system()
+// {
+//   QGauss<dim>   pressure_quadrature_formula(1);
+//   QGauss<dim>   quadrature_formula(fe.degree() + 1);
 
-  FEValues<dim> fe_values(fe, quadrature_formula,
-                          update_values | update_gradients |
-                          update_JxW_values);
-  FEValues<dim> fe_values_pressure(pressure_fe, pressure_quadrature_formula,
-                                   update_values);
+//   FEValues<dim> fe_values(fe, quadrature_formula,
+//                           update_values | update_gradients |
+//                           update_JxW_values);
+//   FEValues<dim> fe_values_pressure(pressure_fe, pressure_quadrature_formula,
+//                                    update_values);
 
-  const unsigned int dofs_per_cell = fe.dofs_per_cell;
-  const unsigned int n_q_points = quadrature_formula.size();
+//   const unsigned int dofs_per_cell = fe.dofs_per_cell;
+//   const unsigned int n_q_points = quadrature_formula.size();
 
-  std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
+//   std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
 
-  typename DoFHandler<dim>::active_cell_iterator
-      cell = dof_handler.begin_active(),
-      endc = dof_handler.end(),
-      pressure_cell = pressure_dof_handler.begin_active();
+//   typename DoFHandler<dim>::active_cell_iterator
+//       cell = dof_handler.begin_active(),
+//       endc = dof_handler.end(),
+//       pressure_cell = pressure_dof_handler.begin_active();
 
-  system_matrix = 0;
-  rhs_vector = 0;
+//   system_matrix = 0;
+//   rhs_vector = 0;
 
-  for (; cell!=endc; ++cell, ++pressure_cell)
-    if (cell->is_locally_owned())
-    {
-      fe_values.reinit(cell);
-    } // end cell loop
-}  // eom
+//   for (; cell!=endc; ++cell, ++pressure_cell)
+//     if (cell->is_locally_owned())
+//     {
+//       fe_values.reinit(cell);
+//     } // end cell loop
+// }  // eom
 
 
 } // end of namespace
