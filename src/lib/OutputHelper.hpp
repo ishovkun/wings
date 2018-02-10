@@ -15,6 +15,12 @@ class OutputHelper
  public:
   OutputHelper(MPI_Comm &mpi_communicator,
                const parallel::distributed::Triangulation<dim> &triangulation);
+  // returns the output directory for the current case
+  boost::filesystem::path output_directory();
+  /*
+   * create directory with the case name and
+   * create vtu subdirectory
+   */
   void prepare_output_directories();
   void set_case_name(const std::string &case_name);
   void write_output(const double        time,
@@ -52,6 +58,50 @@ OutputHelper<dim>::set_case_name(const std::string &case_name)
 
 
 template<int dim>
+boost::filesystem::path
+OutputHelper<dim>::output_directory()
+{
+  boost::filesystem::path path("./" + case_name);
+  return path;
+}
+
+
+
+template<int dim>
+void
+OutputHelper<dim>::prepare_output_directories()
+{
+  if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+  {
+    const boost::filesystem::path output_dir = output_directory();
+
+    if (!boost::filesystem::is_directory(output_dir))
+    {
+      std::cout << "Output folder not found\n"
+            << "Creating directory: ";
+      if (boost::filesystem::create_directory(output_dir))
+        std::cout << "Success" << std::endl;
+    }
+    else
+    { // remove everything from this directory
+      std::cout << "Folder exists: cleaning folder: ";
+      boost::filesystem::remove_all(output_dir);
+      if (boost::filesystem::create_directory(output_dir))
+        std::cout << "Success" << std::endl;
+    }
+
+    // create directory for vtu's
+    const boost::filesystem::path vtu_dir(Keywords::vtu_dir_name);
+    // boost::filesystem::path vtu_path("./" + case_name + "/vtu");
+    // boost::filesystem::path vtu_path("./" + case_name + "/vtu");
+    boost::filesystem::create_directory(output_dir / vtu_dir);
+  }  // end mpi==0
+
+} // eom
+
+
+
+template<int dim>
 void
 OutputHelper<dim>::write_output(const double        time,
                                 const unsigned int  time_step_number,
@@ -59,7 +109,7 @@ OutputHelper<dim>::write_output(const double        time,
 {
   const std::string output_folder_path = ("./" + case_name + "/");
   const std::string vtu_folder_path =
-      (output_folder_path + Keywords::vtu_folder_name + "/");
+      (output_folder_path + Keywords::vtu_dir_name + "/");
   const std::string this_vtu_file_name =
       + "/" + Keywords::vtu_file_prefix
       // time step #
@@ -105,7 +155,7 @@ OutputHelper<dim>::write_output(const double        time,
     data_out.write_pvtu_record(pvtu_file, all_vtu_files);
 
     // write master pvd file (for real time in paraview)
-    const std::string pvtu_full_name = Keywords::vtu_folder_name + "/" + pvtu_filename;
+    const std::string pvtu_full_name = Keywords::vtu_dir_name + "/" + pvtu_filename;
     times_and_names.push_back(std::make_pair(time, pvtu_full_name));
     std::ofstream pvd_file(output_folder_path + Keywords::pvd_file_name);
     DataOutBase::write_pvd_record(pvd_file, times_and_names);

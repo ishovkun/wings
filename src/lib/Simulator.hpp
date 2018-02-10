@@ -168,6 +168,8 @@ void Simulator<dim>::run()
   read_mesh();
   // create_mesh();
 
+  output_helper.prepare_output_directories();
+
   FluidSolvers::SaturationSolver<dim>
       saturation_solver(mpi_communicator,
                         pressure_solver.get_dof_handler(),

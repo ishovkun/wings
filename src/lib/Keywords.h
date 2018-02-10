@@ -65,7 +65,7 @@ namespace Keywords
 
   // Output names
   const std::string
-      vtu_folder_name = "vtu",
+      vtu_dir_name = "vtu",
       vtu_file_prefix = "solution-",
       vtu_file_suffix = "vtu",
       pvtu_file_prefix = "solution-",
