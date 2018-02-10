@@ -24,23 +24,20 @@
 
 namespace FluidSolvers
 {
-  using namespace dealii;
+using namespace dealii;
 
 
 template <int dim>
 class PressureSolver
 {
  public:
-  // PressureSolver(const Triangulation<dim>  &triangulation,
-  //                const Data::DataBase<dim> &data_);
   PressureSolver(MPI_Comm                                  &mpi_communicator_,
                  parallel::distributed::Triangulation<dim> &triangulation_,
                  const Model::Model<dim>                   &model_,
                  ConditionalOStream                        &pcout_);
   ~PressureSolver();
   /* setup degrees of freedom for the current triangulation
-   * and allocate memory for solution vectors
-   */
+   * and allocate memory for solution vectors */
   void setup_dofs();
   // Fill system matrix and rhs vector
   void assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
@@ -64,12 +61,13 @@ class PressureSolver
   ConditionalOStream                        &pcout;
 
   // Matrices and vectors
-  TrilinosWrappers::SparseMatrix            system_matrix;
-  std::vector<IndexSet>                     owned_partitioning;
+  TrilinosWrappers::SparseMatrix system_matrix;
+  TrilinosWrappers::MPI::Vector  rhs_vector;
 
  public:
-  TrilinosWrappers::MPI::Vector solution, old_solution, rhs_vector;
+  TrilinosWrappers::MPI::Vector solution, old_solution;
   TrilinosWrappers::MPI::Vector relevant_solution;
+  // partitioning
   IndexSet                      locally_owned_dofs, locally_relevant_dofs;
 };
 
@@ -111,8 +109,7 @@ void PressureSolver<dim>::setup_dofs()
     system_matrix.clear();
     TrilinosWrappers::SparsityPattern
         sparsity_pattern(locally_owned_dofs, mpi_communicator);
-    DoFTools::make_flux_sparsity_pattern(dof_handler,
-                                         sparsity_pattern);
+    DoFTools::make_flux_sparsity_pattern(dof_handler, sparsity_pattern);
     sparsity_pattern.compress();
     system_matrix.reinit(sparsity_pattern);
   }
@@ -136,8 +133,8 @@ assemble_system(CellValues::CellValuesBase<dim>                  &cell_values,
                 const std::vector<TrilinosWrappers::MPI::Vector> &saturation)
 {
   // Only one integration point in FVM
-  QGauss<dim>       quadrature_formula(1);
-  QGauss<dim-1>     face_quadrature_formula(1);
+  QGauss<dim>   quadrature_formula(1);
+  QGauss<dim-1> face_quadrature_formula(1);
 
   FEValues<dim> fe_values(fe, quadrature_formula, update_values);
   FEValues<dim> fe_values_neighbor(fe, quadrature_formula, update_values);
