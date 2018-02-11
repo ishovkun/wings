@@ -14,8 +14,7 @@
 #include <Model.hpp>
 #include <Reader.hpp>
 #include <Wellbore.hpp>
-#include <PressureSolver.hpp>
-#include <SaturationSolver.hpp>
+#include <SolverIMPES.hpp>
 #include <Parsers.hpp>
 #include <CellValues/CellValuesBase.hpp>
 #include <FEFunction/FEFunction.hpp>
@@ -40,8 +39,7 @@ namespace Wings
     MPI_Comm                                  mpi_communicator;
     parallel::distributed::Triangulation<dim> triangulation;
     ConditionalOStream                        pcout;
-    Model::Model<dim>                         data;
-    FluidSolvers::PressureSolver<dim>         pressure_solver;
+    Model::Model<dim>                         model;
     std::string                               input_file;
     // TimerOutput                               computing_timer;
   };
@@ -53,8 +51,7 @@ namespace Wings
     mpi_communicator(MPI_COMM_WORLD),
     triangulation(mpi_communicator),
     pcout(std::cout, (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)),
-    data(mpi_communicator, pcout),
-    pressure_solver(mpi_communicator, triangulation, data, pcout),
+    model(mpi_communicator, pcout),
     input_file(input_file_name_)
     // computing_timer(mpi_communicator, pcout,
     //                 TimerOutput::summary, TimerOutput::wall_times)
@@ -66,7 +63,7 @@ namespace Wings
   {
     GridIn<dim> gridin;
     gridin.attach_triangulation(triangulation);
-    std::ifstream f(data.mesh_file.string());
+    std::ifstream f(model.mesh_file.string());
 
     // typename GridIn<dim>::format format = gridin<dim>::ucd;
     // gridin.read(f, format);
@@ -103,34 +100,31 @@ namespace Wings
   template <int dim>
   void WingsPressure<dim>::run()
   {
-    Parsers::Reader reader(pcout, data);
+    Parsers::Reader reader(pcout, model);
     reader.read_input(input_file, /* verbosity= */0);
     read_mesh();
 
     refine_mesh();
     // return;
-    FluidSolvers::SaturationSolver<dim>
-        saturation_solver(mpi_communicator,
-                          pressure_solver.get_dof_handler(),
-                          data, pcout);
+    FluidSolvers::SolverIMPES<dim> fluid_solver(mpi_communicator,
+                                                triangulation,
+                                                model, pcout);
 
-    pressure_solver.setup_dofs();
-    saturation_solver.setup_dofs(pressure_solver.locally_owned_dofs,
-                                 pressure_solver.locally_relevant_dofs);
+    fluid_solver.setup_dofs();
 
-    // auto & well_A = data.wells[0];
-    auto & well_B = data.wells[1];
-    // auto & well_C = data.wells[2];
+    // auto & well_A = model.wells[0];
+    auto & well_B = model.wells[1];
+    // auto & well_C = model.wells[2];
 
-    // const auto & pressure_dof_handler = pressure_solver.get_dof_handler();
-    // const auto & pressure_fe = pressure_solver.get_fe();
-    data.locate_wells(pressure_solver.get_dof_handler());
-    // data.update_well_productivities();
+    // const auto & pressure_dof_handler = fluid_solver.get_dof_handler();
+    // const auto & pressure_fe = fluid_solver.get_fe();
+    model.locate_wells(fluid_solver.get_dof_handler());
+    // model.update_well_productivities();
 
-    // for (auto & id : data.get_well_ids())
+    // for (auto & id : model.get_well_ids())
     // {
     //   std::cout << "well_id " << id << std::endl;
-    //   auto & well = data.wells[id];
+    //   auto & well = model.wells[id];
 
     //   std::cout << "Real locations"  << std::endl;
     //   for (auto & loc : well.get_locations())
@@ -144,12 +138,12 @@ namespace Wings
     // }
 
     // // true values that should be given by solution
-    // // data
-    const double k = data.get_permeability->value(Point<dim>(1,1,1), 1);
-    const double phi = data.get_porosity->value(Point<dim>(1,1,1), 1);
-    // const double mu = data.viscosity_water();
-    // const double B_w = data.volume_factor_water();
-    // const double cw = data.compressibility_water();
+    // // model
+    const double k = model.get_permeability->value(Point<dim>(1,1,1), 1);
+    const double phi = model.get_porosity->value(Point<dim>(1,1,1), 1);
+    // const double mu = model.viscosity_water();
+    // const double B_w = model.volume_factor_water();
+    // const double cw = model.compressibility_water();
     const double mu = 1e-3;
     const double B_w = 1;
     const double cw = 5e-10;
@@ -172,32 +166,28 @@ namespace Wings
 
 
     double time = 1;
-    double time_step = data.min_time_step;
+    double time_step = model.min_time_step;
+
     // some init values
-    pressure_solver.solution = 0;
-    // pressure_solver.solution[0] = 1;
-    pressure_solver.old_solution = pressure_solver.solution;
-    // if (std::find(lo_dofs.begin(), lo_dofs.end(), i) != lo_dofs.end())
-    //     AssertThrow(abs(rhs_vector[i]) < eps,
-    //                 ExcMessage("wrong rhs " + std::to_string(i)));
-
-    // for (unsigned int i=0; i<saturation_solver.solution[0].size(); ++i)
-    // {
-    //   saturation_solver.solution[0][i] =1;
-    // }
-    // saturation_solver.relevant_solution[0] = saturation_solver.solution[0];
+    // pressure
+    fluid_solver.solution = 0;
+    fluid_solver.solution[0] = 1;
+    fluid_solver.pressure_relevant = fluid_solver.solution;
+    // saturation
+    fluid_solver.solution[0] = 1;
+    fluid_solver.saturation_relevant[0] = fluid_solver.solution;
 
 
-    data.update_well_controls(time);
+    model.update_well_controls(time);
 
     FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
-        pressure_function(pressure_solver.get_dof_handler(),
-                          pressure_solver.relevant_solution);
+        pressure_function(fluid_solver.get_dof_handler(),
+                          fluid_solver.pressure_relevant);
     FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
-        saturation_function(pressure_solver.get_dof_handler(),
-                            saturation_solver.relevant_solution);
+        saturation_function(fluid_solver.get_dof_handler(),
+                            fluid_solver.saturation_relevant);
 
-    data.update_well_productivities(pressure_function, saturation_function);
+    model.update_well_productivities(pressure_function, saturation_function);
 
     const auto & j_ind_b = well_B.get_productivities();
 
@@ -222,16 +212,16 @@ namespace Wings
 
 
     CellValues::CellValuesBase<dim>
-      cell_values(data), neighbor_values(data);
-    pressure_solver.assemble_system(cell_values, neighbor_values, time_step,
-                                    saturation_solver.relevant_solution);
+      cell_values(model), neighbor_values(model);
+    fluid_solver.assemble_pressure_system(cell_values, neighbor_values,
+                                          time_step);
 
     // -----------------------------------------------------------------------
     // RHS vector
-    const auto & rhs_vector = pressure_solver.get_rhs_vector();
+    const auto & rhs_vector = fluid_solver.get_rhs_vector();
     double rhs_an;
 
-    // const auto & dfh = pressure_solver.get_dof_handler();
+    // const auto & dfh = fluid_solver.get_dof_handler();
     // typename DoFHandler<dim>::active_cell_iterator
     //     cell = dfh.begin_active();
     // int index = 0;
@@ -245,7 +235,7 @@ namespace Wings
     // indices that should be zero
     // indices 5 should be zero like geometric small value.
     // we compare it with index in cell 8
-    const auto & lo_dofs = pressure_solver.locally_owned_dofs;
+    const auto & lo_dofs = fluid_solver.locally_owned_dofs;
     const double eps = DefaultValues::small_number;
     std::vector<int> is = {1, 2, 3, 4, 14, 15, 17, 18, 19, 20, 21, 22};
     for (const auto &i : is)
@@ -267,7 +257,7 @@ namespace Wings
     // fine cell with  well B
     const double pressure_B = well_B.get_control().value;
     // this guy exhists only in fine cells
-    const double g_vector_entry = data.density_sc_water()/B_w/B_w*data.gravity() *
+    const double g_vector_entry = model.density_sc_water()/B_w/B_w*model.gravity() *
       T_fine_fine * (h/2);
 
     int dof = 16;
@@ -299,7 +289,7 @@ namespace Wings
 
     // -----------------------------------------------------------------------
     // System matrix
-    const auto & system_matrix = pressure_solver.get_system_matrix();
+    const auto & system_matrix = fluid_solver.get_system_matrix();
 
     double A_ii_an;
     // (0, 0)
@@ -338,8 +328,8 @@ namespace Wings
       AssertThrow(abs(system_matrix(dof, dof) - A_ii_an)/A_ii_an < eps,
                   ExcMessage("wrong "+std::to_string(dof)+", "+std::to_string(dof)));
     // -----------------------------------------------------------------------
-    pressure_solver.solve();
-    // const int n_pressure_iter = pressure_solver.solve();
+    fluid_solver.solve_pressure_system();
+    // const int n_pressure_iter = fluid_solver.solve();
     // pcout << "Pressure solver " << n_pressure_iter << " steps" << std::endl;
   } // eom
 

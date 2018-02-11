@@ -49,7 +49,7 @@ namespace CellValues
     virtual double get_rhs_cell_entry(const double time_step,
                                       const double pressure,
                                       const double old_pressure,
-                                      const int phase = 0) const;
+                                      const int /* phase */ = 0) const;
     /* Get a matrix entry corresponding to the cell.
      * should be called once after update_values()
      */
@@ -58,7 +58,7 @@ namespace CellValues
      * should be called once per face after update_face_values()
      */
     virtual double get_rhs_face_entry(const double /* time_step */,
-                                      const int /* phase */) const;
+                                      const int /* phase */ = 0) const;
 
    public:
     const Model::Model<dim> & model;      // reference to the model object

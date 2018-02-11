@@ -21,8 +21,7 @@
 #include <Wellbore.hpp>
 #include <Model.hpp>
 #include <Reader.hpp>
-#include <PressureSolver.hpp>
-#include <SaturationSolver.hpp>
+#include <SolverIMPES.hpp>
 #include <Parsers.hpp>
 #include <CellValues/CellValuesBase.hpp>
 #include <FEFunction/FEFunction.hpp>
@@ -47,7 +46,6 @@ namespace WingTest
     parallel::distributed::Triangulation<dim> triangulation;
     ConditionalOStream                        pcout;
     Model::Model<dim>                         model;
-    FluidSolvers::PressureSolver<dim>         pressure_solver;
     std::string                               input_file;
   };
 
@@ -59,7 +57,6 @@ namespace WingTest
     triangulation(mpi_communicator),
     pcout(std::cout, (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)),
     model(mpi_communicator, pcout),
-    pressure_solver(mpi_communicator, triangulation, model, pcout),
     input_file(input_file_name_)
   {}
 
@@ -85,14 +82,19 @@ namespace WingTest
     // data.print_input();
     read_mesh();
 
-    FluidSolvers::SaturationSolver<dim>
-        saturation_solver(mpi_communicator,
-                          pressure_solver.get_dof_handler(),
-                          model, pcout);
+    // FluidSolvers::PressureSolver<dim>         pressure_solver;
+    // FluidSolvers::SaturationSolver<dim>
+    //     saturation_solver(mpi_communicator,
+    //                       pressure_solver.get_dof_handler(),
+    //                       model, pcout);
 
-    pressure_solver.setup_dofs();
-    saturation_solver.setup_dofs(pressure_solver.locally_owned_dofs,
-                                 pressure_solver.locally_relevant_dofs);
+    FluidSolvers::SolverIMPES<dim> fluid_solver(mpi_communicator,
+                                                triangulation,
+                                                model, pcout);
+    fluid_solver.setup_dofs();
+    // pressure_solver.setup_dofs();
+    // saturation_solver.setup_dofs(pressure_solver.locally_owned_dofs,
+    //                              pressure_solver.locally_relevant_dofs);
 
     auto & well_A = model.wells[0];
     auto & well_B = model.wells[1];
@@ -145,37 +147,36 @@ namespace WingTest
     const double delta = DefaultValues::small_number;
 
     //  What code gives
-    const auto & pressure_dof_handler = pressure_solver.get_dof_handler();
+    const auto & pressure_dof_handler = fluid_solver.get_dof_handler();
     model.locate_wells(pressure_dof_handler);
 
     // some init values
-    pressure_solver.solution = 0;
-    pressure_solver.solution[0] = 1;
-    pressure_solver.old_solution = pressure_solver.solution;
-    for (unsigned int i=0; i<saturation_solver.solution[0].size(); ++i)
-    {
-      saturation_solver.solution[0][i] =1;
-    }
-    saturation_solver.relevant_solution[0] = saturation_solver.solution[0];
-
+    // pressure
+    fluid_solver.solution = 0;
+    fluid_solver.solution[0] = 1;
+    fluid_solver.pressure_relevant = fluid_solver.solution;
+    fluid_solver.pressure_old = fluid_solver.solution;
+    // saturation
+    fluid_solver.solution = 1;
+    fluid_solver.saturation_relevant[0] = fluid_solver.solution;
 
     double time = 0;
     double time_step = model.min_time_step;
 
     FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
-        pressure_function(pressure_solver.get_dof_handler(),
-                          pressure_solver.relevant_solution);
+        pressure_function(fluid_solver.get_dof_handler(),
+                          fluid_solver.pressure_relevant);
     FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
-        saturation_function(pressure_solver.get_dof_handler(),
-                            saturation_solver.relevant_solution);
+        saturation_function(fluid_solver.get_dof_handler(),
+                            fluid_solver.saturation_relevant);
 
     model.update_well_productivities(pressure_function, saturation_function);
     model.update_well_controls(time);
 
     CellValues::CellValuesBase<dim>
       cell_values(model), neighbor_values(model);
-    pressure_solver.assemble_system(cell_values, neighbor_values, time_step,
-                                    saturation_solver.relevant_solution);
+    fluid_solver.assemble_pressure_system(cell_values, neighbor_values,
+                                          time_step);
 
     // for (auto & id : model.get_well_ids())
     // {
@@ -243,7 +244,7 @@ namespace WingTest
                 ExcMessage("Wrong J index well C"));
 
     double A_ij, A_ij_an;
-    const auto & system_matrix = pressure_solver.get_system_matrix();
+    const auto & system_matrix = fluid_solver.get_system_matrix();
 
     // // Testing A(0, 0) - two neighbors
     A_ij = system_matrix(0, 0);
@@ -266,7 +267,7 @@ namespace WingTest
     AssertThrow(abs(A_ij - A_ij_an)/abs(A_ij_an)<1e-9,
                 ExcMessage("System matrix is wrong"));
 
-    const auto & rhs_vector = pressure_solver.get_rhs_vector();
+    const auto & rhs_vector = fluid_solver.get_rhs_vector();
     // rhs_vector.print(std::cout, 3, true, false);
     const double rate_A = - well_A.get_control().value;
     // std::cout << "Rate A = " << rate_A << std::endl;
@@ -274,7 +275,7 @@ namespace WingTest
     AssertThrow(abs(rhs_vector[4] - rate_A)/rate_A<DefaultValues::small_number,
                     ExcMessage("rhs entry 4 is wrong"));
 
-    const double rhs_0 = B/time_step*pressure_solver.solution[0];
+    const double rhs_0 = B/time_step*fluid_solver.pressure_relevant[0];
     AssertThrow(abs(rhs_vector[0] - rhs_0)/rhs_0<DefaultValues::small_number,
                 ExcMessage("rhs entry 0 is wrong"));
 

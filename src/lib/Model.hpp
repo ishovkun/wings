@@ -93,7 +93,7 @@ class Model
   void get_relative_permeability(Vector<double>      &saturation,
                                  std::vector<double> &dst) const;
   int get_well_id(const std::string& well_name) const;
-  std::pair<double,double> get_saturation_limits(const int phase) const;
+  std::pair<double,double> get_saturation_limits(const unsigned int phase) const;
 
   const Interpolation::LookupTable &
   get_pvt_table_water() const {return pvt_table_water;}
@@ -459,7 +459,7 @@ double Model<dim>::residual_saturation_oil() const
 template <int dim>
 inline
 std::pair<double,double>
-Model<dim>::get_saturation_limits(const int phase) const
+Model<dim>::get_saturation_limits(const unsigned int phase) const
 {
   AssertThrow(phase < n_phases(), ExcMessage("Wrong phase index"));
   if (n_phases() == 1)

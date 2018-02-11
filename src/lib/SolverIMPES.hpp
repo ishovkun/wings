@@ -20,7 +20,7 @@
 // Custom modules
 #include <Model.hpp>
 #include <CellValues/CellValuesBase.hpp>
-// #include <CellValues/CellValuesSaturation.hpp>
+#include <CellValues/CellValuesSaturation.hpp>
 #include <ExtraFEData.hpp>
 
 
@@ -42,28 +42,16 @@ class SolverIMPES
   /* setup degrees of freedom for the current triangulation
    * and allocate memory for solution vectors */
   void setup_dofs();
-  /* generic method to assemble finite volume system
-   * it is used in the assembly of pressure system and explicit saturation
-   * solution */
-  void
-  assemble_finite_volume_system(CellValues::CellValuesBase<dim> & cell_values,
-                                CellValues::CellValuesBase<dim> & neighbor_values,
-                                const double                      time_step,
-                                const bool                        assemble_matrix,
-                                TrilinosWrappers::MPI::Vector   & rhs_vector,
-                                const int                         phase);
   // Implicit pressure system: Fill matrix and rhs vector
   void assemble_pressure_system(CellValues::CellValuesBase<dim> & cell_values,
                                 CellValues::CellValuesBase<dim> & neighbor_values,
                                 const double                      time_step);
   /*
-   * solve saturation system explicitly. This method makes use of
-   * assemble_finite_volume_system.
+   * solve saturation system explicitly.
    */
-  void solve_saturation_system(CellValues::CellValuesBase<dim>       & cell_values,
+  void solve_saturation_system(CellValues::CellValuesSaturation<dim> & cell_values,
                                CellValues::CellValuesBase<dim>       & neighbor_values,
-                               const double                            time_step,
-                               const int                               phase);
+                               const double                            time_step);
   /*
    * solve linear system syste_matrix*pressure_solution = rhs_vector
    * returns the number of solver steps
@@ -88,12 +76,12 @@ class SolverIMPES
   TrilinosWrappers::MPI::Vector              rhs_vector;
 
  public:
-  TrilinosWrappers::MPI::Vector              pressure_solution,
-                                             pressure_relevant_solution,
-                                             pressure_old_solution;
-  std::vector<TrilinosWrappers::MPI::Vector> saturation_solution,
-                                             saturation_relevant_solution,
-                                             saturation_old_solution;
+  TrilinosWrappers::MPI::Vector              solution,
+                                             pressure_relevant,
+                                             pressure_old;
+  // std::vector<TrilinosWrappers::MPI::Vector> saturation_solution;
+  std::vector<TrilinosWrappers::MPI::Vector> saturation_relevant,
+                                             saturation_old;
   // partitioning
   IndexSet                      locally_owned_dofs, locally_relevant_dofs;
 };
@@ -112,9 +100,9 @@ SolverIMPES(MPI_Comm                                  &mpi_communicator_,
     fe(0), // since we want finite volumes
     model(model_),
     pcout(pcout_),
-    saturation_solution(model.n_phases()),
-    saturation_relevant_solution(model.n_phases()),
-    saturation_old_solution(model.n_phases() - 1)  // old solution n-1 phases
+    // saturation_solution(model.n_phases()),
+    saturation_relevant(model.n_phases()),
+    saturation_old(model.n_phases() - 1)  // old solution n-1 phases
 {}  // eom
 
 
@@ -144,18 +132,18 @@ void SolverIMPES<dim>::setup_dofs()
     system_matrix.reinit(sparsity_pattern);
   }
   { // vectors
-    pressure_solution.reinit(locally_owned_dofs, mpi_communicator);
-    pressure_old_solution.reinit(locally_relevant_dofs, mpi_communicator);
-    pressure_relevant_solution.reinit(locally_relevant_dofs, mpi_communicator);
+    solution.reinit(locally_owned_dofs, mpi_communicator);
+    pressure_old.reinit(locally_relevant_dofs, mpi_communicator);
+    pressure_relevant.reinit(locally_relevant_dofs, mpi_communicator);
     rhs_vector.reinit(locally_owned_dofs, locally_relevant_dofs,
                       mpi_communicator, /* omit-zeros= */ true);
     for (unsigned int p=0; p<model.n_phases(); ++p)
     {
-      saturation_solution[p].reinit(locally_owned_dofs, mpi_communicator);
-      saturation_relevant_solution[p].reinit(locally_relevant_dofs, mpi_communicator);
+      // saturation_solution[p].reinit(locally_owned_dofs, mpi_communicator);
+      saturation_relevant[p].reinit(locally_relevant_dofs, mpi_communicator);
       // old solution stores only n-1 phases
       if (p < model.n_phases() - 1)
-        saturation_old_solution[p].reinit(locally_relevant_dofs, mpi_communicator);
+        saturation_old[p].reinit(locally_relevant_dofs, mpi_communicator);
     }
   }  // end setup vectors
 } // eom
@@ -165,12 +153,9 @@ void SolverIMPES<dim>::setup_dofs()
 template <int dim>
 void
 SolverIMPES<dim>::
-assemble_finite_volume_system(CellValues::CellValuesBase<dim> & cell_values,
-                              CellValues::CellValuesBase<dim> & neighbor_values,
-                              const double                      time_step,
-                              const bool                        assemble_matrix,
-                              TrilinosWrappers::MPI::Vector   & rhs_vector,
-                              const int                         phase)
+assemble_pressure_system(CellValues::CellValuesBase<dim> & cell_values,
+                         CellValues::CellValuesBase<dim> & neighbor_values,
+                         const double                      time_step)
 {
   // Only one integration point in FVM
   QGauss<dim>   quadrature_formula(1);
@@ -194,14 +179,14 @@ assemble_finite_volume_system(CellValues::CellValuesBase<dim> & cell_values,
       dof_indices_neighbor(dofs_per_cell);
 
   // objects to store local data
-  Tensor<1, dim>                      normal;
-  std::vector<double>                 p_values(quadrature_formula.size()),
-                                      p_old_values(quadrature_formula.size());
+  Tensor<1, dim>       normal;
+  std::vector<double>  p_values(quadrature_formula.size()),
+                       p_old_values(quadrature_formula.size());
   std::vector< std::vector<double> >  s_values(model.n_phases()-1);
   for (auto & c: s_values)
     c.resize(face_quadrature_formula.size());
   // this one stores both saturation values and geomechanics
-  std::vector<double>                 extra_values(model.n_phases() - 1);
+  std::vector<double>  extra_values(model.n_phases() - 1);
 
   const unsigned int q_point = 0;
 
@@ -209,8 +194,7 @@ assemble_finite_volume_system(CellValues::CellValuesBase<dim> & cell_values,
       cell = dof_handler.begin_active(),
       endc = dof_handler.end();
 
-  if (assemble_matrix)
-    system_matrix = 0;
+  system_matrix = 0;
   rhs_vector = 0;
 
   for (; cell!=endc; ++cell)
@@ -218,12 +202,11 @@ assemble_finite_volume_system(CellValues::CellValuesBase<dim> & cell_values,
     if (cell->is_locally_owned())
     {
       fe_values.reinit(cell);
-      fe_values.get_function_values(pressure_old_solution, p_old_values);
-      fe_values.get_function_values(pressure_relevant_solution, p_values);
+      fe_values.get_function_values(pressure_old, p_old_values);
+      fe_values.get_function_values(pressure_relevant, p_values);
       for (unsigned int c=0; c<model.n_phases() - 1; ++c)
       {
-        fe_values.get_function_values(saturation_relevant_solution[c],
-                                      s_values[c]);
+        fe_values.get_function_values(saturation_relevant[c], s_values[c]);
         extra_values[c] = s_values[c][q_point];
       }
 
@@ -234,13 +217,178 @@ assemble_finite_volume_system(CellValues::CellValuesBase<dim> & cell_values,
       cell_values.update(cell, pressure_value, extra_values);
       cell_values.update_wells(cell);
 
+      double matrix_ii = cell_values.get_matrix_cell_entry(time_step);
+      // double rhs_i = cell_values.get_rhs_cell_entry(time_step,
+      //                                               pressure_value_old,
+      //                                               pressure_value);
       double rhs_i = cell_values.get_rhs_cell_entry(time_step,
                                                     pressure_value,
-                                                    pressure_value_old,
-                                                    phase);
-      double matrix_ii = 0;
-      if (assemble_matrix)
-        matrix_ii = cell_values.get_matrix_cell_entry(time_step);
+                                                    pressure_value_old);
+
+      cell->get_dof_indices(dof_indices);
+      const unsigned int i = dof_indices[q_point];
+      for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
+      {
+        if (cell->at_boundary(f) == false)
+        {
+          if((cell->neighbor(f)->level() == cell->level() &&
+              cell->neighbor(f)->has_children() == false) ||
+             cell->neighbor_is_coarser(f))
+          {
+            const auto & neighbor = cell->neighbor(f);
+            fe_values.reinit(neighbor);
+            fe_face_values.reinit(cell, f);
+
+            fe_values.get_function_values(pressure_relevant, p_values);
+            for (unsigned int c=0; c<model.n_phases() - 1; ++c)
+            {
+              fe_values.get_function_values(saturation_relevant[c], s_values[c]);
+              extra_values[c] = s_values[c][q_point];
+            }
+            const double p_neighbor = p_values[q_point];
+
+            normal = fe_face_values.normal_vector(q_point);
+            const double dS = cell->face(f)->measure();  // face area
+
+            // assemble local matrix and distribute
+            neighbor_values.update(neighbor, p_neighbor, extra_values);
+            cell_values.update_face_values(neighbor_values, normal, dS);
+
+            // distribute
+            neighbor->get_dof_indices(dof_indices_neighbor);
+            const unsigned int j = dof_indices_neighbor[q_point];
+            const double face_entry = cell_values.get_matrix_face_entry();
+            matrix_ii += face_entry;
+            rhs_i += cell_values.get_rhs_face_entry(time_step);
+            system_matrix.add(i, j, -face_entry);
+          }
+          else if ((cell->neighbor(f)->level() == cell->level()) &&
+                   (cell->neighbor(f)->has_children() == true))
+          {
+            for (unsigned int subface=0;
+                 subface<cell->face(f)->n_children(); ++subface)
+            {
+              // compute parameters
+              const auto & neighbor
+                  = cell->neighbor_child_on_subface(f, subface);
+
+              fe_values.reinit(neighbor);
+              fe_subface_values.reinit(cell, f, subface);
+
+              fe_values.get_function_values(pressure_relevant, p_values);
+              for (unsigned int c=0; c<model.n_phases() - 1; ++c)
+              {
+                fe_values.get_function_values(saturation_relevant[c], s_values[c]);
+                extra_values[c] = s_values[c][0];
+              }
+
+              const double p_neighbor = p_values[q_point];
+              normal = fe_subface_values.normal_vector(q_point);
+              const double dS = fe_subface_values.JxW(q_point);
+
+              // update neighbor
+              neighbor_values.update(neighbor, p_neighbor, extra_values);
+              // update face values
+              cell_values.update_face_values(neighbor_values, normal, dS);
+
+              // distribute
+              neighbor->get_dof_indices(dof_indices_neighbor);
+              const unsigned int j = dof_indices_neighbor[q_point];
+              const double face_entry = cell_values.get_matrix_face_entry();
+              matrix_ii += face_entry;
+              rhs_i += cell_values.get_rhs_face_entry(time_step);
+              system_matrix.add(i, j, -face_entry);
+            }
+          } // end case neighbor is finer
+
+        } // end if face not at boundary
+      }  // end face loop
+
+      system_matrix.add(i, i, matrix_ii);
+      rhs_vector[i] += rhs_i;
+    } // end local cells
+  } // end cells loop
+  system_matrix.compress(VectorOperation::add);
+  rhs_vector.compress(VectorOperation::add);
+}  // eom
+
+
+
+template <int dim>
+void
+SolverIMPES<dim>::
+solve_saturation_system(CellValues::CellValuesSaturation<dim> & cell_values,
+                        CellValues::CellValuesBase<dim>       & neighbor_values,
+                        const double                            time_step)
+{
+  // Only one integration point in FVM
+  QGauss<dim>       quadrature_formula(1);
+  QGauss<dim-1>     face_quadrature_formula(1);
+
+  const auto & fe = dof_handler.get_fe();
+  FEValues<dim> fe_values(fe, quadrature_formula, update_values);
+  FEValues<dim> fe_values_neighbor(fe, quadrature_formula, update_values);
+
+  // the following two objects only get geometry data
+  FEFaceValues<dim> fe_face_values(fe, face_quadrature_formula,
+                                   update_normal_vectors);
+  // We need JxW flag for subfaces since there is no
+  // method to determine sub face area in triangulation class
+  FESubfaceValues<dim> fe_subface_values(fe, face_quadrature_formula,
+                                         update_normal_vectors |
+                                         update_JxW_values);
+
+  const unsigned int dofs_per_cell = fe.dofs_per_cell;
+  std::vector<types::global_dof_index>
+      dof_indices(dofs_per_cell),
+      dof_indices_neighbor(dofs_per_cell);
+
+  // objects to store local data
+  Tensor<1, dim>       normal;
+  std::vector<double>  p_values(quadrature_formula.size()),
+                       p_old_values(quadrature_formula.size());
+
+  std::vector< std::vector<double> >  s_values(model.n_phases()-1);
+  for (auto & c: s_values)
+    c.resize(face_quadrature_formula.size());
+
+  std::vector<double>  extra_values(model.n_phases() - 1);
+
+  const double So_rw = model.residual_saturation_oil();
+  const double Sw_crit = model.residual_saturation_water();
+  const unsigned int q_point = 0;
+
+  typename DoFHandler<dim>::active_cell_iterator
+      cell = dof_handler.begin_active(),
+      endc = dof_handler.end();
+
+  for (; cell!=endc; ++cell)
+    if (cell->is_locally_owned())
+    {
+      fe_values.reinit(cell);
+      fe_values.get_function_values(pressure_old, p_old_values);
+      fe_values.get_function_values(pressure_relevant, p_values);
+      for (unsigned int c=0; c<model.n_phases() - 1; ++c)
+      {
+        fe_values.get_function_values(saturation_relevant[c], s_values[c]);
+        extra_values[c] = s_values[c][0];
+      }
+
+      const double p_old = p_old_values[q_point];
+      const double p = p_values[q_point];
+      const double Sw_old = extra_values[q_point];
+
+      // std::cout << "value1 c1w = " << cell_values.c1p << std::endl;
+      // std::cout << "value1 c1p = " << cell_values.c1w << std::endl;
+      cell_values.update(cell, p, extra_values);
+      // std::cout << "value2 c1p = " << cell_values.c1p << std::endl;
+      // std::cout << "value2 c1w = " << cell_values.c1w << std::endl;
+      // std::cout << "value2 c1p/c1w = " << cell_values.c1p / cell_values.c1w << std::endl;
+      // std::cout << "value_weird c1p/c1w = " << cell_values.get_B(0) << std::endl;
+      cell_values.update_wells(cell, p);
+
+      double solution_increment =
+          cell_values.get_rhs_cell_entry(time_step, p, p_old, 0);
 
       cell->get_dof_indices(dof_indices);
       const unsigned int i = dof_indices[q_point];
@@ -257,13 +405,13 @@ assemble_finite_volume_system(CellValues::CellValuesBase<dim> & cell_values,
             fe_values.reinit(neighbor);
             fe_face_values.reinit(cell, f);
 
-            fe_values.get_function_values(pressure_relevant_solution, p_values);
+            fe_values.get_function_values(pressure_relevant, p_values);
             for (unsigned int c=0; c<model.n_phases() - 1; ++c)
             {
-              fe_values.get_function_values(saturation_relevant_solution[c],
-                                            s_values[c]);
+              fe_values.get_function_values(saturation_relevant[c], s_values[c]);
               extra_values[c] = s_values[c][q_point];
             }
+
             const double p_neighbor = p_values[q_point];
 
             normal = fe_face_values.normal_vector(q_point);
@@ -273,17 +421,10 @@ assemble_finite_volume_system(CellValues::CellValuesBase<dim> & cell_values,
             neighbor_values.update(neighbor, p_neighbor, extra_values);
             cell_values.update_face_values(neighbor_values, normal, dS);
 
-            // distribute
-            rhs_i += cell_values.get_rhs_face_entry(time_step, phase);
-            if (assemble_matrix)
-            {
-              neighbor->get_dof_indices(dof_indices_neighbor);
-              const unsigned int j = dof_indices_neighbor[q_point];
-              const double face_entry = cell_values.get_matrix_face_entry();
-              matrix_ii += face_entry;
-              system_matrix.add(i, j, -face_entry);
-            }
-          } // end case neighbor coarser or same
+            solution_increment += cell_values.get_rhs_face_entry(time_step, 0);
+
+          }
+          // case neighbor finer
           else if ((cell->neighbor(f)->level() == cell->level()) &&
                    (cell->neighbor(f)->has_children() == true))
           {
@@ -297,109 +438,43 @@ assemble_finite_volume_system(CellValues::CellValuesBase<dim> & cell_values,
               fe_values.reinit(neighbor);
               fe_subface_values.reinit(cell, f, subface);
 
-              fe_values.get_function_values(pressure_relevant_solution, p_values);
-              for (unsigned int c=0; c<model.n_phases() - 1; ++c)
-              {
-                fe_values.get_function_values(saturation_relevant_solution[c],
-                                              s_values[c]);
-                extra_values[c] = s_values[c][0];
-              }
-
+              fe_values.get_function_values(pressure_relevant, p_values);
               const double p_neighbor = p_values[q_point];
-              normal = fe_subface_values.normal_vector(q_point);
+              for (unsigned int c=0; c<model.n_phases()-1; ++c)
+                fe_values.get_function_values(saturation_relevant[c], s_values[c]);
+
+              normal = fe_subface_values.normal_vector(q_point); // 0 is gauss point
               const double dS = fe_subface_values.JxW(q_point);
 
               // update neighbor
               neighbor_values.update(neighbor, p_neighbor, extra_values);
+
               // update face values
               cell_values.update_face_values(neighbor_values, normal, dS);
 
               // distribute
-              rhs_i += cell_values.get_rhs_face_entry(time_step, phase);
-              if (assemble_matrix)
-              {
-                const double face_entry = cell_values.get_matrix_face_entry();
-                matrix_ii += face_entry;
-                neighbor->get_dof_indices(dof_indices_neighbor);
-                const unsigned int j = dof_indices_neighbor[q_point];
-                system_matrix.add(i, j, -face_entry);
-              }
-            } // end subface loop
+              solution_increment += cell_values.get_rhs_face_entry(time_step, 0);
+            }
           } // end case neighbor is finer
 
         } // end if face not at boundary
       }  // end face loop
 
-      if (assemble_matrix)
-        system_matrix.add(i, i, matrix_ii);
-      rhs_vector[i] += rhs_i;
+      // assert that we are in bounds
+      if (Sw_old + solution_increment > (1.0 - So_rw))
+        solution_increment = (1.0 - So_rw) - Sw_old;
+      else if (Sw_old + solution_increment < Sw_crit)
+        solution_increment = Sw_crit - Sw_old;
 
-    } // end local cells
-  } // end cells loop
+      solution[i] = Sw_old + solution_increment;
+      // solution[0][i] = Sw_old + solution_increment;
+      // solution[1][i] = 1.0 - (Sw_old + solution_increment);
+    } // end cells loop
 
-  if (assemble_matrix)
-    system_matrix.compress(VectorOperation::add);
-  rhs_vector.compress(VectorOperation::add);
+  // solution[0].compress(VectorOperation::insert);
+  // solution[1].compress(VectorOperation::insert);
+  solution.compress(VectorOperation::insert);
 } // eom
-
-
-
-template <int dim>
-void
-SolverIMPES<dim>::
-assemble_pressure_system(CellValues::CellValuesBase<dim> & cell_values,
-                         CellValues::CellValuesBase<dim> & neighbor_values,
-                         const double                      time_step)
-{
-  assemble_finite_volume_system(cell_values, neighbor_values,
-                                time_step, /* assemble_matrix = */ true,
-                                rhs_vector, /* phase = */ 0);
-} // eom
-
-
-
-template <int dim>
-void
-SolverIMPES<dim>::
-solve_saturation_system(CellValues::CellValuesBase<dim> & cell_values,
-                        CellValues::CellValuesBase<dim> & neighbor_values,
-                        const double                      time_step,
-                        const int                         phase)
-{
-  assemble_finite_volume_system(cell_values, neighbor_values,
-                                time_step, /* assemble_matrix = */ false,
-                                rhs_vector, phase);
-
-  const unsigned int dofs_per_cell = fe.dofs_per_cell;
-  std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
-  const int q_point = 0;
-
-  std::pair<double,double> saturation_limits =
-      model.get_saturation_limits(phase);
-
-  typename DoFHandler<dim>::active_cell_iterator
-      cell = dof_handler.begin_active(),
-      endc = dof_handler.end();
-
-  for (; cell!=endc; ++cell)
-    if (cell->is_locally_owned)
-    {
-      cell->get_dof_indices(dof_indices);
-      const unsigned int i = dof_indices[q_point];
-      const double old_saturation = saturation_relevant_solution[phase][i];
-      double increment = rhs_vector[i];
-      if (old_saturation + increment > saturation_limits.second)
-        increment = saturation_limits.second - old_saturation;
-      else if (old_saturation + increment < saturation_limits.first)
-        increment = saturation_limits.first - old_saturation;
-
-      saturation_relevant_solution[phase][i] =
-          old_saturation + increment;
-    }
-
-  saturation_solution[phase].compress(VectorOperation::insert);
-}  // eom
-
 
 
 template <int dim>
@@ -418,8 +493,7 @@ SolverIMPES<dim>::solve_pressure_system()
     TrilinosWrappers::PreconditionAMG::AdditionalData additional_data_amg;
     TrilinosWrappers::PreconditionAMG preconditioner;
     preconditioner.initialize(system_matrix, additional_data_amg);
-    // solver.solve(system_matrix, solution, rhs_vector, preconditioner);
-    solver.solve(system_matrix, pressure_solution, rhs_vector, preconditioner);
+    solver.solve(system_matrix, solution, rhs_vector, preconditioner);
   }
 
   // { // direct solver
@@ -430,186 +504,6 @@ SolverIMPES<dim>::solve_pressure_system()
 
   return solver_control.last_step();
 } // eom
-
-
-
-// template <int dim>
-// void
-// SolverIMPES<dim>::
-// solve_saturation_system(CellValues::CellValuesBase<dim> & cell_values,
-//                         CellValues::CellValuesBase<dim> & neighbor_values,
-//                         const double                      time_step)
-// {
-//   // Only one integration point in FVM
-//   QGauss<dim>   quadrature_formula(1);
-//   QGauss<dim-1> face_quadrature_formula(1);
-
-//   FEValues<dim> fe_values(fe, quadrature_formula, update_values);
-//   FEValues<dim> fe_values_neighbor(fe, quadrature_formula, update_values);
-
-//   // the following two objects only get geometry data
-//   FEFaceValues<dim> fe_face_values(fe, face_quadrature_formula,
-//                                    update_normal_vectors);
-//   // We need JxW flag for subfaces since there is no
-//   // method to determine sub face area in triangulation class
-//   FESubfaceValues<dim> fe_subface_values(fe, face_quadrature_formula,
-//                                          update_normal_vectors |
-//                                          update_JxW_values);
-
-//   const unsigned int dofs_per_cell = fe.dofs_per_cell;
-//   std::vector<types::global_dof_index>
-//       dof_indices(dofs_per_cell),
-//       dof_indices_neighbor(dofs_per_cell);
-
-//   // objects to store local data
-//   Tensor<1, dim>       normal;
-//   std::vector<double>  p_values(quadrature_formula.size()),
-//                        p_old_values(quadrature_formula.size());
-
-//   std::vector< std::vector<double> >  s_values(model.n_phases()-1);
-//   for (auto & c: s_values)
-//     c.resize(face_quadrature_formula.size());
-
-//   std::vector<double>  extra_values(model.n_phases() - 1);
-
-//   const double So_rw = model.residual_saturation_oil();
-//   const double Sw_crit = model.residual_saturation_water();
-//   const unsigned int q_point = 0;
-
-//   typename DoFHandler<dim>::active_cell_iterator
-//       cell = dof_handler.begin_active(),
-//       endc = dof_handler.end();
-
-//   for (; cell!=endc; ++cell)
-//     if (cell->is_locally_owned())
-//     {
-//       fe_values.reinit(cell);
-//       fe_values.get_function_values(old_pressure_solution, p_old_values);
-//       fe_values.get_function_values(pressure_solution, p_values);
-//       for (unsigned int c=0; c<model.n_phases() - 1; ++c)
-//       {
-//         fe_values.get_function_values(relevant_solution[c], s_values[c]);
-//         extra_values[c] = s_values[c][0];
-//       }
-
-//       const double p_old = p_old_values[q_point];
-//       const double p = p_values[q_point];
-//       const double Sw_old = extra_values[q_point];
-
-//       // std::cout << "value1 c1w = " << cell_values.c1p << std::endl;
-//       // std::cout << "value1 c1p = " << cell_values.c1w << std::endl;
-//       cell_values.update(cell, p, extra_values);
-//       // std::cout << "value2 c1p = " << cell_values.c1p << std::endl;
-//       // std::cout << "value2 c1w = " << cell_values.c1w << std::endl;
-//       // std::cout << "value2 c1p/c1w = " << cell_values.c1p / cell_values.c1w << std::endl;
-//       // std::cout << "value_weird c1p/c1w = " << cell_values.get_B(0) << std::endl;
-//       cell_values.update_wells(cell, p);
-
-//       double solution_increment =
-//           cell_values.get_rhs_cell_entry(time_step, p, p_old, 0);
-
-//       cell->get_dof_indices(dof_indices);
-//       const unsigned int i = dof_indices[q_point];
-
-//       for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
-//       {
-//         if (cell->at_boundary(f) == false)
-//         {
-//           if((cell->neighbor(f)->level() == cell->level() &&
-//               cell->neighbor(f)->has_children() == false) ||
-//              cell->neighbor_is_coarser(f))
-//           {
-//             const auto & neighbor = cell->neighbor(f);
-//             fe_values.reinit(neighbor);
-//             fe_face_values.reinit(cell, f);
-
-//             fe_values.get_function_values(pressure_solution, p_values);
-//             for (unsigned int c=0; c<model.n_phases() - 1; ++c)
-//             {
-//               fe_values.get_function_values(relevant_solution[c], s_values[c]);
-//               extra_values[c] = s_values[c][q_point];
-//             }
-//             const double p_neighbor = p_values[q_point];
-
-//             normal = fe_face_values.normal_vector(q_point);
-//             const double dS = cell->face(f)->measure();  // face area
-
-//             // assemble local matrix and distribute
-//             neighbor_values.update(neighbor, p_neighbor, extra_values);
-//             cell_values.update_face_values(neighbor_values, normal, dS);
-
-//             solution_increment += cell_values.get_rhs_face_entry(time_step, 0);
-//           }
-//           else if ((cell->neighbor(f)->level() == cell->level()) &&
-//                    (cell->neighbor(f)->has_children() == true))
-//           {
-//             for (unsigned int subface=0;
-//                  subface<cell->face(f)->n_children(); ++subface)
-//             {
-//               // compute parameters
-//               const auto & neighbor
-//                   = cell->neighbor_child_on_subface(f, subface);
-
-//               fe_values.reinit(neighbor);
-//               fe_subface_values.reinit(cell, f, subface);
-
-//               fe_values.get_function_values(pressure_solution, p_values);
-//               const double p_neighbor = p_values[q_point];
-//               for (unsigned int c=0; c<model.n_phases()-1; ++c)
-//                 fe_values.get_function_values(relevant_solution[c], s_values[c]);
-
-//               normal = fe_subface_values.normal_vector(q_point); // 0 is gauss point
-//               const double dS = fe_subface_values.JxW(q_point);
-
-//               // update neighbor
-//               neighbor_values.update(neighbor, p_neighbor, extra_values);
-
-//               // update face values
-//               cell_values.update_face_values(neighbor_values, normal, dS);
-
-//               // distribute
-//               solution_increment += cell_values.get_rhs_face_entry(time_step, 0);
-//               // solution_increment +=
-//               //     time_step *
-//               //     (
-//               //         cell_values.get_T_face(0)
-//               //         -
-//               //         cell_values.get_G_face(0)
-//               //      )
-//               //     ;
-//             }
-//           } // end case neighbor is finer
-
-//         } // end if face not at boundary
-//       }  // end face loop
-
-//       // assert that we are in bounds
-//       if (Sw_old + solution_increment > (1.0 - So_rw))
-//         solution_increment = (1.0 - So_rw) - Sw_old;
-//       else if (Sw_old + solution_increment < Sw_crit)
-//         solution_increment = Sw_crit - Sw_old;
-
-//       // if (i == 0)
-//       // {
-//       //   pcout << "\nSATURATION"<< std::endl;
-//       //   pcout << "dp = "<< p - p_old << std::endl;
-//       //   pcout << "dSw = " << solution_increment << std::endl;
-//       //   pcout << "Qw = " << time_step*cell_values.get_Q(0) << std::endl;
-//       //   pcout << "Tw = " << cell_values.get_T_face(0) << std::endl;
-//       //   pcout << "C1P/C1W = " << cell_values.get_B(0)
-//       //         << std::endl;
-
-//       //   pcout << std::endl;
-//       // }
-//       solution[0][i] = Sw_old + solution_increment;
-//       solution[1][i] = 1.0 - (Sw_old + solution_increment);
-//     } // end cells loop
-
-//   // solution[0].compress(VectorOperation::add);
-//   // solution[1].compress(VectorOperation::add);
-//   solution[0].compress(VectorOperation::insert);
-//   solution[1].compress(VectorOperation::insert);
-// }  // eom
 
 
 

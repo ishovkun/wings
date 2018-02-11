@@ -246,7 +246,6 @@ solve(CellValues::CellValuesSaturation<dim> &cell_values,
 
               // update neighbor
               neighbor_values.update(neighbor, p_neighbor, extra_values);
-
               // update face values
               cell_values.update_face_values(neighbor_values, normal, dS);
 

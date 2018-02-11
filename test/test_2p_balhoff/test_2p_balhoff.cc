@@ -10,10 +10,10 @@
 #include <Reader.hpp>
 
 // #include <Wellbore.hpp>
-#include <PressureSolver.hpp>
-#include <SaturationSolver.hpp>
+#include <SolverIMPES.hpp>
 #include <FEFunction/FEFunction.hpp>
 // #include <FEFunction/FEFunctionPVT.hpp>
+#include <CellValues/CellValuesSaturation.hpp>
 
 namespace Wings
 {
@@ -36,7 +36,6 @@ namespace Wings
     parallel::distributed::Triangulation<dim> triangulation;
     ConditionalOStream                        pcout;
     Model::Model<dim>                         model;
-    FluidSolvers::PressureSolver<dim>         pressure_solver;
     std::string                               input_file;
     // TimerOutput                               computing_timer;
   };
@@ -49,7 +48,6 @@ namespace Wings
     triangulation(mpi_communicator),
     pcout(std::cout, (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)),
     model(mpi_communicator, pcout),
-    pressure_solver(mpi_communicator, triangulation, model, pcout),
     input_file(input_file_name_)
     // ,computing_timer(mpi_communicator, pcout,
     //                 TimerOutput::summary, TimerOutput::wall_times)
@@ -105,28 +103,21 @@ namespace Wings
     read_mesh();
     // refine_mesh();
 
-    FluidSolvers::SaturationSolver<dim>
-        saturation_solver(mpi_communicator,
-                          pressure_solver.get_dof_handler(),
-                          model, pcout);
-
-
-    pressure_solver.setup_dofs();
-    // if multiphase
-    saturation_solver.setup_dofs(pressure_solver.locally_owned_dofs,
-                                 pressure_solver.locally_relevant_dofs);
-
+    FluidSolvers::SolverIMPES<dim> fluid_solver(mpi_communicator,
+                                                triangulation,
+                                                model, pcout);
+    fluid_solver.setup_dofs();
 
     // initial values
-    for (unsigned int i=0; i<saturation_solver.solution[0].size(); ++i)
-    {
-      saturation_solver.solution[0][i] =0.2;
-      pressure_solver.solution = 6894760;
-    }
-    saturation_solver.relevant_solution[0] = saturation_solver.solution[0];
-    pressure_solver.relevant_solution = pressure_solver.solution;
-    pressure_solver.old_solution = pressure_solver.solution;
+    fluid_solver.solution = 0.2;
+    fluid_solver.saturation_relevant[0] = fluid_solver.solution;
+    fluid_solver.saturation_old[0] = fluid_solver.solution;
+    fluid_solver.solution = 0.8;
+    fluid_solver.saturation_relevant[1] = fluid_solver.solution;
 
+    fluid_solver.solution = 6894760;
+    fluid_solver.pressure_relevant = fluid_solver.solution;
+    fluid_solver.pressure_old = fluid_solver.solution;
 
     // double time = 1;
 
@@ -136,39 +127,17 @@ namespace Wings
 
     CellValues::CellValuesBase<dim> cell_values_pressure(model),
                                     neighbor_values_pressure(model);
-    // pointer to cell values that are gonna be used
-    CellValues::CellValuesBase<dim>* p_cell_values = &cell_values_pressure;
-    CellValues::CellValuesBase<dim>* p_neighbor_values = &neighbor_values_pressure;
-    // CellValues::CellValuesBase<dim>* p_cell_values = NULL;
-    // CellValues::CellValuesBase<dim>* p_neighbor_values = NULL;
-    // if (model.fluid_model == Model::FluidModelType::Liquid)
-    // {
-    //   p_cell_values = &cell_values_sf;
-    //   p_neighbor_values = &neighbor_values_sf;
-    // }
-    // else
-    // {
 
-    //   p_cell_values = &cell_values_mp;
-    //   p_neighbor_values = &neighbor_values_mp;
-    // }
-
-    model.locate_wells(pressure_solver.get_dof_handler());
+    model.locate_wells(fluid_solver.get_dof_handler());
     // std::vector<TrilinosWrappers::MPI::Vector*> saturation_solution =
     //     {&satura};
 
     FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
-        saturation_function(pressure_solver.get_dof_handler(),
-                            saturation_solver.relevant_solution);
-    // {// test saturation values
-    //   Vector<double> tmp(2);
-    //   saturation_function.vector_value(Point<dim>{0,0,0}, tmp);
-    //   // pcout << "Sw " << tmp[0] << std::endl;
-    // }
-
+        pressure_function(fluid_solver.get_dof_handler(),
+                          fluid_solver.pressure_relevant);
     FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
-        pressure_function(pressure_solver.get_dof_handler(),
-                          pressure_solver.relevant_solution);
+        saturation_function(fluid_solver.get_dof_handler(),
+                            fluid_solver.saturation_relevant);
 
     const double p = 6894760;
     // test pvt
@@ -205,9 +174,9 @@ namespace Wings
 
     model.update_well_productivities(pressure_function, saturation_function);
 
-    pressure_solver.assemble_system(*p_cell_values, *p_neighbor_values,
-                                    time_step,
-                                    saturation_solver.relevant_solution);
+    fluid_solver.assemble_pressure_system(cell_values_pressure,
+                                          neighbor_values_pressure,
+                                          time_step);
 
     // for (auto & id : model.get_well_ids())
     // {
@@ -226,7 +195,7 @@ namespace Wings
     // }
 
 
-    const auto & system_matrix = pressure_solver.get_system_matrix();
+    const auto & system_matrix = fluid_solver.get_system_matrix();
     // system_matrix.print(std::cout, true);
 
     const double ft = model.units.length();
@@ -248,6 +217,7 @@ namespace Wings
     int dof = 0;
     // double dof1 = 0 , dof2 = 0;
 
+    // MATRIX
     // a11
     dof = 0;
     a = D_entry + Tx + Ty;
@@ -310,12 +280,12 @@ namespace Wings
                            ", "+std::to_string(dof)+")"));
 
     // RHS VECTOR
-    const auto & rhs_vector = pressure_solver.get_rhs_vector();
+    const auto & rhs_vector = fluid_solver.get_rhs_vector();
     // system_matrix.print(std::cout, true);
     // rhs_vector.print(std::cout, 3, true, false);
 
     dof = 0;
-    a = D_entry*pressure_solver.old_solution[dof] + Q1;
+    a = D_entry*fluid_solver.pressure_old[dof] + Q1;
     m = rhs_vector(dof);
     if (Math::relative_difference(m,a) > tol)
     {
@@ -326,17 +296,17 @@ namespace Wings
     AssertThrow(Math::relative_difference(m, a) < tol,
                 ExcMessage("Wrong entry in b("+std::to_string(dof) + ")"));
     dof = 1;
-    a = D_entry*pressure_solver.old_solution[dof];
+    a = D_entry*fluid_solver.pressure_old[dof];
     m = rhs_vector(dof);
     AssertThrow(Math::relative_difference(m, a) < tol,
                 ExcMessage("Wrong entry in b("+std::to_string(dof) + ")"));
     dof = 4;
-    a = D_entry*pressure_solver.old_solution[dof] + Q2;
+    a = D_entry*fluid_solver.pressure_old[dof] + Q2;
     m = rhs_vector(dof);
     AssertThrow(Math::relative_difference(m, a) < tol,
                 ExcMessage("Wrong entry in b("+std::to_string(dof) + ")"));
     dof = 8;
-    a = D_entry*pressure_solver.old_solution[dof] + Q8;
+    a = D_entry*fluid_solver.pressure_old[dof] + Q8;
     // a = Q8;
     m = rhs_vector(dof);
     // std::cout << "b_an(" << dof<< ") = " << a << std::endl;;
@@ -345,25 +315,34 @@ namespace Wings
     AssertThrow(Math::relative_difference(m, a) < tol,
                 ExcMessage("Wrong entry in b("+std::to_string(dof) + ")"));
 
-    pressure_solver.solve();
-    pressure_solver.relevant_solution = pressure_solver.solution;
+    fluid_solver.solve_pressure_system();
+    fluid_solver.pressure_relevant = fluid_solver.solution;
 
 
     CellValues::CellValuesSaturation<dim> cell_values_saturation(model);
 
     if (model.fluid_model != Model::FluidModelType::Liquid)
     {
-      saturation_solver.solve(cell_values_saturation,
-                              neighbor_values_pressure,
-                              time_step,
-                              pressure_solver.relevant_solution,
-                              pressure_solver.old_solution);
-      saturation_solver.relevant_solution[0] = saturation_solver.solution[0];
-      saturation_solver.relevant_solution[1] = saturation_solver.solution[1];
+      // saturation_solver.solve(cell_values_saturation,
+      //                         neighbor_values_pressure,
+      //                         time_step,
+      //                         fluid_solver.relevant_solution,
+      //                         fluid_solver.old_solution);
+      fluid_solver.solve_saturation_system(cell_values_saturation,
+                                           neighbor_values_pressure, time_step);
+      // fluid_solver.saturation_relevant_solution[0] =
+      //     fluid_solver.solution;
+      // fluid_solver.saturation_relevant_solution[1] =
+      //     fluid_solver.saturation_solution[1];
+      fluid_solver.saturation_relevant[0] = fluid_solver.solution;
+      fluid_solver.saturation_old[0] = fluid_solver.solution;
+      fluid_solver.saturation_relevant[1] = 1.0;
+      fluid_solver.saturation_relevant[1] -= fluid_solver.solution;
+      //     fluid_solver.saturation_solution[1];
     }
 
     // test pressure solution
-    // pressure_solver.solution.print(std::cout, 3, true, false);
+    // fluid_solver.solution.print(std::cout, 3, true, false);
 
     //                          0     3   6     1    4    7   2    5    8
     // P_an_balhoff = {984, 990, 972, 990, 993, 958, 991, 984, 921};
@@ -375,14 +354,15 @@ namespace Wings
     for (int dof =0; dof<9; ++dof)
     {
       a = P_an[dof];
-      m = pressure_solver.solution(dof);
+      m = fluid_solver.pressure_relevant(dof);
       if (Math::relative_difference(m, a) > tol)
       {
-        std::cout << "b_an(" << dof<< ") = " << a << std::endl;;
-        std::cout << "b(" << dof<< ") = " << m << std::endl;;
+        std::cout << "first time step pressure solution" << std::endl;
+        std::cout << "P_an(" << dof<< ") = " << a << std::endl;;
+        std::cout << "P_num(" << dof<< ") = " << m << std::endl;;
       }
       AssertThrow(Math::relative_difference(m, a) < tol,
-                  ExcMessage("Wrong entry in b("+std::to_string(dof) + ")"));
+                  ExcMessage("Wrong entry in P("+std::to_string(dof) + ")"));
     }
 
     // check saturation solution
@@ -391,37 +371,33 @@ namespace Wings
     for (int dof =0; dof<9; ++dof)
     {
       a = S_an[dof];
-      m = saturation_solver.solution[0](dof);
+      m = fluid_solver.saturation_relevant[0](dof);
       if (Math::relative_difference(m, a) > tol)
       {
-        std::cout << "b_an(" << dof<< ") = " << a << std::endl;;
-        std::cout << "b(" << dof<< ") = " << m << std::endl;;
+        std::cout << "first time step saturation solution" << std::endl;
+        std::cout << "S_an(" << dof<< ") = " << a << std::endl;;
+        std::cout << "S_num(" << dof<< ") = " << m << std::endl;;
       }
       AssertThrow(Math::relative_difference(m, a) < tol,
-                  ExcMessage("Wrong entry in b("+std::to_string(dof) + ")"));
+                  ExcMessage("Wrong entry in Sw("+std::to_string(dof) + ")"));
     }
 
 
     // Second time step
     model.update_well_productivities(pressure_function, saturation_function);
 
-    pressure_solver.old_solution = pressure_solver.solution;
-    pressure_solver.assemble_system(*p_cell_values, *p_neighbor_values,
-                                    time_step,
-                                    saturation_solver.relevant_solution);
+    fluid_solver.pressure_old = fluid_solver.pressure_relevant;
+    fluid_solver.assemble_pressure_system(cell_values_pressure,
+                                          neighbor_values_pressure,
+                                          time_step);
 
-    pressure_solver.solve();
-    pressure_solver.relevant_solution = pressure_solver.solution;
-    if (model.fluid_model != Model::FluidModelType::Liquid)
-    {
-      saturation_solver.solve(cell_values_saturation,
-                              neighbor_values_pressure,
-                              time_step,
-                              pressure_solver.relevant_solution,
-                              pressure_solver.old_solution);
-      saturation_solver.relevant_solution[0] = saturation_solver.solution[0];
-      saturation_solver.relevant_solution[1] = saturation_solver.solution[1];
-    }
+    fluid_solver.solve_pressure_system();
+    fluid_solver.pressure_relevant = fluid_solver.solution;
+
+    fluid_solver.solve_saturation_system(cell_values_saturation,
+                                         neighbor_values_pressure, time_step);
+    fluid_solver.saturation_relevant[0] =
+        fluid_solver.solution;
 
     // new part
     const double D2_0 = 307.8380*ft*ft*ft/psi/day;
@@ -465,14 +441,15 @@ namespace Wings
     for (int dof =0; dof<9; ++dof)
     {
       a = P_an[dof];
-      m = pressure_solver.solution(dof);
+      m = fluid_solver.pressure_relevant(dof);
       if (Math::relative_difference(m, a) > tol)
       {
-        std::cout << "b_an(" << dof<< ") = " << a << std::endl;;
-        std::cout << "b(" << dof<< ") = " << m << std::endl;;
+        std::cout << "Second time step pressure" << std::endl;
+        std::cout << "P_an(" << dof<< ") = " << a << std::endl;;
+        std::cout << "P_num(" << dof<< ") = " << m << std::endl;;
       }
       AssertThrow(Math::relative_difference(m, a) < tol,
-                  ExcMessage("Wrong entry in b("+std::to_string(dof) + ")"));
+                  ExcMessage("Wrong entry in P("+std::to_string(dof) + ")"));
     }
 
 
@@ -485,14 +462,15 @@ namespace Wings
     for (int dof =0; dof<9; ++dof)
     {
       a = S_an[dof];
-      m = saturation_solver.solution[0](dof);
+      m = fluid_solver.saturation_relevant[0](dof);
       if (Math::relative_difference(m, a) > tol)
       {
-        std::cout << "b_an(" << dof<< ") = " << a << std::endl;;
-        std::cout << "b(" << dof<< ") = " << m << std::endl;;
+        std::cout << "second time step saturation solution" << std::endl;
+        std::cout << "S_an(" << dof<< ") = " << a << std::endl;;
+        std::cout << "S_num(" << dof<< ") = " << m << std::endl;;
       }
       AssertThrow(Math::relative_difference(m, a) < tol,
-                  ExcMessage("Wrong entry in b("+std::to_string(dof) + ")"));
+                  ExcMessage("Wrong entry in Sw("+std::to_string(dof) + ")"));
     }
 
   } // eom

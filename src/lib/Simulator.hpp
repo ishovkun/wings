@@ -172,7 +172,15 @@ void Simulator<dim>::run()
 
   output_helper.prepare_output_directories();
 
-  FluidSolvers::SolverIMPES<dim>(mpi_communicator, triangulation, model, pcout);
+  FluidSolvers::SolverIMPES<dim> fluid_solver(mpi_communicator,
+                                              triangulation,
+                                              model, pcout);
+  fluid_solver.setup_dofs();
+
+  fluid_solver.solution = 0.2;
+  fluid_solver.saturation_relevant[0] = fluid_solver.solution;
+  fluid_solver.saturation_relevant[1] = 1.0;
+  fluid_solver.saturation_relevant[1] -= fluid_solver.solution;
 
   // FluidSolvers::SaturationSolver<dim>
   //     saturation_solver(mpi_communicator,
