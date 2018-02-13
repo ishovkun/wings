@@ -1,0 +1,49 @@
+subsection Mesh
+
+Mesh file                  domain.msh /
+
+subsection Well data
+
+Wells
+# name r coords
+A, 0.1,
+1.5, 0.5, 0.0; # this defines a vertical well occupying one cell
+B, 0.01,
+1.5, 2.5, 0.0,
+2.5, 1.5, 0.0;
+C, 0.1,
+1.5, 1.0, 0.0,
+2.5, 1.0, 0.0,
+3.5, 1.0, 0.0
+/
+
+Schedule
+0, A, 1, 15, 0;
+1, A, 1, 0, 0;
+1, B, 0, 10, 0;
+/
+
+subsection Equation data
+
+Fluid model             Liquid /
+Solid model             Elasticity /
+Units                   Metric /
+Young modulus           1e8 /
+Poisson ratio           0.3 /
+Biot coefficient        1.0 /
+Density water           1000 /
+Permeability            bitmap perm4x4_homog.dat /
+Porosity                0.3 /
+Perm anisotropy         1, 1, 1 /
+
+PVT water
+# p Bw   Cw    mu_w   R_wg
+10, 1.0, 5e-10, 1e-3, 0 /
+
+
+subsection Solver
+
+Minimum time step    1e-5 /
+T max                100 /
+FSS tolerance        1e-8 /
+Max FSS steps        30 /

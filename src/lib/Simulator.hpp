@@ -182,22 +182,22 @@ void Simulator<dim>::run()
   fluid_solver.saturation_relevant[1] = 1.0;
   fluid_solver.saturation_relevant[1] -= fluid_solver.solution;
 
-  // FluidSolvers::SaturationSolver<dim>
-  //     saturation_solver(mpi_communicator,
-  //                       pressure_solver.get_dof_handler(),
-  //                       model, pcout);
+  SolidSolvers::ElasticSolver<dim>
+      solid_solver(mpi_communicator, triangulation, model, pcout);
 
-  // SolidSolvers::ElasticSolver<dim>
-  //     solid_solver(mpi_communicator, triangulation, model, pcout);
+  solid_solver.set_coupling(fluid_solver.get_dof_handler());
 
-  // pressure_solver.setup_dofs();
+  fluid_solver.setup_dofs();
+  solid_solver.setup_dofs();
 
   // // if multiphase
   // saturation_solver.setup_dofs(pressure_solver.locally_owned_dofs,
   //                              pressure_solver.locally_relevant_dofs);
 
 
-  // // initial values
+  // initial values
+  fluid_solver.solution = 1e6;
+  fluid_solver.pressure_relevant = fluid_solver.solution;
   // for (unsigned int i=0; i<saturation_solver.solution[0].size(); ++i)
   // {
   //   saturation_solver.solution[0][i] =model.residual_saturation_water();

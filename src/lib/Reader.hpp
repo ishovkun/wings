@@ -189,6 +189,30 @@ namespace Parsers {
                            rel_perm_water[2], rel_perm_oil[2]);
       }
 
+      { // solid model
+        // can be Compressibility, Elasticity, default compressibility
+        std::string model_type_str = parser.get(Keywords::solid_model_type,
+                                                Keywords::model_compressibility);
+
+        // Model::SolidModelType solid_model_type(Model::SolidModelType::Compressibility);
+        if (model_type_str == Keywords::model_compressibility)
+          model.set_solid_model(Model::SolidModelType::Compressibility);
+        else if (model_type_str == Keywords::model_elasticity)
+          model.set_solid_model(Model::SolidModelType::Elasticity);
+        else
+          AssertThrow(false, ExcNotImplemented());
+
+        if (model.solid_model == Model::SolidModelType::Compressibility)
+        {
+          const double c_rock = parser.get_double(Keywords::rock_compressibility, 0.0);
+          model.set_rock_compressibility(c_rock);
+        }
+        else if (model.solid_model == Model::SolidModelType::Elasticity)
+        {
+          // biot coefficient, young's modulus (func), Poisson_ratio (function)
+          // const double biot_
+        }
+      }
 
     } // end equation data
 

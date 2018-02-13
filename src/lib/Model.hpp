@@ -21,8 +21,9 @@ namespace Model
 {
 using namespace dealii;
 
-enum FluidModelType {Liquid, SingleGas, /* WaterOil = */ DeadOil,
-                     WaterGas, Blackoil};
+enum FluidModelType {Liquid, GasOnly, DeadOil, WaterGas, Blackoil};
+
+enum SolidModelType {Compressibility, Elasticity};
 
 enum PVTType {Constant, Table, Correlation};
 
@@ -53,14 +54,14 @@ class Model
   // void print_input();
 
   // Functions of a coordinate
-  Function<dim> *get_young_modulus,
-    *get_poisson_ratio,
-    *get_permeability,
-    *get_porosity;
-  // *get_porosity;
+  Function<dim> * get_young_modulus,
+                * get_poisson_ratio,
+                * get_permeability,
+                * get_porosity;
 
   // adding data
-  void set_fluid_model(FluidModelType type);
+  void set_fluid_model(const FluidModelType &type);
+  void set_solid_model(const SolidModelType &type);
   void set_pvt_water(Interpolation::LookupTable &table);
   void set_pvt_oil(Interpolation::LookupTable &table);
   void set_pvt_gas(Interpolation::LookupTable &table);
@@ -70,6 +71,7 @@ class Model
                     const double k_ro0,
                     const double nw,
                     const double no);
+  void set_rock_compressibility(const double x) {rock_compressibility_constant = x;}
   void set_density_sc_w(const double x) {density_sc_w_constant = x;}
   void set_density_sc_o(const double x) {density_sc_o_constant = x;}
   void add_well(const std::string name,
@@ -82,6 +84,7 @@ class Model
   double density_sc_water() const;
   double density_sc_oil() const;
   double gravity() const;
+  double get_rock_compressibility() const;
   void get_pvt_oil(const double        pressure,
                    std::vector<double> &dst) const;
   void get_pvt_water(const double        pressure,
@@ -129,6 +132,7 @@ class Model
   int                                    max_fss_steps;
 
   FluidModelType                         fluid_model;
+  SolidModelType                         solid_model;
   ModelConfig                            config;
  protected:
   std::string                            mesh_file_name,
@@ -137,7 +141,8 @@ class Model
                                          density_sc_o_constant,
                                          porosity,
                                          young_modulus,
-                                         poisson_ratio_constant;
+                                         poisson_ratio_constant,
+                                         rock_compressibility_constant;
   Interpolation::LookupTable             pvt_table_water,
                                          pvt_table_oil,
                                          pvt_table_gas;
@@ -365,7 +370,15 @@ void Model<dim>::get_pvt_oil(const double        pressure,
 
 
 template <int dim>
-void Model<dim>::set_fluid_model(FluidModelType model_type)
+void Model<dim>::set_solid_model(const SolidModelType & model_type)
+{
+  solid_model = model_type;
+} // eom
+
+
+
+template <int dim>
+void Model<dim>::set_fluid_model(const FluidModelType & model_type)
 {
   phases.clear();
   fluid_model = model_type;
@@ -479,5 +492,25 @@ Model<dim>::get_saturation_limits(const unsigned int phase) const
   // to supress warning
   return std::make_pair(0.0, 1.0);
 }  // eom
+
+
+
+template<int dim>
+double
+Model<dim>::get_rock_compressibility() const
+{
+  if (solid_model == SolidModelType::Compressibility)
+  {
+    return rock_compressibility_constant;
+  }
+  else if (solid_model == SolidModelType::Elasticity)
+  {
+    AssertThrow(false, ExcNotImplemented());
+  }
+  else
+  {
+    AssertThrow(false, ExcNotImplemented());
+  }
+}  // end get_rock_compressibility
 
 }  // end of namespace

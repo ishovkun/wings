@@ -16,7 +16,6 @@ class ElasticSolver
                     const Model::Model<dim>                   &model,
                     ConditionalOStream                        &pcout);
   ~ElasticSolver();
-  void set_coupling();
   /* setup degrees of freedom for the current triangulation
    * and allocate memory for solution vectors */
   void setup_dofs();
@@ -24,6 +23,8 @@ class ElasticSolver
   void assemble_system();
   // solve linear system syste_matrix*solution= rhs_vector
   unsigned int solve();
+  // give solver access to fluid dofs
+  void set_coupling(const DoFHandler<dim> &fluid_dof_handler);
   // accessing private members
   const TrilinosWrappers::SparseMatrix & get_system_matrix();
   const TrilinosWrappers::MPI::Vector  & get_rhs_vector();
@@ -38,8 +39,9 @@ class ElasticSolver
   const Model::Model<dim>                   & model;
   ConditionalOStream                        & pcout;
   // Matrices and vectors
-  TrilinosWrappers::SparseMatrix system_matrix;
-  TrilinosWrappers::MPI::Vector  rhs_vector;
+  TrilinosWrappers::SparseMatrix         system_matrix;
+  TrilinosWrappers::MPI::Vector          rhs_vector;
+  const DoFHandler<dim>                * p_fluid_dof_handler;
 
  public:
   // solution vectors
@@ -54,9 +56,9 @@ class ElasticSolver
 template <int dim>
 ElasticSolver<dim>::
 ElasticSolver(MPI_Comm                                  &mpi_communicator,
-                  parallel::distributed::Triangulation<dim> &triangulation,
-                  const Model::Model<dim>                   &model,
-                  ConditionalOStream                        &pcout)
+              parallel::distributed::Triangulation<dim> &triangulation,
+              const Model::Model<dim>                   &model,
+              ConditionalOStream                        &pcout)
     :
     mpi_communicator(mpi_communicator),
     triangulation(triangulation),
@@ -74,6 +76,14 @@ ElasticSolver<dim>::~ElasticSolver()
   dof_handler.clear();
 } // eom
 
+
+
+template <int dim>
+void
+ElasticSolver<dim>::set_coupling(const DoFHandler<dim> &fluid_dof_handler)
+{
+  p_fluid_dof_handler = &fluid_dof_handler;
+} // eom
 
 
 
@@ -110,38 +120,41 @@ ElasticSolver<dim>::setup_dofs()
 
 
 
-// template <int dim>
-// void
-// ElasticSolver<dim>::assmeble_system()
-// {
-//   QGauss<dim>   pressure_quadrature_formula(1);
-//   QGauss<dim>   quadrature_formula(fe.degree() + 1);
+template <int dim>
+void
+ElasticSolver<dim>::assemble_system()
+{
+  const auto pressure_fe = p_fluid_dof_handler->get_fe();
 
-//   FEValues<dim> fe_values(fe, quadrature_formula,
-//                           update_values | update_gradients |
-//                           update_JxW_values);
-//   FEValues<dim> fe_values_pressure(pressure_fe, pressure_quadrature_formula,
-//                                    update_values);
+  QGauss<dim>   fvm_quadrature_formula(1);
+  QGauss<dim>   quadrature_formula(fe.degree() + 1);
 
-//   const unsigned int dofs_per_cell = fe.dofs_per_cell;
-//   const unsigned int n_q_points = quadrature_formula.size();
+  FEValues<dim> fe_values(fe, quadrature_formula,
+                          update_values | update_gradients |
+                          update_JxW_values);
+  FEValues<dim> fe_values_pressure(pressure_fe,
+                                   fvm_quadrature_formula,
+                                   update_values);
 
-//   std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
+  const unsigned int dofs_per_cell = fe.dofs_per_cell;
+  const unsigned int n_q_points = quadrature_formula.size();
 
-//   typename DoFHandler<dim>::active_cell_iterator
-//       cell = dof_handler.begin_active(),
-//       endc = dof_handler.end(),
-//       pressure_cell = pressure_dof_handler.begin_active();
+  std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
 
-//   system_matrix = 0;
-//   rhs_vector = 0;
+  typename DoFHandler<dim>::active_cell_iterator
+      cell = dof_handler.begin_active(),
+      endc = dof_handler.end(),
+      fluid_cell = p_fluid_dof_handler->begin_active();
 
-//   for (; cell!=endc; ++cell, ++pressure_cell)
-//     if (cell->is_locally_owned())
-//     {
-//       fe_values.reinit(cell);
-//     } // end cell loop
-// }  // eom
+  system_matrix = 0;
+  rhs_vector = 0;
+
+  for (; cell!=endc; ++cell, ++fluid_cell)
+    if (cell->is_locally_owned())
+    {
+      fe_values.reinit(cell);
+    } // end cell loop
+}  // eom
 
 
 } // end of namespace
