@@ -46,6 +46,8 @@ class PressureSolver
                        const std::vector<TrilinosWrappers::MPI::Vector> &saturation);
   // solve linear system syste_matrix*solution= rhs_vector
   unsigned int solve();
+  void set_coupling(const DoFHandler<dim>               & solid_dof_handler,
+                    const TrilinosWrappers::MPI::Vector & displacement_vector);
   // accessing private members
   const TrilinosWrappers::SparseMatrix& get_system_matrix();
   const TrilinosWrappers::MPI::Vector&  get_rhs_vector();
@@ -63,6 +65,10 @@ class PressureSolver
   // Matrices and vectors
   TrilinosWrappers::SparseMatrix system_matrix;
   TrilinosWrappers::MPI::Vector  rhs_vector;
+
+  // Pointers to solid solver objects
+  const DoFHandler<dim>               * p_solid_dof_handler;
+  const TrilinosWrappers::MPI::Vector * p_displacement_vector;
 
  public:
   TrilinosWrappers::MPI::Vector solution, old_solution;
@@ -369,6 +375,19 @@ PressureSolver<dim>::solve()
   // }
   return solver_control.last_step();
 } // eom
+
+
+
+
+template<int dim>
+void
+PressureSolver<dim>::
+set_coupling(const DoFHandler<dim>               & solid_dof_handler,
+             const TrilinosWrappers::MPI::Vector & displacement_vector)
+{
+  p_solid_dof_handler = & solid_dof_handler;
+  p_displacement_vector = & p_displacement_vector;
+}  // eom
 
 
 
