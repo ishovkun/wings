@@ -123,8 +123,8 @@ constexpr int dim = 3;
       {// Permeability & porosity
         std::vector<double> default_anisotropy{1,1,1};
         Tensor<1,dim> anisotropy = Parsers::convert<dim>
-            (parser.get_double_list(Keywords::permeability_anisotropy, ",",
-                                    default_anisotropy));
+            (parser.get_number_list<double>(Keywords::permeability_anisotropy, ",",
+                                            default_anisotropy));
         // apply units
         anisotropy *= model.units.permeability();
         model.get_permeability =
@@ -180,9 +180,9 @@ constexpr int dim = 3;
       {
         // Relative permeability
         const auto & rel_perm_water =
-            parser.get_double_list(Keywords::rel_perm_water, ",");
+            parser.get_number_list<double>(Keywords::rel_perm_water, ",");
         const auto & rel_perm_oil =
-            parser.get_double_list(Keywords::rel_perm_oil, ",");
+            parser.get_number_list<double>(Keywords::rel_perm_oil, ",");
         AssertThrow(rel_perm_water.size() == 3,
                     ExcDimensionMismatch(rel_perm_water.size(), 3));
         AssertThrow(rel_perm_oil.size() == 3,
@@ -241,22 +241,35 @@ constexpr int dim = 3;
        */
       if (model.solid_model == Model::SolidModelType::Elasticity)
       {
+        // Dirichlet BCs
         const auto dirichlet_labels_list =
-            parser.get_int_list(Keywords::solid_dirichlet_labels,
-                                std::string(","));
+            parser.get_number_list<int>(Keywords::solid_dirichlet_labels,
+                                        std::string(","));
         const auto dirichlet_component_list =
-            parser.get_int_list(Keywords::solid_dirichlet_components,
-                                std::string(","));
+            parser.get_number_list<int>(Keywords::solid_dirichlet_components,
+                                        std::string(","));
         const auto dirichlet_value_list =
-            parser.get_double_list(Keywords::solid_dirichlet_values,
-                                   std::string(","));
+            parser.get_number_list<double>(Keywords::solid_dirichlet_values,
+                                           std::string(","));
         AssertThrow(dirichlet_labels_list.size() > 0,
                     ExcMessage("Need at least one Dirichlet boundary"));
-        AssertThrow(dirichlet_labels_list.size() ==
-                    dirichlet_value_list.size() ==
-                    dirichlet_component_list.size(),
-                    ExcMessage("Inconsistent Dirichlet BC's"));
-
+        AssertThrow(dirichlet_labels_list.size() == dirichlet_value_list.size()
+                    &&
+                    dirichlet_value_list.size() == dirichlet_component_list.size(),
+                    ExcMessage("Inconsistent displacement boundary conditions"));
+        // Neumann BC's -- not required
+        const auto neumann_labels =
+            parser.get_number_list<int>(Keywords::solid_neumann_labels,
+                                        std::string(","), std::vector<int>());
+        const auto neumann_components =
+            parser.get_number_list<int>(Keywords::solid_neumann_components,
+                                        std::string(","), std::vector<int>());
+        const auto neumann_values =
+            parser.get_number_list<double>(Keywords::solid_neumann_values,
+                                           std::string(","), std::vector<double>());
+        AssertThrow(neumann_labels.size() == neumann_values.size() &&
+                    neumann_values.size() == neumann_components.size(),
+                    ExcMessage("Inconsistent stress boundary conditions"));
         // const auto
       }
     }

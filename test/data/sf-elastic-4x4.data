@@ -1,6 +1,6 @@
 subsection Mesh
 
-Mesh file                  domain.msh /
+Mesh file                  3x3x1_boundary_ids.msh /
 
 subsection Well data
 

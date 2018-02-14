@@ -21,18 +21,14 @@ namespace Parsers
     std::string get(const std::string &kwd) const;
     std::vector<std::string> get_str_list(const std::string &kwd,
                                           const std::string &delimiter) const;
-    std::vector<int>
-    get_int_list(const std::string  &kwd,
-                 const std::string  &delimiter,
-                 const unsigned int size=0) const;
-    std::vector<double>
-    get_double_list(const std::string  &kwd,
-                    const std::string  &delimiter,
-                    const unsigned int size=0) const;
-    std::vector<double>
-    get_double_list(const std::string &kwd,
-                    const std::string &delimiter,
-                    std::vector<double> &default_value) const;
+    template<typename Number>
+    std::vector<Number> get_number_list(const std::string         & kwd,
+                                        const std::string         & delimiter,
+                                        const unsigned int        size = 0) const;
+    template<typename Number>
+    std::vector<Number> get_number_list(const std::string         & kwd,
+                                        const std::string         & delimiter,
+                                        const std::vector<Number> & default_value) const;
     FullMatrix<double>
     get_matrix(const std::string  &kwd,
                const std::string  &delimiter_col,
@@ -186,25 +182,29 @@ namespace Parsers
 
 
 
-std::vector<int>
-SyntaxParser::get_int_list(const std::string  &kwd,
-                           const std::string  &delimiter,
-                           const unsigned int size) const
+template<typename Number>
+std::vector<Number>
+SyntaxParser::get_number_list(const std::string  &kwd,
+                              const std::string  &delimiter,
+                              const std::vector<Number> & default_value) const
 {
-  const auto & str_list = get_str_list(kwd, delimiter);
-  if (size>0)
-    AssertThrow(str_list.size() == size,
-                ExcDimensionMismatch(str_list.size(), size));
-  std::vector<int> int_list(str_list.size());
-  for (unsigned int i=0; i<str_list.size(); ++i)
-    int_list[i] = convert<int>(str_list[i]);
-  return int_list;
-} // eom
+  try
+  {
+    const auto & str_list = get_str_list(kwd, delimiter);
+    std::vector<Number> number_list(str_list.size());
+    for (unsigned int i=0; i<str_list.size(); ++i)
+      number_list[i] = convert<Number>(str_list[i]);
+    return number_list;
+  }
+  catch(...)
+  {
+    return default_value;
+  }
+}
 
-
-
-std::vector<double>
-SyntaxParser::get_double_list(const std::string  &kwd,
+template<typename Number>
+std::vector<Number>
+SyntaxParser::get_number_list(const std::string  &kwd,
                               const std::string  &delimiter,
                               const unsigned int size) const
 {
@@ -212,55 +212,41 @@ SyntaxParser::get_double_list(const std::string  &kwd,
   if (size>0)
     AssertThrow(str_list.size() == size,
                 ExcDimensionMismatch(str_list.size(), size));
-  std::vector<double> double_list(str_list.size());
+  std::vector<Number> number_list(str_list.size());
   for (unsigned int i=0; i<str_list.size(); ++i)
-    double_list[i] = convert<double>(str_list[i]);
-  return double_list;
-} // eom
+    number_list[i] = convert<Number>(str_list[i]);
+  return number_list;
+}
 
 
-  std::vector<double>
-  SyntaxParser::get_double_list(const std::string    &kwd,
-                                const std::string    &delimiter,
-                                std::vector <double> &default_value) const
+
+FullMatrix<double>
+SyntaxParser::get_matrix(const std::string  &kwd,
+                         const std::string  &delimiter_row,
+                         const std::string  &delimiter_col) const
+{
+  std::vector<std::string> rows = get_str_list(kwd, delimiter_row);
+  const unsigned int n_rows = rows.size();
+  std::vector<std::string> tmp;
+  boost::algorithm::split(tmp, rows[0],
+                          boost::is_any_of(delimiter_col),
+                          boost::token_compress_on);
+  const unsigned int n_cols = tmp.size();
+  FullMatrix<double> result(n_rows, n_cols);
+  for (unsigned int i=0; i<n_rows; ++i)
   {
-    try {
-      const auto & result =
-        get_double_list(kwd, delimiter, default_value.size());
-      return result;
-    }
-    catch (std::exception &exc) {
-      return default_value;
-    };
-  } // eom
-
-
-  FullMatrix<double>
-  SyntaxParser::get_matrix(const std::string  &kwd,
-                           const std::string  &delimiter_row,
-                           const std::string  &delimiter_col) const
-  {
-    std::vector<std::string> rows = get_str_list(kwd, delimiter_row);
-    const unsigned int n_rows = rows.size();
-    std::vector<std::string> tmp;
-    boost::algorithm::split(tmp, rows[0],
+    boost::algorithm::split(tmp, rows[i],
                             boost::is_any_of(delimiter_col),
                             boost::token_compress_on);
-    const unsigned int n_cols = tmp.size();
-    FullMatrix<double> result(n_rows, n_cols);
-    for (unsigned int i=0; i<n_rows; ++i)
+    AssertThrow(tmp.size() == n_cols,
+                ExcDimensionMismatch(tmp.size(), n_cols));
+    for (unsigned int j=0; j<n_cols; ++j)
     {
-      boost::algorithm::split(tmp, rows[i],
-                              boost::is_any_of(delimiter_col),
-                              boost::token_compress_on);
-      AssertThrow(tmp.size() == n_cols,
-                  ExcDimensionMismatch(tmp.size(), n_cols));
-      for (unsigned int j=0; j<n_cols; ++j)
-      {
-        result(i, j) = Parsers::convert<double>(tmp[j]);
-      }
+      result(i, j) = Parsers::convert<double>(tmp[j]);
     }
+  }
 
-    return result;
-  } // eom
+  return result;
+} // eom
+
 }

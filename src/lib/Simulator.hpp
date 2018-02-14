@@ -35,7 +35,7 @@ class Simulator
  public:
   Simulator(std::string);
   // ~Simulator();
-  void read_mesh();
+  void read_mesh(unsigned int verbosity = 0);
   void create_mesh();
   void run();
 
@@ -78,15 +78,65 @@ void Simulator<dim>::create_mesh()
 {
   // make grid with 102x1x1 elements,
   // hx = hy = hz = h = 25 ft
-  std::vector<unsigned int > repetitions = {102, 1, 1};
+  std::vector<unsigned int > repetitions = {3, 3, 1};
   GridGenerator::subdivided_hyper_rectangle(triangulation,
                                             repetitions,
-                                            Point<dim>(0,   -25, -12.5),
-                                            Point<dim>(510, 25, +12.5));
+                                            Point<dim>(0, 0, -0.5),
+                                            Point<dim>(3, 3, 0.5));
+
+  // make boundary ids
+  typename Triangulation<3>::active_cell_iterator
+    cell = triangulation.begin_active(),
+    endc = triangulation.end();
+
+  for (; cell!=endc; ++cell)
+    for (unsigned int f=0; f < GeometryInfo<3>::faces_per_cell; ++f)
+    {
+      const Point<dim> face_center = cell->face(f)->center();
+      if (cell->face(f)->at_boundary())
+      {
+        if (abs(face_center[0])<1e-6)
+        {
+          cell->face(f)->set_boundary_id(0);
+          std::cout << "left " << cell->center() << "\t" << f << std::endl;
+        }
+        if (abs(face_center[0] - 3.0)<1e-6)
+        {
+          cell->face(f)->set_boundary_id(1);
+          // std::cout << "right" << std::endl;
+          std::cout << "right " << cell->center() << "\t" << f << std::endl;
+        }
+        if (abs(face_center[1])<1e-6)
+        {
+          cell->face(f)->set_boundary_id(2);
+          // std::cout << "front" << std::endl;
+          std::cout << "front " << cell->center() << "\t" << f << std::endl;
+        }
+        if (abs(face_center[1] - 3.0)<1e-6)
+        {
+          cell->face(f)->set_boundary_id(3);
+          std::cout << "back" << std::endl;
+        }
+        if (abs(face_center[2] - 0.5)<1e-6)
+        {
+          cell->face(f)->set_boundary_id(4);
+          std::cout << "bottom" << std::endl;
+        }
+        if (abs(face_center[2] + 0.5)<1e-6)
+        {
+          cell->face(f)->set_boundary_id(5);
+          std::cout << "top" << std::endl;
+        }
+      }
+
+    }
+  GridOutFlags::Msh flags(/* write_faces = */ true,
+                          /* write_lines = */ false);
   GridOut grid_out;
+  grid_out.set_flags(flags);
   // std::ofstream out ("bl-mesh.vtk ");
   // grid_out.write_vtk(triangulation, out);
-  std::ofstream out("buckley_leverett.msh");
+  std::ofstream out("3x3x1_1m3.msh");
   grid_out.write_msh(triangulation, out);
 
   GridTools::scale(model.units.length(), triangulation);
@@ -95,13 +145,14 @@ void Simulator<dim>::create_mesh()
 
 
 template <int dim>
-void Simulator<dim>::read_mesh()
+void Simulator<dim>::read_mesh(unsigned int verbosity)
 {
   GridIn<dim> gridin;
   gridin.attach_triangulation(triangulation);
   std::ifstream f(model.mesh_file.string());
 
-  pcout << "Reading mesh file " << model.mesh_file << std::endl;
+  if (verbosity > 0)
+    pcout << "Reading mesh file " << model.mesh_file << std::endl;
   // typename GridIn<dim>::format format = gridin<dim>::ucd;
   // gridin.read(f, format);
   gridin.read_msh(f);
@@ -167,7 +218,7 @@ void Simulator<dim>::run()
   output_helper.set_case_name("solution");
 
 
-  read_mesh();
+  read_mesh(/* verbosity = */ 1);
   // create_mesh();
 
   output_helper.prepare_output_directories();

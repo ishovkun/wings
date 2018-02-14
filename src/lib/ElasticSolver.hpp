@@ -17,9 +17,9 @@ class ElasticSolver
 {
  public:
   ElasticSolver(MPI_Comm                                  &mpi_communicator,
-                    parallel::distributed::Triangulation<dim> &triangulation,
-                    const Model::Model<dim>                   &model,
-                    ConditionalOStream                        &pcout);
+                parallel::distributed::Triangulation<dim> &triangulation,
+                const Model::Model<dim>                   &model,
+                ConditionalOStream                        &pcout);
   ~ElasticSolver();
   /* setup degrees of freedom for the current triangulation
    * and allocate memory for solution vectors */
@@ -164,13 +164,18 @@ assemble_system(const TrilinosWrappers::MPI::Vector & pressure_vector)
 
   QGauss<dim>   fvm_quadrature_formula(1);
   QGauss<dim>   quadrature_formula(fe.degree + 1);
+  QGauss<dim-1> face_quadrature_formula(fe.degree + 1);
 
-  FEValues<dim> fe_values(fe, quadrature_formula,
-                          update_values | update_gradients |
-                          update_JxW_values);
-  FEValues<dim> fluid_fe_values(fluid_fe,
-                                fvm_quadrature_formula,
-                                update_values);
+  FEValues<dim>     fe_values(fe, quadrature_formula,
+                              update_values | update_gradients |
+                              update_JxW_values);
+  FEValues<dim>     fluid_fe_values(fluid_fe,
+                                    fvm_quadrature_formula,
+                                    update_values);
+  FEFaceValues<dim> fe_face_values(fe, face_quadrature_formula,
+                                   update_values |
+                                   update_normal_vectors |
+                                   update_JxW_values);
 
   // we need this because FeSystem class is weird
   // we use this extractor to extract all (displacement) dofs
@@ -178,6 +183,8 @@ assemble_system(const TrilinosWrappers::MPI::Vector & pressure_vector)
 
   const unsigned int dofs_per_cell = fe.dofs_per_cell;
   const unsigned int n_q_points = quadrature_formula.size();
+  const unsigned int n_face_q_points = face_quadrature_formula.size();
+  const unsigned int n_neumann_conditions = model.solid_neumann_labels.size();
 
   std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
   FullMatrix<double>                   cell_matrix(dofs_per_cell, dofs_per_cell);
@@ -241,7 +248,46 @@ assemble_system(const TrilinosWrappers::MPI::Vector & pressure_vector)
           cell_rhs(i)  +=
               alpha*p_value*trace(grad_xi_u[i])*fe_values.JxW(q);
         }  // end i loop
+
       }  // end q loop
+
+      // impose neumann BC's
+      for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
+        if (cell->face(f)->at_boundary())
+        {
+          unsigned int face_boundary_id = cell->face(f)->boundary_id();
+          fe_face_values.reinit(cell, f);
+
+          // loop through input neumann labels
+          for (unsigned int l=0; l<n_neumann_conditions; ++l)
+          {
+            const unsigned int id = model.solid_neumann_labels[l];
+
+            if (face_boundary_id == id)
+              for (unsigned int i=0; i<dofs_per_cell; ++i)
+              {
+                const unsigned int component_i =
+                    fe.system_to_component_index(i).first;
+                const unsigned int neumann_component =
+                    model.solid_neumann_components[l];
+
+                if (component_i == neumann_component)
+                  for (unsigned int q=0; q<n_face_q_points; ++q)
+                  {
+                    double neumann_value =
+                        model.solid_neumann_values[l] *
+                        fe_face_values.normal_vector(q)[component_i];
+
+                    cell_rhs(i) +=
+                        fe_face_values.shape_value(i, q) *
+                        neumann_value *
+                        fe_face_values.JxW(q);
+                  }  // end of q_point loop
+              }  // end of i loop
+
+          }  // end loop neumann labels
+        } // end face loop
+      // end Neumann BC's
 
       cell->get_dof_indices(local_dof_indices);
       constraints.distribute_local_to_global
