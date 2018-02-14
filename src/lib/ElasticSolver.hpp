@@ -27,6 +27,7 @@ class ElasticSolver
   // Fill system matrix and rhs vector
   void assemble_system(const TrilinosWrappers::MPI::Vector & pressure_vector);
   // solve linear system syste_matrix*solution= rhs_vector
+  // returns the number of solver steps
   unsigned int solve();
   // give solver access to fluid dofs
   void set_coupling(const DoFHandler<dim> &fluid_dof_handler);
@@ -299,5 +300,35 @@ assemble_system(const TrilinosWrappers::MPI::Vector & pressure_vector)
   rhs_vector.compress(VectorOperation::add);
 }  // eom
 
+
+
+template<int dim>
+unsigned int
+ElasticSolver<dim>::solve()
+{
+  double tol = 1e-10*rhs_vector.l2_norm();
+  if (tol == 0.0)
+    tol = 1e-10;
+  SolverControl solver_control(1000, tol);
+
+  // preconditioner
+  TrilinosWrappers::PreconditionAMG preconditioner;
+  TrilinosWrappers::PreconditionAMG::AdditionalData data_amg;
+  // data_amg.constant_modes = constant_modes;
+  data_amg.elliptic = true;
+  data_amg.higher_order_elements = true;
+  data_amg.smoother_sweeps = 2;
+  data_amg.aggregation_threshold = 0.02;
+  preconditioner.initialize(system_matrix, data_amg);
+
+  TrilinosWrappers::SolverCG::AdditionalData data_cg;
+  TrilinosWrappers::SolverCG solver(solver_control, data_cg);
+
+  solver.solve(system_matrix, solution, rhs_vector, preconditioner);
+
+  constraints.distribute(solution);
+
+  return solver_control.last_step();
+}  // end solve
 
 } // end of namespace

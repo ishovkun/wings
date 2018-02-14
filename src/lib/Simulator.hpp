@@ -242,6 +242,7 @@ void Simulator<dim>::run()
   solid_solver.setup_dofs();
 
   solid_solver.assemble_system(fluid_solver.pressure_relevant);
+  solid_solver.solve();
 
   // initial values
   // fluid_solver.solution = 1e6;
