@@ -242,6 +242,9 @@ void Simulator<dim>::run()
   solid_solver.setup_dofs();
 
   solid_solver.assemble_system(fluid_solver.pressure_relevant);
+
+  const auto & solid_system_matrix = solid_solver.get_system_matrix();
+  // solid_system_matrix.print(std::cout, true);
   solid_solver.solve();
 
   // initial values

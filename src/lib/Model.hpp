@@ -131,10 +131,10 @@ class Model
 
   // ATTRIBUTES
  public:
-  std::vector<unsigned int>  solid_dirichlet_labels;
+  std::vector<int>           solid_dirichlet_labels;
   std::vector<int>           solid_dirichlet_components;
   std::vector<double>        solid_dirichlet_values;
-  std::vector<unsigned int>  solid_neumann_labels;
+  std::vector<int>           solid_neumann_labels;
   std::vector<int>           solid_neumann_components;
   std::vector<double>        solid_neumann_values;
   const unsigned int         n_pvt_water_columns = 5;

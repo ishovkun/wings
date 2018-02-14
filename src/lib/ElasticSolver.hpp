@@ -257,6 +257,10 @@ assemble_system(const TrilinosWrappers::MPI::Vector & pressure_vector)
         if (cell->face(f)->at_boundary())
         {
           unsigned int face_boundary_id = cell->face(f)->boundary_id();
+          // pcout << "at boundary" << cell->center()
+          //       << "\t" << "face = " << f
+          //       << "\t" << "id = " << face_boundary_id
+          //       << std::endl;
           fe_face_values.reinit(cell, f);
 
           // loop through input neumann labels
@@ -267,6 +271,8 @@ assemble_system(const TrilinosWrappers::MPI::Vector & pressure_vector)
             if (face_boundary_id == id)
               for (unsigned int i=0; i<dofs_per_cell; ++i)
               {
+                // pcout << "found boundary " << id << std::endl;
+
                 const unsigned int component_i =
                     fe.system_to_component_index(i).first;
                 const unsigned int neumann_component =
@@ -330,5 +336,14 @@ ElasticSolver<dim>::solve()
 
   return solver_control.last_step();
 }  // end solve
+
+
+
+template<int dim>
+const TrilinosWrappers::SparseMatrix &
+ElasticSolver<dim>::get_system_matrix()
+{
+  return system_matrix;
+}  // end get_syste_matrix
 
 } // end of namespace

@@ -25,9 +25,12 @@ Schedule
 
 subsection Boundary conditions
 
-Displacement boundaries 0 /
-Displacement components 0 /
-Displacement values 0 /
+Displacement boundaries 0 4 /
+Displacement components 0 2 /
+Displacement values 0 0 /
+Stress boundaries 5 /
+Stress components 3 /
+Stress values 20 /
 
 subsection Equation data
 

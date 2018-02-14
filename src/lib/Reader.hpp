@@ -242,21 +242,24 @@ constexpr int dim = 3;
       if (model.solid_model == Model::SolidModelType::Elasticity)
       {
         // Dirichlet BCs
-        const auto dirichlet_labels_list =
+        const auto dirichlet_labels =
             parser.get_number_list<int>(Keywords::solid_dirichlet_labels,
                                         std::string(","));
-        const auto dirichlet_component_list =
+        const auto dirichlet_components =
             parser.get_number_list<int>(Keywords::solid_dirichlet_components,
                                         std::string(","));
-        const auto dirichlet_value_list =
+        const auto dirichlet_values =
             parser.get_number_list<double>(Keywords::solid_dirichlet_values,
                                            std::string(","));
-        AssertThrow(dirichlet_labels_list.size() > 0,
+        AssertThrow(dirichlet_labels.size() > 0,
                     ExcMessage("Need at least one Dirichlet boundary"));
-        AssertThrow(dirichlet_labels_list.size() == dirichlet_value_list.size()
+        AssertThrow(dirichlet_labels.size() == dirichlet_values.size()
                     &&
-                    dirichlet_value_list.size() == dirichlet_component_list.size(),
+                    dirichlet_values.size() == dirichlet_components.size(),
                     ExcMessage("Inconsistent displacement boundary conditions"));
+        model.set_solid_dirichlet_boundary_conditions(dirichlet_labels,
+                                                      dirichlet_components,
+                                                      dirichlet_values);
         // Neumann BC's -- not required
         const auto neumann_labels =
             parser.get_number_list<int>(Keywords::solid_neumann_labels,
@@ -270,7 +273,9 @@ constexpr int dim = 3;
         AssertThrow(neumann_labels.size() == neumann_values.size() &&
                     neumann_values.size() == neumann_components.size(),
                     ExcMessage("Inconsistent stress boundary conditions"));
-        // const auto
+        model.set_solid_neumann_boundary_conditions(neumann_labels,
+                                                    neumann_components,
+                                                    neumann_values);
       }
     }
 
