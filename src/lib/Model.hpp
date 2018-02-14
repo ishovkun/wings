@@ -71,19 +71,29 @@ class Model
                     const double k_ro0,
                     const double nw,
                     const double no);
+  // this method is for elasticity model only
+  void set_biot_coefficient(const double x){biot_coefficient = x;}
+  // this method is for Compressibility model only
   void set_rock_compressibility(const double x) {rock_compressibility_constant = x;}
   void set_density_sc_w(const double x) {density_sc_w_constant = x;}
   void set_density_sc_o(const double x) {density_sc_o_constant = x;}
   void add_well(const std::string name,
                 const double radius,
                 const std::vector< Point<dim> > &locations);
-
+  void set_solid_dirichlet_boundary_conditions(const std::vector<int>    & labels,
+                                               const std::vector<int>    & components,
+                                               const std::vector<double> & values);
+  void set_solid_neumann_boundary_conditions(const std::vector<int>    & labels,
+                                             const std::vector<int>    & components,
+                                             const std::vector<double> & values);
   // querying data
   bool has_phase(const Phase &phase) const;
   unsigned int n_phases() const;
   double density_sc_water() const;
   double density_sc_oil() const;
+  double get_biot_coefficient() const;
   double gravity() const;
+  // C_r = \partial poro / \partial p
   double get_rock_compressibility() const;
   void get_pvt_oil(const double        pressure,
                    std::vector<double> &dst) const;
@@ -91,6 +101,11 @@ class Model
                      std::vector<double> &dst) const;
   void get_pvt_gas(const double        pressure,
                    std::vector<double> &dst) const;
+  // this function calls any of the three above allowing for
+  // phase-agnostic CellValues
+  void get_pvt(const double        pressure,
+               const int           phase,
+               std::vector<double> &dst) const;
   double get_time_step(const double time) const;
   std::vector<int> get_well_ids() const;
   void get_relative_permeability(Vector<double>      &saturation,
@@ -116,19 +131,26 @@ class Model
 
   // ATTRIBUTES
  public:
-  const unsigned int                     n_pvt_water_columns = 5;
-  const unsigned int                     n_pvt_oil_columns = 5;
-  const unsigned int                     n_pvt_gas_columns = 5;
-  int                                    initial_refinement_level,
-    n_adaptive_steps;
-  std::vector<std::pair<double,double>>  local_prerefinement_region;
-  Units::Units                           units;
-  boost::filesystem::path                mesh_file;
-  std::vector< Wellbore<dim> > wells;
-  Schedule::Schedule                     schedule;
-  double                                 fss_tolerance,
-    min_time_step,
-    t_max;
+  std::vector<unsigned int>  solid_dirichlet_labels;
+  std::vector<int>           solid_dirichlet_components;
+  std::vector<double>        solid_dirichlet_values;
+  std::vector<unsigned int>  solid_neumann_labels;
+  std::vector<int>           solid_neumann_components;
+  std::vector<double>        solid_neumann_values;
+  const unsigned int         n_pvt_water_columns = 5;
+  const unsigned int         n_pvt_oil_columns = 5;
+  const unsigned int         n_pvt_gas_columns = 5;
+  int                        initial_refinement_level,
+                             n_adaptive_steps;
+  std::vector< std::pair< Point<dim>,Point<dim> > >
+  local_prerefinement_region;
+  Units::Units               units;
+  boost::filesystem::path    mesh_file;
+  std::vector<Wellbore<dim>> wells;
+  Schedule::Schedule         schedule;
+  double                     fss_tolerance,
+                             min_time_step,
+                             t_max;
   int                                    max_fss_steps;
 
   FluidModelType                         fluid_model;
@@ -140,8 +162,9 @@ class Model
   double                                 density_sc_w_constant,
                                          density_sc_o_constant,
                                          porosity,
-                                         young_modulus,
-                                         poisson_ratio_constant,
+                                         // young_modulus,
+                                         // poisson_ratio_constant,
+                                         biot_coefficient,
                                          rock_compressibility_constant;
   Interpolation::LookupTable             pvt_table_water,
                                          pvt_table_oil,
@@ -349,6 +372,28 @@ void Model<dim>::set_pvt_oil(Interpolation::LookupTable &table)
 
 
 template <int dim>
+void Model<dim>::get_pvt(const double        pressure,
+                         const int           phase,
+                         std::vector<double> &dst) const
+{
+  AssertThrow(phase < n_phases(), ExcMessage("Wrong phase"));
+
+  if (fluid_model == FluidModelType::Liquid)
+    get_pvt_water(pressure, dst);
+  else if (fluid_model == DeadOil)
+  {
+    if (phase == 0)
+      get_pvt_water(pressure, dst);
+    else
+      get_pvt_oil(pressure, dst);
+  }
+  else
+    AssertThrow(false, ExcNotImplemented());
+}
+
+
+
+template <int dim>
 void Model<dim>::get_pvt_water(const double        pressure,
                                std::vector<double> &dst) const
 {
@@ -505,6 +550,8 @@ Model<dim>::get_rock_compressibility() const
   }
   else if (solid_model == SolidModelType::Elasticity)
   {
+    // 1/N modulus
+    // buck_modulus/(1-biot_coef)/(biot_coef - poro)
     AssertThrow(false, ExcNotImplemented());
   }
   else
@@ -513,4 +560,40 @@ Model<dim>::get_rock_compressibility() const
   }
 }  // end get_rock_compressibility
 
+
+
+template<int dim>
+void
+Model<dim>::
+set_solid_dirichlet_boundary_conditions(const std::vector<int>    & labels,
+                                        const std::vector<int>    & components,
+                                        const std::vector<double> & values)
+{
+  solid_dirichlet_labels = labels;
+  solid_dirichlet_components = components;
+  solid_dirichlet_values = values;
+}  // end set_solid_dirichlet_boundary_conditions
+
+
+
+template<int dim>
+void
+Model<dim>::
+set_solid_neumann_boundary_conditions(const std::vector<int>    & labels,
+                                      const std::vector<int>    & components,
+                                      const std::vector<double> & values)
+{
+  solid_neumann_labels = labels;
+  solid_neumann_components = components;
+  solid_neumann_values = values;
+}  // end set_solid_dirichlet_boundary_conditions
+
+
+
+template<int dim>
+double
+Model<dim>::get_biot_coefficient() const
+{
+  return biot_coefficient;
+}  // end get_biot_coefficient
 }  // end of namespace

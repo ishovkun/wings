@@ -21,6 +21,10 @@ namespace Parsers
     std::string get(const std::string &kwd) const;
     std::vector<std::string> get_str_list(const std::string &kwd,
                                           const std::string &delimiter) const;
+    std::vector<int>
+    get_int_list(const std::string  &kwd,
+                 const std::string  &delimiter,
+                 const unsigned int size=0) const;
     std::vector<double>
     get_double_list(const std::string  &kwd,
                     const std::string  &delimiter,
@@ -136,6 +140,7 @@ namespace Parsers
     std::string raw_result =
       Parsers::find_substring(active_text, kwd, kwd_close);
     boost::trim(raw_result);
+    boost::algorithm::trim_left(raw_result);
     return raw_result;
   }  // eom
 
@@ -145,7 +150,7 @@ namespace Parsers
   {
     try
     {
-      return Parsers::find_substring(active_text, kwd, kwd_close);
+      return get(kwd);
     }
     catch (std::exception &exc)
     {
@@ -180,20 +185,38 @@ namespace Parsers
   }  // eom
 
 
-  std::vector<double>
-  SyntaxParser::get_double_list(const std::string  &kwd,
-                                const std::string  &delimiter,
-                                const unsigned int size) const
-  {
-    const auto & str_list = get_str_list(kwd, delimiter);
-    if (size>0)
-      AssertThrow(str_list.size() == size,
-                  ExcDimensionMismatch(str_list.size(), size));
-    std::vector<double> double_list(str_list.size());
-    for (unsigned int i=0; i<str_list.size(); ++i)
-      double_list[i] = convert<double>(str_list[i]);
-    return double_list;
-  } // eom
+
+std::vector<int>
+SyntaxParser::get_int_list(const std::string  &kwd,
+                           const std::string  &delimiter,
+                           const unsigned int size) const
+{
+  const auto & str_list = get_str_list(kwd, delimiter);
+  if (size>0)
+    AssertThrow(str_list.size() == size,
+                ExcDimensionMismatch(str_list.size(), size));
+  std::vector<int> int_list(str_list.size());
+  for (unsigned int i=0; i<str_list.size(); ++i)
+    int_list[i] = convert<int>(str_list[i]);
+  return int_list;
+} // eom
+
+
+
+std::vector<double>
+SyntaxParser::get_double_list(const std::string  &kwd,
+                              const std::string  &delimiter,
+                              const unsigned int size) const
+{
+  const auto & str_list = get_str_list(kwd, delimiter);
+  if (size>0)
+    AssertThrow(str_list.size() == size,
+                ExcDimensionMismatch(str_list.size(), size));
+  std::vector<double> double_list(str_list.size());
+  for (unsigned int i=0; i<str_list.size(); ++i)
+    double_list[i] = convert<double>(str_list[i]);
+  return double_list;
+} // eom
 
 
   std::vector<double>

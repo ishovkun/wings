@@ -23,6 +23,12 @@ Schedule
 1, B, 0, 10, 0;
 /
 
+subsection Boundary conditions
+
+Displacement boundaries 0 /
+Displacement components 0 /
+Displacement values 0 /
+
 subsection Equation data
 
 Fluid model             Liquid /

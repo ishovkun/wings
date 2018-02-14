@@ -21,11 +21,13 @@
 
 namespace Parsers {
 
+constexpr int dim = 3;
+
   class Reader
   {
   public:
-    Reader(ConditionalOStream &pcout_,
-           Model::Model<3>    &model_);
+    Reader(ConditionalOStream & pcout_,
+           Model::Model<dim>  & model_);
     void read_input(const std::string&,
                     const int verbosity_=0);
     void print_input();
@@ -36,13 +38,13 @@ namespace Parsers {
                       const SyntaxParser &parser);
     void assign_schedule(const std::string  &kwd,
                          const SyntaxParser &parser);
-    Function<3> *
-    get_function(const std::string  &kwd,
-                 const Tensor<1,3>    &anisotropy,
-                 const SyntaxParser &parser);
+    Function<dim> *
+    get_function(const std::string   & kwd,
+                 const Tensor<1,dim> & anisotropy,
+                 const SyntaxParser  & parser);
 
-    ConditionalOStream                     &pcout;
-    Model::Model<3>                        &model;
+    ConditionalOStream                    & pcout;
+    Model::Model<dim>                     & model;
     int                                    verbosity;
     std::string                            input_text;
     std::string                            input_file_name;
@@ -50,7 +52,7 @@ namespace Parsers {
 
 
   Reader::Reader(ConditionalOStream &pcout_,
-                 Model::Model<3>    &model_)
+                 Model::Model<dim>    &model_)
     :
     pcout(pcout_),
     model(model_),
@@ -93,6 +95,9 @@ namespace Parsers {
       // std::cout << model.mesh_file << std::endl;
     }
     {  // equation data
+      // Tensor<1,dim> no_anisotropy = Parsers::convert<dim>(default_anisotropy);
+      const Tensor<1,dim> no_anisotropy = Point<dim>(1, 1, 1);
+
       parser.enter_subsection(Keywords::section_equation_data);
       std::string model_type_str = parser.get(Keywords::model_type);
       // std::cout << model_type_str << std::endl;
@@ -116,9 +121,7 @@ namespace Parsers {
       }
 
       {// Permeability & porosity
-        const int dim = 3;
         std::vector<double> default_anisotropy{1,1,1};
-        Tensor<1,dim> no_anisotropy = Parsers::convert<dim>(default_anisotropy);
         Tensor<1,dim> anisotropy = Parsers::convert<dim>
             (parser.get_double_list(Keywords::permeability_anisotropy, ",",
                                     default_anisotropy));
@@ -210,11 +213,53 @@ namespace Parsers {
         else if (model.solid_model == Model::SolidModelType::Elasticity)
         {
           // biot coefficient, young's modulus (func), Poisson_ratio (function)
-          // const double biot_
+          const double biot_coef = parser.get_double(Keywords::biot_coefficient);
+          model.set_biot_coefficient(biot_coef);
+          model.get_young_modulus =
+              get_function(Keywords::young_modulus, no_anisotropy, parser);
+          model.get_poisson_ratio =
+              get_function(Keywords::poisson_ratio, no_anisotropy, parser);
+        }
+        else
+        {
+          AssertThrow(false, ExcNotImplemented());
         }
       }
 
     } // end equation data
+    { // boundary conditions: aquifers, solid bc's
+      try {
+        parser.enter_subsection(Keywords::section_boundary_conditions);
+      }
+      catch (...)
+      {
+        AssertThrow(model.solid_model == Model::SolidModelType::Compressibility,
+                    ExcMessage("Need solid boundary conditions"));
+      }
+      /*
+       * By default all fluid BC's are no-flux
+       */
+      if (model.solid_model == Model::SolidModelType::Elasticity)
+      {
+        const auto dirichlet_labels_list =
+            parser.get_int_list(Keywords::solid_dirichlet_labels,
+                                std::string(","));
+        const auto dirichlet_component_list =
+            parser.get_int_list(Keywords::solid_dirichlet_components,
+                                std::string(","));
+        const auto dirichlet_value_list =
+            parser.get_double_list(Keywords::solid_dirichlet_values,
+                                   std::string(","));
+        AssertThrow(dirichlet_labels_list.size() > 0,
+                    ExcMessage("Need at least one Dirichlet boundary"));
+        AssertThrow(dirichlet_labels_list.size() ==
+                    dirichlet_value_list.size() ==
+                    dirichlet_component_list.size(),
+                    ExcMessage("Inconsistent Dirichlet BC's"));
+
+        // const auto
+      }
+    }
 
     {  // wells
       parser.enter_subsection(Keywords::section_wells);
@@ -233,12 +278,11 @@ namespace Parsers {
   } // eom
 
 
-  Function<3> *
+  Function<dim> *
   Reader::get_function(const std::string  &kwd,
-                       const Tensor<1,3>  &anisotropy,
+                       const Tensor<1,dim>  &anisotropy,
                        const SyntaxParser &parser)
   {
-    const int dim = 3;
     const auto kwd_list =
       parser.get_str_list(kwd, std::string("\t "));
 
@@ -297,7 +341,6 @@ namespace Parsers {
       r *= model.units.length();
       // parse locations
       unsigned int n_loc = (well_strs.size()-2) / 3;
-      const int dim = 3;
       std::vector<Point<dim>> locations(n_loc);
       int loc=0;
       for (unsigned int i=2; i<well_strs.size(); i+=dim)

@@ -36,6 +36,7 @@ namespace Keywords
     field_units = "Field",
     young_modulus = "Young modulus",
     poisson_ratio = "Poisson ratio",
+    biot_coefficient = "Biot coefficient",
     rock_compressibility = "Rock compressibility",
     volume_factor_water = "Volume factor water",
     // volume_factor_oil = "Volume factor oil",
@@ -60,7 +61,16 @@ namespace Keywords
     time_stepping = "Time stepping",
     minimum_time_step = "Minimum time step",
     fss_tolerance = "FSS tolerance",
-    max_fss_steps = "Max FSS steps";
+    max_fss_steps = "Max FSS steps",
+
+  section_boundary_conditions = "Boundary conditions",
+      solid_dirichlet_labels = "Displacement boundaries",
+      solid_dirichlet_components = "Displacement components",
+      solid_dirichlet_values = "Displacement values",
+      solid_neumann_labels = "Stress boundaries",
+      solid_neumann_components = "Stress components",
+      solid_neumann_values = "Stress values";
+
 
   // Output names
   const std::string

@@ -5,7 +5,6 @@ namespace Math
 using namespace dealii;
 
 
-
 void harmonic_mean(const Vector<double> &v1,
                    const Vector<double> &v2,
                    const double         dx1,
@@ -66,6 +65,7 @@ double sum(const std::vector<double> & v)
 }  // eom
 
 
+
 template <int dim>
 Tensor<1,dim> normalize(const Tensor<1,dim> &t)
 {
@@ -84,4 +84,17 @@ double relative_difference(const double numerical,
   return abs((numerical - analytical)/ analytical);
 }
 
-}
+
+
+template <int dim>
+inline Tensor<2,dim>
+get_identity_tensor()
+{
+  Tensor<2,dim> identity_tensor;
+  identity_tensor.clear();
+  for (int i=0; i<dim; ++i)
+    identity_tensor[i][i] = 1;
+  return identity_tensor;
+}  // eof
+
+}  // end of namespace
