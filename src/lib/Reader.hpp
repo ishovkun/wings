@@ -280,7 +280,7 @@ constexpr int dim = 3;
     }
 
     {  // wells
-      parser.enter_subsection(Keywords::section_wells);
+      parser.enter_subsection(Keywords::section_wells, /* required = */ false);
       assign_wells(Keywords::well_parameters, parser);
       assign_schedule(Keywords::well_schedule, parser);
     }
@@ -338,7 +338,9 @@ constexpr int dim = 3;
   void Reader::assign_wells(const std::string  &kwd,
                             const SyntaxParser &parser)
   {
-    const auto well_list = parser.get_str_list(kwd, std::string(";"));
+    // const auto well_list = parser.get_str_list(kwd, std::string(";"));
+    const auto well_list = parser.get_str_list(kwd, std::string(";"),
+                                               std::vector<std::string>());
     for (const auto & w : well_list)
     { // loop over individual wells
       // std::cout << w << std::endl;
@@ -381,7 +383,9 @@ constexpr int dim = 3;
   void Reader::assign_schedule(const std::string  &kwd,
                                const SyntaxParser &parser)
   {
-    const auto lines = parser.get_str_list(kwd, std::string(";"));
+    // const auto lines = parser.get_str_list(kwd, std::string(";"));
+    const auto lines = parser.get_str_list(kwd, std::string(";"),
+                                           std::vector<std::string>());
     for (auto & line : lines)
     {
       // std::cout << line << std::endl;

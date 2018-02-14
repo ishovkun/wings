@@ -2,26 +2,7 @@ subsection Mesh
 
 Mesh file                  3x3x1_boundary_ids.msh /
 
-subsection Well data
-
-Wells
-# name r coords
-A, 0.1,
-1.5, 0.5, 0.0; # this defines a vertical well occupying one cell
-B, 0.01,
-1.5, 2.5, 0.0,
-2.5, 1.5, 0.0;
-C, 0.1,
-1.5, 1.0, 0.0,
-2.5, 1.0, 0.0,
-3.5, 1.0, 0.0
-/
-
-Schedule
-0, A, 1, 15, 0;
-1, A, 1, 0, 0;
-1, B, 0, 10, 0;
-/
+# subsection Well data
 
 subsection Boundary conditions
 

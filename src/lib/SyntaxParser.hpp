@@ -9,7 +9,8 @@ namespace Parsers
   {
   public:
     SyntaxParser(std::string &text_);
-    void enter_subsection(const std::string& kwd);
+    void enter_subsection(const std::string& kwd,
+                          const bool required = true);
     double get_double(const std::string & kwd,
                       const double default_value) const;
     double get_double(const std::string & kwd) const;
@@ -21,6 +22,9 @@ namespace Parsers
     std::string get(const std::string &kwd) const;
     std::vector<std::string> get_str_list(const std::string &kwd,
                                           const std::string &delimiter) const;
+    std::vector<std::string> get_str_list(const std::string              &kwd,
+                                          const std::string              &delimiter,
+                                          const std::vector<std::string> &default_value) const;
     template<typename Number>
     std::vector<Number> get_number_list(const std::string         & kwd,
                                         const std::string         & delimiter,
@@ -54,36 +58,48 @@ namespace Parsers
   {}
 
 
-  void SyntaxParser::enter_subsection(const std::string &kwd)
-  {
-    try {
-      active_text =
+void SyntaxParser::enter_subsection(const std::string &kwd,
+                                    const bool required)
+{
+  try {
+    active_text =
         Parsers::find_substring(text,
                                 subsection_prefix + kwd,
                                 subsection_close);
-    }
-    catch (std::exception &exc) { // to the end of file
-      // this doesn't work for some reason
-      // active_text =
-      //   Parsers::find_substring(text,
-      //                           // subsection_prefix + kwd + "[^$]+");
-      //                           // subsection_prefix + kwd + "[^\z]*");
-      //                           subsection_prefix + kwd + ".*");
+  }
+  catch (std::exception &exc) { // to the end of file and not found sections
 
-      std::regex re(subsection_prefix + kwd + "[^$]*");
-      std::smatch match;
-      std::regex_search (text, match, re);
-      active_text = text.substr(match.position(0) +
-                                subsection_prefix.size() + kwd.size(),
-                                text.size());
-      AssertThrow(match.size() <= 1,
-                  ExcMessage("Found more than one subsection " + kwd));
-      // std::cout << "match.size " << match.size() << std::endl;
-      // std::cout << "weird section " << active_text << std::endl;
+    // this doesn't work for some reason
+    // active_text =
+    //   Parsers::find_substring(text,
+    //                           // subsection_prefix + kwd + "[^$]+");
+    //                           // subsection_prefix + kwd + "[^\z]*");
+    //                           subsection_prefix + kwd + ".*");
+
+    std::regex re(subsection_prefix + kwd + "[^$]*");
+    std::smatch match;
+    std::regex_search(text, match, re);
+    if (required)
+    {
+      AssertThrow(match.size() > 0, ExcMessage("Section " + kwd + " not found"));
+    }
+    else
+    {
+      active_text = std::string();
+      return;
     }
 
-    // std::cout<<active_text<<std::endl;
-  } // eom
+    active_text = text.substr(match.position(0) +
+                              subsection_prefix.size() + kwd.size(),
+                              text.size());
+    AssertThrow(match.size() <= 1,
+                ExcMessage("Found more than one subsection " + kwd));
+    // std::cout << "match.size " << match.size() << std::endl;
+    // std::cout << "weird section " << active_text << std::endl;
+  }
+
+  // std::cout<<active_text<<std::endl;
+} // eom
 
 
   int SyntaxParser::get_int(const std::string &kwd) const
@@ -156,30 +172,46 @@ namespace Parsers
   } // eom
 
 
-  std::vector<std::string>
-  SyntaxParser::get_str_list(const std::string &kwd,
-                             const std::string &delimiter) const
+std::vector<std::string>
+SyntaxParser::get_str_list(const std::string &kwd,
+                           const std::string &delimiter) const
+{
+  std::string raw_result = get(kwd);
+  // cut whitespace stuff
+  boost::trim_if(raw_result, boost::is_any_of("\t \n"));
+  std::vector<std::string> result;
+  boost::algorithm::split(result, raw_result,
+                          boost::is_any_of(delimiter),
+                          boost::token_compress_on);
+  // trim and remove empty
+  int count=0;
+  for (auto & item: result)
   {
-    std::string raw_result = get(kwd);
-    // cut whitespace stuff
-    boost::trim_if(raw_result, boost::is_any_of("\t \n"));
-    std::vector<std::string> result;
-    boost::algorithm::split(result, raw_result,
-                            boost::is_any_of(delimiter),
-                            boost::token_compress_on);
-    // trim and remove empty
-    int count=0;
-    for (auto & item: result)
-    {
-      boost::trim(item);
-      if (std::all_of(item.begin(),item.end(),isspace))
-        result.erase(result.begin()+count);
-      count++;
-    }
+    boost::trim(item);
+    if (std::all_of(item.begin(),item.end(),isspace))
+      result.erase(result.begin()+count);
+    count++;
+  }
 
-    return result;
-  }  // eom
+  return result;
+}  // eom
 
+
+
+std::vector<std::string>
+SyntaxParser::get_str_list(const std::string              &kwd,
+                           const std::string              &delimiter,
+                           const std::vector<std::string> &default_value) const
+{
+  try
+  {
+    return get_str_list(kwd, delimiter);
+  }
+  catch (...)
+  {
+    return default_value;
+  }
+}  // eom
 
 
 template<typename Number>
