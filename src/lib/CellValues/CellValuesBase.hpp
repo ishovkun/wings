@@ -91,6 +91,7 @@ class CellValuesBase
     c1w, c1p, c1e,     // eq coeffs, see equations
     c2o, c2p, c2e,
     c3g, c3o, c3w, c3p, c3e;
+  double delta_div_u;
   double T_w_face, T_o_face, T_g_face;  // cell phase transmissibilities
   double G_w_face, G_o_face, G_g_face;  // cell phase gravity vectors
   double Sw, So, Sg;                    // cell saturations
@@ -131,6 +132,8 @@ CellValuesBase<dim>::update(const CellIterator<dim> & cell,
   model.get_permeability->vector_value(cell->center(), this->k);
   this->cell_volume = cell->measure();
   this->pressure = pressure;
+
+  this->delta_div_u = extra_values.div_u - extra_values.div_old_u;
 
   // determine saturations
   this->Sw = 0;
@@ -179,7 +182,7 @@ CellValuesBase<dim>::update(const CellIterator<dim> & cell,
 
     c1w = this->phi * this->cell_volume / this->B_w; // = d12
     c1p = this->phi * this->Sw * this->C_w * this->cell_volume / this->B_w ; // = d11
-    c1e = 0;
+    c1e = this->Sw/this->B_w * model.get_biot_coefficient();
     // std::cout << "phi = "<< this->phi << std::endl;
     // std::cout << "Bw = "<< this->B_w << std::endl;
     // std::cout << "Cw = "<< this->C_w << std::endl;
@@ -207,13 +210,13 @@ CellValuesBase<dim>::update(const CellIterator<dim> & cell,
 
     c2o = this->phi * this->cell_volume / this->B_o;
     c2p = this->phi * So * this->C_o * this->cell_volume / this->B_o;
-    c2e = 0;
+    c2e = this->So/this->B_o * model.get_biot_coefficient();
   }
   if (model.has_phase(Model::Phase::Gas))
   {
     AssertThrow(false, ExcNotImplemented());
     // c3p = 0;
-    // c3e = 0;
+    // c3e = this->Sg/this->B_g * model.get_biot_coefficient();
     // c3w = Rgw*c1w;
     // c3g = this->phi / B_g * this->cell_volume;
     // c3o = Rgo*c2o;
@@ -442,6 +445,7 @@ get_rhs_cell_entry(const double time_step,
     // J = vector_J_phase[0];
     entry += c1p * pressure/time_step; // B matrix
     entry += vector_Q_phase[0];  // Q vector
+    entry += -c1e*delta_div_u/time_step; // poroelastic
   }
   else if (model.fluid_model == Model::FluidModelType::DeadOil)
   {
@@ -449,16 +453,15 @@ get_rhs_cell_entry(const double time_step,
     // J = +c2o/c1w*vector_J_phase[0] + vector_J_phase[1];
     entry += (c2o/c1w * c1p + c2p)*pressure/time_step;  // B matrix
     entry += +c2o/c1w*vector_Q_phase[0] + vector_Q_phase[1]; // Q vector
-
+    entry += - (c2o/c1w*c1e + c2e)*delta_div_u/time_step; // poroelastic
   }
   else if (model.fluid_model == Model::FluidModelType::Blackoil)
   {
     const double A = c2o/c1w * (c3g-c3w)/(c3g-c3o);
     const double B = c2o / (c3g - c3o);
-    // B_mass = A*c1p + c2p + B*c3p;
     entry += (A*c1p + c2p + B*c3p)*pressure/time_step;  // B matrix
 
-    // need to get equations for J and Q
+    // need to get equations for J and Q and poroelastic
     AssertThrow(false, ExcNotImplemented());
   }
   return entry;
