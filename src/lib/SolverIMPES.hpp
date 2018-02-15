@@ -201,14 +201,13 @@ assemble_pressure_system(CellValues::CellValuesBase<dim> & cell_values,
   Tensor<1, dim>       normal;
   std::vector<double>  p_values(n_q_points),
                        p_old_values(n_q_points);
-  std::vector<double>  				 div_u_values(n_q_points);
-  std::vector<double>  				 div_old_u_values(n_q_points);
+  std::vector<double>  div_u_values(n_q_points);
+  std::vector<double>  div_old_u_values(n_q_points);
   std::vector< std::vector<double> >  s_values(model.n_phases()-1);
   for (auto & c: s_values)
     c.resize(face_quadrature_formula.size());
   // this one stores both saturation values and geomechanics
-  std::vector<double>  extra_values(model.n_phases() - 1);
-  CellValues::ExtraValues extra_values1;
+  CellValues::ExtraValues extra_values;
 
   const unsigned int q_point = 0;
 
@@ -234,8 +233,7 @@ assemble_pressure_system(CellValues::CellValuesBase<dim> & cell_values,
       for (unsigned int c=0; c<model.n_phases() - 1; ++c)
       {
         fe_values.get_function_values(saturation_relevant[c], s_values[c]);
-        extra_values[c] = s_values[c][q_point];
-        extra_values1.saturation[c] = s_values[c][q_point];
+        extra_values.saturation[c] = s_values[c][q_point];
       }
       if (coupled_with_solid)
       {
@@ -244,8 +242,8 @@ assemble_pressure_system(CellValues::CellValuesBase<dim> & cell_values,
             get_function_divergences(*p_displacement, div_u_values);
         fe_values_solid[*p_displacement_extractor].
             get_function_divergences(*p_old_displacement, div_old_u_values);
-        extra_values1.div_u = div_u_values[q_point];
-        extra_values1.div_old_u = div_old_u_values[q_point];
+        extra_values.div_u = div_u_values[q_point];
+        extra_values.div_old_u = div_old_u_values[q_point];
       }
 
       // std::cout << "cell: " << i << std::endl;
@@ -281,7 +279,17 @@ assemble_pressure_system(CellValues::CellValuesBase<dim> & cell_values,
             for (unsigned int c=0; c<model.n_phases() - 1; ++c)
             {
               fe_values.get_function_values(saturation_relevant[c], s_values[c]);
-              extra_values[c] = s_values[c][q_point];
+              extra_values.saturation[c] = s_values[c][q_point];
+            }
+            if (coupled_with_solid)
+            {
+              fe_values_solid.reinit(solid_cell->neighbor(f));
+              fe_values_solid[*p_displacement_extractor].
+                  get_function_divergences(*p_displacement, div_u_values);
+              fe_values_solid[*p_displacement_extractor].
+                  get_function_divergences(*p_old_displacement, div_old_u_values);
+              extra_values.div_u = div_u_values[q_point];
+              extra_values.div_old_u = div_old_u_values[q_point];
             }
             const double p_neighbor = p_values[q_point];
 
@@ -317,7 +325,19 @@ assemble_pressure_system(CellValues::CellValuesBase<dim> & cell_values,
               for (unsigned int c=0; c<model.n_phases() - 1; ++c)
               {
                 fe_values.get_function_values(saturation_relevant[c], s_values[c]);
-                extra_values[c] = s_values[c][0];
+                extra_values.saturation[c] = s_values[c][q_point];
+              }
+              if (coupled_with_solid)
+              {
+                const auto & solid_neighbor =
+                    solid_cell->neighbor_child_on_subface(f, subface);
+                fe_values_solid.reinit(solid_neighbor);
+                fe_values_solid[*p_displacement_extractor].
+                    get_function_divergences(*p_displacement, div_u_values);
+                fe_values_solid[*p_displacement_extractor].
+                    get_function_divergences(*p_old_displacement, div_old_u_values);
+                extra_values.div_u = div_u_values[q_point];
+                extra_values.div_old_u = div_old_u_values[q_point];
               }
 
               const double p_neighbor = p_values[q_point];
@@ -377,7 +397,15 @@ solve_saturation_system(CellValues::CellValuesSaturation<dim> & cell_values,
                                          update_normal_vectors |
                                          update_JxW_values);
 
+  FEValues<dim> * p_fe_values_solid = NULL;
+  if (coupled_with_solid)
+    p_fe_values_solid = new FEValues<dim>(p_solid_dof_handler->get_fe(),
+                                          quadrature_formula, update_gradients);
+  auto & fe_values_solid = * p_fe_values_solid;
+
   const unsigned int dofs_per_cell = fe.dofs_per_cell;
+  const unsigned int n_q_points = quadrature_formula.size();
+
   std::vector<types::global_dof_index>
       dof_indices(dofs_per_cell),
       dof_indices_neighbor(dofs_per_cell);
@@ -386,22 +414,29 @@ solve_saturation_system(CellValues::CellValuesSaturation<dim> & cell_values,
   Tensor<1, dim>       normal;
   std::vector<double>  p_values(quadrature_formula.size()),
                        p_old_values(quadrature_formula.size());
+  std::vector<double>  div_u_values(n_q_points);
+  std::vector<double>  div_old_u_values(n_q_points);
 
   std::vector< std::vector<double> >  s_values(model.n_phases()-1);
   for (auto & c: s_values)
     c.resize(face_quadrature_formula.size());
 
-  std::vector<double>  extra_values(model.n_phases() - 1);
+  CellValues::ExtraValues extra_values;
 
-  const double So_rw = model.residual_saturation_oil();
+  const double So_rw = model.residual_saturation_oil();  //
   const double Sw_crit = model.residual_saturation_water();
   const unsigned int q_point = 0;
 
   typename DoFHandler<dim>::active_cell_iterator
       cell = dof_handler.begin_active(),
+      // trick to place solid_cell in cell loop condition
+      solid_cell = dof_handler.begin_active(),
       endc = dof_handler.end();
 
-  for (; cell!=endc; ++cell)
+  if (coupled_with_solid)
+    solid_cell = p_solid_dof_handler->begin_active();
+
+  for (; cell!=endc; ++cell, ++solid_cell)
     if (cell->is_locally_owned())
     {
       fe_values.reinit(cell);
@@ -410,12 +445,22 @@ solve_saturation_system(CellValues::CellValuesSaturation<dim> & cell_values,
       for (unsigned int c=0; c<model.n_phases() - 1; ++c)
       {
         fe_values.get_function_values(saturation_relevant[c], s_values[c]);
-        extra_values[c] = s_values[c][0];
+        extra_values.saturation[c] = s_values[c][q_point];
+      }
+      if (coupled_with_solid)
+      {
+        fe_values_solid.reinit(solid_cell);
+        fe_values_solid[*p_displacement_extractor].
+            get_function_divergences(*p_displacement, div_u_values);
+        fe_values_solid[*p_displacement_extractor].
+            get_function_divergences(*p_old_displacement, div_old_u_values);
+        extra_values.div_u = div_u_values[q_point];
+        extra_values.div_old_u = div_old_u_values[q_point];
       }
 
       const double p_old = p_old_values[q_point];
       const double p = p_values[q_point];
-      const double Sw_old = extra_values[q_point];
+      const double Sw_old = extra_values.saturation[0];
 
       // std::cout << "value1 c1w = " << cell_values.c1p << std::endl;
       // std::cout << "value1 c1p = " << cell_values.c1w << std::endl;
@@ -448,7 +493,17 @@ solve_saturation_system(CellValues::CellValuesSaturation<dim> & cell_values,
             for (unsigned int c=0; c<model.n_phases() - 1; ++c)
             {
               fe_values.get_function_values(saturation_relevant[c], s_values[c]);
-              extra_values[c] = s_values[c][q_point];
+              extra_values.saturation[c] = s_values[c][q_point];
+            }
+            if (coupled_with_solid)
+            {
+              fe_values_solid.reinit(solid_cell->neighbor(f));
+              fe_values_solid[*p_displacement_extractor].
+                  get_function_divergences(*p_displacement, div_u_values);
+              fe_values_solid[*p_displacement_extractor].
+                  get_function_divergences(*p_old_displacement, div_old_u_values);
+              extra_values.div_u = div_u_values[q_point];
+              extra_values.div_old_u = div_old_u_values[q_point];
             }
 
             const double p_neighbor = p_values[q_point];
@@ -479,8 +534,23 @@ solve_saturation_system(CellValues::CellValuesSaturation<dim> & cell_values,
 
               fe_values.get_function_values(pressure_relevant, p_values);
               const double p_neighbor = p_values[q_point];
-              for (unsigned int c=0; c<model.n_phases()-1; ++c)
+              for (unsigned int c=0; c<model.n_phases() - 1; ++c)
+              {
                 fe_values.get_function_values(saturation_relevant[c], s_values[c]);
+                extra_values.saturation[c] = s_values[c][q_point];
+              }
+              if (coupled_with_solid)
+              {
+                const auto & solid_neighbor =
+                    solid_cell->neighbor_child_on_subface(f, subface);
+                fe_values_solid.reinit(solid_neighbor);
+                fe_values_solid[*p_displacement_extractor].
+                    get_function_divergences(*p_displacement, div_u_values);
+                fe_values_solid[*p_displacement_extractor].
+                    get_function_divergences(*p_old_displacement, div_old_u_values);
+                extra_values.div_u = div_u_values[q_point];
+                extra_values.div_old_u = div_old_u_values[q_point];
+              }
 
               normal = fe_subface_values.normal_vector(q_point); // 0 is gauss point
               const double dS = fe_subface_values.JxW(q_point);

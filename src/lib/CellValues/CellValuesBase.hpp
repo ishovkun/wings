@@ -22,80 +22,80 @@ struct ExtraValues
 };
 
 
-  template <int dim>
-  class CellValuesBase
-  {
-   public:
-    CellValuesBase(const Model::Model<dim> &model_);
-    /* Update storage vectors and values for the current cell */
-    virtual void update(const CellIterator<dim> &cell,
-                        const double pressure,
-                        const std::vector<double> &extra_values);
-    /* Update wellbore rates and j-indices.
-     * The calculated rates are not true rates for
-     * pressure-controled wells,
-     * Q-vector rather gets the value j_ind*BHP
-     */
-    virtual void update_wells(const CellIterator<dim> &cell);
-    /* Update wellbore rates.
-     * This method actually gets real rates for both flow- and pressure-
-     * controlled wellbores.
-     */
-    virtual void update_wells(const CellIterator<dim> &cell,
-                              const double pressure);
-    /* Update storage vectors and values for the current face */
-    virtual void update_face_values(const CellValuesBase<dim> &neighbor_data,
-                                    const Tensor<1,dim>       &face_normal,
-                                    const double               dS);
-    // methods for pressure solver
-    /* Get a matrix entry corresponding to the cell.
-     * should be called once after update_values()
-     */
-    virtual double get_matrix_cell_entry(const double time_step) const;
-    /* Get a rhs entry corresponding to the cell.
-     * should be called once after update_values()
-     */
-    virtual double get_rhs_cell_entry(const double time_step,
-                                      const double pressure,
-                                      const double old_pressure,
-                                      const int /* phase */ = 0) const;
-    /* Get a matrix entry corresponding to the cell.
-     * should be called once after update_values()
-     */
-    virtual double get_matrix_face_entry() const;
-    /* Get a rhs entry corresponding to the face.
-     * should be called once per face after update_face_values()
-     */
-    virtual double get_rhs_face_entry(const double /* time_step */,
-                                      const int /* phase */ = 0) const;
+template <int dim>
+class CellValuesBase
+{
+ public:
+  CellValuesBase(const Model::Model<dim> &model_);
+  /* Update storage vectors and values for the current cell */
+  virtual void update(const CellIterator<dim> & cell,
+                      const double              pressure,
+                      const ExtraValues       & extra_values);
+  /* Update wellbore rates and j-indices.
+   * The calculated rates are not true rates for
+   * pressure-controled wells,
+   * Q-vector rather gets the value j_ind*BHP
+   */
+  virtual void update_wells(const CellIterator<dim> &cell);
+  /* Update wellbore rates.
+   * This method actually gets real rates for both flow- and pressure-
+   * controlled wellbores.
+   */
+  virtual void update_wells(const CellIterator<dim> &cell,
+                            const double pressure);
+  /* Update storage vectors and values for the current face */
+  virtual void update_face_values(const CellValuesBase<dim> &neighbor_data,
+                                  const Tensor<1,dim>       &face_normal,
+                                  const double               dS);
+  // methods for pressure solver
+  /* Get a matrix entry corresponding to the cell.
+   * should be called once after update_values()
+   */
+  virtual double get_matrix_cell_entry(const double time_step) const;
+  /* Get a rhs entry corresponding to the cell.
+   * should be called once after update_values()
+   */
+  virtual double get_rhs_cell_entry(const double time_step,
+                                    const double pressure,
+                                    const double old_pressure,
+                                    const int /* phase */ = 0) const;
+  /* Get a matrix entry corresponding to the cell.
+   * should be called once after update_values()
+   */
+  virtual double get_matrix_face_entry() const;
+  /* Get a rhs entry corresponding to the face.
+   * should be called once per face after update_face_values()
+   */
+  virtual double get_rhs_face_entry(const double /* time_step */,
+                                    const int /* phase */ = 0) const;
 
-   public:
-    const Model::Model<dim> & model;      // reference to the model object
-    Vector<double>            k;  // absolute permeability
-    std::vector<double>       rel_perm;  // relative permeabilities
-    Vector<double>            saturation;  // phase saturations
-    Point<dim>                cell_coord;  // cell center coordinates
-    // these vectors store current pvt values for phases
-    std::vector<double>       pvt_values_water,
-                              pvt_values_oil,
-                              pvt_values_gas;
-    // for wells
-    Vector<double>            vector_J_phase;  // productivity indices for phases and segments
-    Vector<double>            vector_Q_phase;  // well rates for all segments and phases
-    // coeffs
-    double pressure;  // stores current cell pressure
-    double phi, cell_volume;  // current permeability and cell volume
-    double mu_w, B_w, C_w,    // phase viscosities, volume factors, and compressiblities
-           mu_o, B_o, C_o,
-           mu_g, B_g, C_g,
-           c1w, c1p, c1e,     // eq coeffs, see equations
-           c2o, c2p, c2e,
-           c3g, c3o, c3w, c3p, c3e;
-    double T_w_face, T_o_face, T_g_face;  // cell phase transmissibilities
-    double G_w_face, G_o_face, G_g_face;  // cell phase gravity vectors
-    double Sw, So, Sg;                    // cell saturations
+ public:
+  const Model::Model<dim> & model;      // reference to the model object
+  Vector<double>            k;  // absolute permeability
+  std::vector<double>       rel_perm;  // relative permeabilities
+  Vector<double>            saturation;  // phase saturations
+  Point<dim>                cell_coord;  // cell center coordinates
+  // these vectors store current pvt values for phases
+  std::vector<double>       pvt_values_water,
+                            pvt_values_oil,
+                            pvt_values_gas;
+  // for wells
+  Vector<double>            vector_J_phase;  // productivity indices for phases and segments
+  Vector<double>            vector_Q_phase;  // well rates for all segments and phases
+  // coeffs
+  double pressure;  // stores current cell pressure
+  double phi, cell_volume;  // current permeability and cell volume
+  double mu_w, B_w, C_w,    // phase viscosities, volume factors, and compressiblities
+    mu_o, B_o, C_o,
+    mu_g, B_g, C_g,
+    c1w, c1p, c1e,     // eq coeffs, see equations
+    c2o, c2p, c2e,
+    c3g, c3o, c3w, c3p, c3e;
+  double T_w_face, T_o_face, T_g_face;  // cell phase transmissibilities
+  double G_w_face, G_o_face, G_g_face;  // cell phase gravity vectors
+  double Sw, So, Sg;                    // cell saturations
 
-  };
+};
 
 
 
@@ -117,14 +117,14 @@ CellValuesBase<dim>::CellValuesBase(const Model::Model<dim> &model_)
 
 template <int dim>
 void
-CellValuesBase<dim>::update(const CellIterator<dim> &cell,
-                            const double pressure,
-                            const std::vector<double> &extra_values)
+CellValuesBase<dim>::update(const CellIterator<dim> & cell,
+                            const double              pressure,
+                            const ExtraValues       & extra_values)
 {
   const auto & model = this->model;
-  AssertThrow(extra_values.size() == model.n_phases()-1,
-              ExcDimensionMismatch(extra_values.size(),
-                                   model.n_phases()-1));
+  // AssertThrow(extra_values.size() == model.n_phases()-1,
+  //             ExcDimensionMismatch(extra_values.size(),
+  //                                  model.n_phases()-1));
 
   this->cell_coord = cell->center();
   this->phi = model.get_porosity->value(cell->center());
@@ -141,7 +141,8 @@ CellValuesBase<dim>::update(const CellIterator<dim> &cell,
   {
     if (model.n_phases() > 1)
     {
-      this->Sw = extra_values[0];
+      // this->Sw = extra_values[0];
+      this->Sw = extra_values.saturation[0];
       saturation[0] = this->Sw;
     }
     else
@@ -155,7 +156,7 @@ CellValuesBase<dim>::update(const CellIterator<dim> &cell,
     if (model.fluid_model == Model::FluidModelType::DeadOil)
       this->So = 1.0 - this->Sw;
     else if (model.fluid_model == Model::FluidModelType::Blackoil)
-      this->So = extra_values[1];
+      this->So = extra_values.saturation[1];
     saturation[1] = this->So;
   }
 
