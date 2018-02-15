@@ -69,6 +69,7 @@ class PressureSolver
   // Pointers to solid solver objects
   const DoFHandler<dim>               * p_solid_dof_handler;
   const TrilinosWrappers::MPI::Vector * p_displacement_vector;
+  bool coupled_with_solid;
 
  public:
   TrilinosWrappers::MPI::Vector solution, old_solution;
@@ -90,7 +91,8 @@ PressureSolver(MPI_Comm                                  &mpi_communicator_,
     dof_handler(triangulation_),
     fe(0), // since we want finite volumes
     model(model_),
-    pcout(pcout_)
+    pcout(pcout_),
+    coupled_with_solid(false)
 {}  // eom
 
 
@@ -387,6 +389,7 @@ set_coupling(const DoFHandler<dim>               & solid_dof_handler,
 {
   p_solid_dof_handler = & solid_dof_handler;
   p_displacement_vector = & p_displacement_vector;
+  coupled_with_solid = true;
 }  // eom
 
 

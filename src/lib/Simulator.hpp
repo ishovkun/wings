@@ -236,16 +236,25 @@ void Simulator<dim>::run()
   SolidSolvers::ElasticSolver<dim>
       solid_solver(mpi_communicator, triangulation, model, pcout);
 
+  const FEValuesExtractors::Vector displacement(0);
   solid_solver.set_coupling(fluid_solver.get_dof_handler());
+  fluid_solver.set_coupling(solid_solver.get_dof_handler(),
+                            solid_solver.relevant_solution,
+                            solid_solver.old_solution,
+                            displacement);
 
   fluid_solver.setup_dofs();
   solid_solver.setup_dofs();
 
-  solid_solver.assemble_system(fluid_solver.pressure_relevant);
+  // solid_solver.assemble_system(fluid_solver.pressure_relevant);
+  // CellValues::CellValuesBase<dim> cell_values_pressure(model),
+  //                                 neighbor_values_pressure(model);
+  // CellValues::CellValuesSaturation<dim> cell_values_saturation(model);
+  // fluid_solver.assemble_system(fluid_solver.pressure_relevant);
 
-  const auto & solid_system_matrix = solid_solver.get_system_matrix();
+  // const auto & solid_system_matrix = solid_solver.get_system_matrix();
   // solid_system_matrix.print(std::cout, true);
-  solid_solver.solve();
+  // solid_solver.solve();
 
   // initial values
   // fluid_solver.solution = 1e6;
@@ -279,8 +288,12 @@ void Simulator<dim>::run()
   //               ExcMessage("bug in rel perm"));
   // }
 
-  // double time = 0;
-  // double time_step = model.min_time_step;
+  double time = 0;
+  double time_step = model.min_time_step;
+
+  CellValues::CellValuesBase<dim>
+      cell_values(model), neighbor_values(model);
+  fluid_solver.assemble_pressure_system(cell_values, neighbor_values, time_step);
   // unsigned int time_step_number = 0;
 
   // while(time <= model.t_max)

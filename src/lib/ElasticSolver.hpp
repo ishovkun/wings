@@ -346,4 +346,13 @@ ElasticSolver<dim>::get_system_matrix()
   return system_matrix;
 }  // end get_syste_matrix
 
+
+
+template <int dim>
+const DoFHandler<dim> &
+ElasticSolver<dim>::get_dof_handler()
+{
+  return dof_handler;
+}  // eom
+
 } // end of namespace

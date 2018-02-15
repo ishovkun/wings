@@ -57,6 +57,11 @@ class SolverIMPES
    * returns the number of solver steps
    */
   unsigned int solve_pressure_system();
+  // give solver access to solid dofs and solution vector
+  void set_coupling(const DoFHandler<dim>               & solid_dof_handler,
+                    const TrilinosWrappers::MPI::Vector & displacement_vector,
+                    const TrilinosWrappers::MPI::Vector & old_displacement_vector,
+                    const FEValuesExtractors::Vector    & extractor);
   // accessing private members
   const TrilinosWrappers::SparseMatrix & get_system_matrix();
   const TrilinosWrappers::MPI::Vector  & get_rhs_vector();
@@ -72,8 +77,8 @@ class SolverIMPES
   ConditionalOStream                        & pcout;
 
   // Matrices and vectors
-  TrilinosWrappers::SparseMatrix             system_matrix;
-  TrilinosWrappers::MPI::Vector              rhs_vector;
+  TrilinosWrappers::SparseMatrix              system_matrix;
+  TrilinosWrappers::MPI::Vector               rhs_vector;
 
  public:
   TrilinosWrappers::MPI::Vector              solution,
@@ -84,15 +89,23 @@ class SolverIMPES
                                              saturation_old;
   // partitioning
   IndexSet                      locally_owned_dofs, locally_relevant_dofs;
+
+ private:
+  const DoFHandler<dim>                     * p_solid_dof_handler;
+  const TrilinosWrappers::MPI::Vector       * p_displacement;
+  const TrilinosWrappers::MPI::Vector       * p_old_displacement;
+  const FEValuesExtractors::Vector          * p_displacement_extractor;
+  bool coupled_with_solid;
+
 };
 
 
 template <int dim>
 SolverIMPES<dim>::
 SolverIMPES(MPI_Comm                                  &mpi_communicator_,
-               parallel::distributed::Triangulation<dim> &triangulation_,
-               const Model::Model<dim>                   &model_,
-               ConditionalOStream                        &pcout_)
+            parallel::distributed::Triangulation<dim> &triangulation_,
+            const Model::Model<dim>                   &model_,
+            ConditionalOStream                        &pcout_)
     :
     mpi_communicator(mpi_communicator_),
     triangulation(triangulation_),
@@ -102,7 +115,8 @@ SolverIMPES(MPI_Comm                                  &mpi_communicator_,
     pcout(pcout_),
     // saturation_solution(model.n_phases()),
     saturation_relevant(model.n_phases()),
-    saturation_old(model.n_phases() - 1)  // old solution n-1 phases
+    saturation_old(model.n_phases() - 1),  // old solution n-1 phases
+    coupled_with_solid(false)
 {}  // eom
 
 
@@ -163,7 +177,6 @@ assemble_pressure_system(CellValues::CellValuesBase<dim> & cell_values,
 
   FEValues<dim> fe_values(fe, quadrature_formula, update_values);
   FEValues<dim> fe_values_neighbor(fe, quadrature_formula, update_values);
-
   // the following two objects only get geometry data
   FEFaceValues<dim> fe_face_values(fe, face_quadrature_formula,
                                    update_normal_vectors);
@@ -172,16 +185,24 @@ assemble_pressure_system(CellValues::CellValuesBase<dim> & cell_values,
   FESubfaceValues<dim> fe_subface_values(fe, face_quadrature_formula,
                                          update_normal_vectors |
                                          update_JxW_values);
+  FEValues<dim> * p_fe_values_solid = NULL;
+  if (coupled_with_solid)
+    p_fe_values_solid = new FEValues<dim>(p_solid_dof_handler->get_fe(),
+                                          quadrature_formula, update_gradients);
+  auto & fe_values_solid = * p_fe_values_solid;
 
   const unsigned int dofs_per_cell = fe.dofs_per_cell;
+  const unsigned int n_q_points = quadrature_formula.size();
   std::vector<types::global_dof_index>
       dof_indices(dofs_per_cell),
       dof_indices_neighbor(dofs_per_cell);
 
   // objects to store local data
   Tensor<1, dim>       normal;
-  std::vector<double>  p_values(quadrature_formula.size()),
-                       p_old_values(quadrature_formula.size());
+  std::vector<double>  p_values(n_q_points),
+                       p_old_values(n_q_points);
+  std::vector<double>  				 div_u_values(n_q_points);
+  std::vector<double>  				 div_old_u_values(n_q_points);
   std::vector< std::vector<double> >  s_values(model.n_phases()-1);
   for (auto & c: s_values)
     c.resize(face_quadrature_formula.size());
@@ -192,12 +213,16 @@ assemble_pressure_system(CellValues::CellValuesBase<dim> & cell_values,
 
   typename DoFHandler<dim>::active_cell_iterator
       cell = dof_handler.begin_active(),
+      solid_cell = dof_handler.begin_active(),
       endc = dof_handler.end();
+
+  if (coupled_with_solid)
+    solid_cell = p_solid_dof_handler->begin_active();
 
   system_matrix = 0;
   rhs_vector = 0;
 
-  for (; cell!=endc; ++cell)
+  for (; cell!=endc; ++cell, ++solid_cell)
   {
     if (cell->is_locally_owned())
     {
@@ -208,6 +233,14 @@ assemble_pressure_system(CellValues::CellValuesBase<dim> & cell_values,
       {
         fe_values.get_function_values(saturation_relevant[c], s_values[c]);
         extra_values[c] = s_values[c][q_point];
+      }
+      if (coupled_with_solid)
+      {
+        fe_values_solid.reinit(solid_cell);
+        fe_values_solid[*p_displacement_extractor].
+            get_function_divergences(*p_displacement, div_u_values);
+        fe_values_solid[*p_displacement_extractor].
+            get_function_divergences(*p_old_displacement, div_old_u_values);
       }
 
       // std::cout << "cell: " << i << std::endl;
@@ -310,6 +343,7 @@ assemble_pressure_system(CellValues::CellValuesBase<dim> & cell_values,
   } // end cells loop
   system_matrix.compress(VectorOperation::add);
   rhs_vector.compress(VectorOperation::add);
+  delete p_fe_values_solid;
 }  // eom
 
 
@@ -504,6 +538,23 @@ SolverIMPES<dim>::solve_pressure_system()
 
   return solver_control.last_step();
 } // eom
+
+
+
+template<int dim>
+void
+SolverIMPES<dim>::
+set_coupling(const DoFHandler<dim>               & solid_dof_handler,
+             const TrilinosWrappers::MPI::Vector & displacement_vector,
+             const TrilinosWrappers::MPI::Vector & old_displacement_vector,
+             const FEValuesExtractors::Vector    & extractor)
+{
+  p_solid_dof_handler      = & solid_dof_handler;
+  p_displacement           = & displacement_vector;
+  p_old_displacement       = & old_displacement_vector;
+  p_displacement_extractor = & extractor;
+  coupled_with_solid = true;
+}  // eom
 
 
 
