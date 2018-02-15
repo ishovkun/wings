@@ -208,11 +208,13 @@ assemble_pressure_system(CellValues::CellValuesBase<dim> & cell_values,
     c.resize(face_quadrature_formula.size());
   // this one stores both saturation values and geomechanics
   std::vector<double>  extra_values(model.n_phases() - 1);
+  CellValues::ExtraValues extra_values1;
 
   const unsigned int q_point = 0;
 
   typename DoFHandler<dim>::active_cell_iterator
       cell = dof_handler.begin_active(),
+      // trick to place solid_cell in cell loop condition
       solid_cell = dof_handler.begin_active(),
       endc = dof_handler.end();
 
@@ -233,6 +235,7 @@ assemble_pressure_system(CellValues::CellValuesBase<dim> & cell_values,
       {
         fe_values.get_function_values(saturation_relevant[c], s_values[c]);
         extra_values[c] = s_values[c][q_point];
+        extra_values1.saturation[c] = s_values[c][q_point];
       }
       if (coupled_with_solid)
       {
@@ -241,6 +244,8 @@ assemble_pressure_system(CellValues::CellValuesBase<dim> & cell_values,
             get_function_divergences(*p_displacement, div_u_values);
         fe_values_solid[*p_displacement_extractor].
             get_function_divergences(*p_old_displacement, div_old_u_values);
+        extra_values1.div_u = div_u_values[q_point];
+        extra_values1.div_old_u = div_old_u_values[q_point];
       }
 
       // std::cout << "cell: " << i << std::endl;

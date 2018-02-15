@@ -7,10 +7,19 @@
 
 namespace CellValues
 {
-  using namespace dealii;
 
-  template <int dim>
-  using CellIterator = typename dealii::DoFHandler<dim>::active_cell_iterator;
+using namespace dealii;
+
+template <int dim>
+using CellIterator = typename dealii::DoFHandler<dim>::active_cell_iterator;
+
+
+struct ExtraValues
+{
+  ExtraValues(const int n_phases = 3) {saturation.reinit(n_phases);}
+  Vector<double> saturation;
+  double div_u, div_old_u;
+};
 
 
   template <int dim>
