@@ -127,19 +127,21 @@ CellValuesBase<dim>::update(const CellIterator<dim> & cell,
   //             ExcDimensionMismatch(extra_values.size(),
   //                                  model.n_phases()-1));
 
+  // Save stuff
   this->cell_coord = cell->center();
   this->phi = model.get_porosity->value(cell->center());
   model.get_permeability->vector_value(cell->center(), this->k);
   this->cell_volume = cell->measure();
   this->pressure = pressure;
-
   this->delta_div_u = extra_values.div_u - extra_values.div_old_u;
+
+  // for geomechanics
+  const double C_r = model.get_rock_compressibility(cell->center());
 
   // determine saturations
   this->Sw = 0;
   this->So = 0;
   this->Sg = 0;
-
   if (model.has_phase(Model::Phase::Water))
   {
     if (model.n_phases() > 1)
@@ -153,7 +155,6 @@ CellValuesBase<dim>::update(const CellIterator<dim> & cell,
       this->Sw = 1.0;
     }
   }
-
   if (model.has_phase(Model::Phase::Oil))
   {
     if (model.fluid_model == Model::FluidModelType::DeadOil)
@@ -181,7 +182,8 @@ CellValuesBase<dim>::update(const CellIterator<dim> & cell,
     this->mu_w = pvt_values_water[2];
 
     c1w = this->phi * this->cell_volume / this->B_w; // = d12
-    c1p = this->phi * this->Sw * this->C_w * this->cell_volume / this->B_w ; // = d11
+    // c1p = this->phi * this->Sw * this->C_w * this->cell_volume / this->B_w ; // = d11
+    c1p = Sw/B_w * (C_r + phi*C_w) * cell_volume; // = d11 in balhoff
     c1e = this->Sw/this->B_w * model.get_biot_coefficient();
     // std::cout << "phi = "<< this->phi << std::endl;
     // std::cout << "Bw = "<< this->B_w << std::endl;
@@ -209,7 +211,7 @@ CellValuesBase<dim>::update(const CellIterator<dim> & cell,
     // std::cout << "S_o = "<< this->So << std::endl;
 
     c2o = this->phi * this->cell_volume / this->B_o;
-    c2p = this->phi * So * this->C_o * this->cell_volume / this->B_o;
+    c2p = So/B_o * (C_r + phi*C_o) * cell_volume; // = d11 in balhoff
     c2e = this->So/this->B_o * model.get_biot_coefficient();
   }
   if (model.has_phase(Model::Phase::Gas))

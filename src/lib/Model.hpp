@@ -94,7 +94,7 @@ class Model
   double get_biot_coefficient() const;
   double gravity() const;
   // C_r = \partial poro / \partial p
-  double get_rock_compressibility() const;
+  double get_rock_compressibility(const Point<dim> &p) const;
   void get_pvt_oil(const double        pressure,
                    std::vector<double> &dst) const;
   void get_pvt_water(const double        pressure,
@@ -542,7 +542,7 @@ Model<dim>::get_saturation_limits(const unsigned int phase) const
 
 template<int dim>
 double
-Model<dim>::get_rock_compressibility() const
+Model<dim>::get_rock_compressibility(const Point<dim> &p) const
 {
   if (solid_model == SolidModelType::Compressibility)
   {
@@ -550,9 +550,15 @@ Model<dim>::get_rock_compressibility() const
   }
   else if (solid_model == SolidModelType::Elasticity)
   {
-    // 1/N modulus
-    // buck_modulus/(1-biot_coef)/(biot_coef - poro)
-    AssertThrow(false, ExcNotImplemented());
+    const double E = get_young_modulus->value(p);
+    const double nu = get_poisson_ratio->value(p);
+    const double bulk_modulus = E/3.0/(1.0-2.0*nu);
+    const double phi = get_porosity->value(p);
+    const double alpha = get_biot_coefficient();
+    AssertThrow(alpha > phi /* || alpha == 0.0 */,
+                ExcMessage("Biot coef should be > porosity"));
+    const double rec_N = (alpha - phi) * (1.0 - alpha) / bulk_modulus;
+    return rec_N;
   }
   else
   {
