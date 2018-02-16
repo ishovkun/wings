@@ -114,6 +114,7 @@ CellValuesSaturation<dim>::get_rhs_cell_entry(const double time_step,
           time_step;
       result += CellValuesBase<dim>::c1p / CellValuesBase<dim>::c1w *
       (pressure - old_pressure);
+      result += -CellValuesBase<dim>::c1e * CellValuesBase<dim>::delta_div_u;
     }
     else
     {
@@ -121,6 +122,7 @@ CellValuesSaturation<dim>::get_rhs_cell_entry(const double time_step,
           time_step;
       result += CellValuesBase<dim>::c2p / CellValuesBase<dim>::c2o *
           (pressure - old_pressure);
+      result += -CellValuesBase<dim>::c2e * CellValuesBase<dim>::delta_div_u;
     }
   }
   else
