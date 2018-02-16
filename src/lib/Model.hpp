@@ -29,7 +29,9 @@ enum PVTType {Constant, Table, Correlation};
 
 enum Phase {Water, Oil, Gas};
 
+enum FluidCouplingStrategy {None, FixedStressSplit};
 
+// This is to extend to functions and correlations instead of tables
 struct ModelConfig
 {
   PVTType pvt_oil, pvt_water, pvt_gas;
@@ -119,6 +121,7 @@ class Model
   get_pvt_table_oil() const {return pvt_table_oil;}
   double residual_saturation_water() const;
   double residual_saturation_oil() const;
+  FluidCouplingStrategy coupling_strategy() const;
 
   // update methods
   void update_well_controls(const double time);
@@ -602,4 +605,22 @@ Model<dim>::get_biot_coefficient() const
 {
   return biot_coefficient;
 }  // end get_biot_coefficient
+
+
+
+template<int dim>
+FluidCouplingStrategy
+Model<dim>::coupling_strategy() const
+{
+  if (solid_model == SolidModelType::Compressibility)
+    return FluidCouplingStrategy::None;
+  else if (solid_model == SolidModelType::Elasticity)
+    return FluidCouplingStrategy::FixedStressSplit;
+  else
+    AssertThrow(false, ExcNotImplemented());
+
+  return FluidCouplingStrategy::None;
+}  // end do_something
+
+
 }  // end of namespace

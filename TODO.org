@@ -8,6 +8,8 @@
 ** TODO Arithmetic mean for properties should take cell sizes into account
 ** Make impes solver have only one owned solution
    have solution instead of pressure_solution and saturation_solution
+** Allow creating cubic mesh with n_elements and dimensions
+   also allow mesh file keyword
 * Physics
 ** Multiphase
 *** DONE Input

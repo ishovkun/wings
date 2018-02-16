@@ -329,10 +329,6 @@ update_face_values(const CellValuesBase<dim> &neighbor_data,
     // }
 
     T_w_face = T_abs_face*k_rw_face/mu_w_face/B_w_face;
-    // for (int d=0; d<dim; ++d)
-    //   if (abs(dx[d]/distance) > DefaultValues::small_number)
-    //     T_w_face += 1./mu_w_face/B_w_face *
-    //         (k_face[d]*k_rw_face*abs(face_normal[d]/dx[d]))*face_area;
 
     G_w_face = model.density_sc_water()/B_w_face/B_w_face/mu_w_face *
         model.gravity()*k_face[2]*k_rw_face*face_normal[2]*face_area;
@@ -361,10 +357,7 @@ update_face_values(const CellValuesBase<dim> &neighbor_data,
                                           pot_o, pot_o_neighbor);
 
     T_o_face = T_abs_face*k_ro_face/mu_o_face/B_o_face;
-    // for (int d=0; d<dim; ++d)
-    //   if (abs(dx[d]/distance) > DefaultValues::small_number)
-    //     T_o_face += 1./mu_o_face/B_o_face *
-    //         (k_face[d]*k_ro_face*abs(face_normal[d]/dx[d]))*face_area;
+
     G_o_face = model.density_sc_oil()/B_o_face/B_o_face/mu_o_face *
         model.gravity()*k_face[2]*k_ro_face*face_normal[2]*face_area;
 
@@ -424,6 +417,17 @@ get_matrix_cell_entry(const double time_step) const
     // need to get equations for J
     AssertThrow(false, ExcNotImplemented());
   }
+
+  // coupling with geomechanics
+  if (model.coupling_strategy() == Model::FluidCouplingStrategy::FixedStressSplit)
+  {
+    const double alpha = model.biot_coefficient();
+    const double E = get_young_modulus->value(this->cell_coord);
+    const double nu = get_poisson_ratio->value(this->cell_coord);
+    const double bulk_modulus = E/3.0/(1.0-2.0*nu);
+    entry += alpha*alpha/bulk_modulus/time_step;
+  }
+
   return entry;
 } // eom
 
@@ -443,16 +447,12 @@ get_rhs_cell_entry(const double time_step,
   const auto & model = this->model;
   if (model.fluid_model == Model::FluidModelType::Liquid)
   {
-    // B_mass = c1p;
-    // J = vector_J_phase[0];
     entry += c1p * pressure/time_step; // B matrix
     entry += vector_Q_phase[0];  // Q vector
     entry += -c1e*delta_div_u/time_step; // poroelastic
   }
   else if (model.fluid_model == Model::FluidModelType::DeadOil)
   {
-    // B_mass = c2o/c1w * c1p + c2p;
-    // J = +c2o/c1w*vector_J_phase[0] + vector_J_phase[1];
     entry += (c2o/c1w * c1p + c2p)*pressure/time_step;  // B matrix
     entry += +c2o/c1w*vector_Q_phase[0] + vector_Q_phase[1]; // Q vector
     entry += - (c2o/c1w*c1e + c2e)*delta_div_u/time_step; // poroelastic
@@ -465,6 +465,16 @@ get_rhs_cell_entry(const double time_step,
 
     // need to get equations for J and Q and poroelastic
     AssertThrow(false, ExcNotImplemented());
+  }
+
+  // coupling with geomechanics
+  if (model.coupling_strategy() == Model::FluidCouplingStrategy::FixedStressSplit)
+  {
+    const double alpha = model.biot_coefficient();
+    const double E = get_young_modulus->value(this->cell_coord);
+    const double nu = get_poisson_ratio->value(this->cell_coord);
+    const double bulk_modulus = E/3.0/(1.0-2.0*nu);
+    entry += alpha*alpha/bulk_modulus/time_step * pressure;
   }
   return entry;
 } // eom
