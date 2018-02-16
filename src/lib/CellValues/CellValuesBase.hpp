@@ -421,9 +421,9 @@ get_matrix_cell_entry(const double time_step) const
   // coupling with geomechanics
   if (model.coupling_strategy() == Model::FluidCouplingStrategy::FixedStressSplit)
   {
-    const double alpha = model.biot_coefficient();
-    const double E = get_young_modulus->value(this->cell_coord);
-    const double nu = get_poisson_ratio->value(this->cell_coord);
+    const double alpha = model.get_biot_coefficient();
+    const double E = model.get_young_modulus->value(this->cell_coord);
+    const double nu = model.get_poisson_ratio->value(this->cell_coord);
     const double bulk_modulus = E/3.0/(1.0-2.0*nu);
     entry += alpha*alpha/bulk_modulus/time_step;
   }
@@ -470,9 +470,9 @@ get_rhs_cell_entry(const double time_step,
   // coupling with geomechanics
   if (model.coupling_strategy() == Model::FluidCouplingStrategy::FixedStressSplit)
   {
-    const double alpha = model.biot_coefficient();
-    const double E = get_young_modulus->value(this->cell_coord);
-    const double nu = get_poisson_ratio->value(this->cell_coord);
+    const double alpha = model.get_biot_coefficient();
+    const double E = model.get_young_modulus->value(this->cell_coord);
+    const double nu = model.get_poisson_ratio->value(this->cell_coord);
     const double bulk_modulus = E/3.0/(1.0-2.0*nu);
     entry += alpha*alpha/bulk_modulus/time_step * pressure;
   }

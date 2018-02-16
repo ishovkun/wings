@@ -31,6 +31,8 @@ enum Phase {Water, Oil, Gas};
 
 enum FluidCouplingStrategy {None, FixedStressSplit};
 
+enum LinearSolverType {Direct, CG, GMRES};
+
 // This is to extend to functions and correlations instead of tables
 struct ModelConfig
 {
@@ -88,6 +90,8 @@ class Model
   void set_solid_neumann_boundary_conditions(const std::vector<int>    & labels,
                                              const std::vector<int>    & components,
                                              const std::vector<double> & values);
+  void set_fluid_linear_solver(const LinearSolverType & solver_type);
+  void set_solid_linear_solver(const LinearSolverType & solver_type);
   // querying data
   bool has_phase(const Phase &phase) const;
   unsigned int n_phases() const;
@@ -154,31 +158,31 @@ class Model
   double                     fss_tolerance,
                              min_time_step,
                              t_max;
-  int                                    max_fss_steps;
+  int                        max_fss_steps;
 
-  FluidModelType                         fluid_model;
-  SolidModelType                         solid_model;
-  ModelConfig                            config;
+  FluidModelType             fluid_model;
+  SolidModelType             solid_model;
+  // this thing is to specify the types of pvts (table, correlation) and relperms
+  ModelConfig                config; // not used anywhere
+  LinearSolverType           linear_solver_solid,
+                             linear_solver_fluid;
+
  protected:
-  std::string                            mesh_file_name,
-                                         input_file_name;
-  double                                 density_sc_w_constant,
-                                         density_sc_o_constant,
-                                         porosity,
-                                         // young_modulus,
-                                         // poisson_ratio_constant,
-                                         biot_coefficient,
-                                         rock_compressibility_constant;
-  Interpolation::LookupTable             pvt_table_water,
-                                         pvt_table_oil,
-                                         pvt_table_gas;
-  RelativePermeability                   rel_perm;
-  std::vector<Phase>                     phases;
+  std::string                mesh_file_name,
+                             input_file_name;
+  double                     density_sc_w_constant,
+                             density_sc_o_constant,
+                             porosity,
+                             biot_coefficient,
+                             rock_compressibility_constant;
+  Interpolation::LookupTable pvt_table_water,
+                             pvt_table_oil,
+                             pvt_table_gas;
+  RelativePermeability       rel_perm;
+  std::vector<Phase>         phases;
  private:
-  std::map<double, double>               timestep_table;
-  std::map<std::string, int>             well_ids;
-
-  int                                    verbosity;
+  std::map<double, double>   timestep_table;
+  std::map<std::string, int> well_ids;
 };  // eom
 
 
@@ -194,7 +198,6 @@ Model<dim>::Model(MPI_Comm           &mpi_communicator_,
     get_porosity(NULL)
 {
   // declare_parameters();
-  verbosity = 0;
   units.set_system(Units::si_units);
 }  // eom
 
@@ -622,5 +625,24 @@ Model<dim>::coupling_strategy() const
   return FluidCouplingStrategy::None;
 }  // end do_something
 
+
+
+template<int dim>
+void
+Model<dim>::
+set_fluid_linear_solver(const LinearSolverType & solver_type)
+{
+  linear_solver_fluid = solver_type;
+}  // end set_fluid_linear_solver( const Model::LinearSolverType solver_type )
+
+
+
+template<int dim>
+void
+Model<dim>::
+set_solid_linear_solver(const LinearSolverType & solver_type)
+{
+  linear_solver_solid = solver_type;
+}  // end set_fluid_linear_solver( const Model::LinearSolverType solver_type )
 
 }  // end of namespace

@@ -62,6 +62,11 @@ namespace Keywords
     minimum_time_step = "Minimum time step",
     fss_tolerance = "FSS tolerance",
     max_fss_steps = "Max FSS steps",
+    solid_linear_solver = "Linear solver solid",
+    fluid_linear_solver = "Linear solver fluid",
+    linear_solver_direct = "Direct",
+    linear_solver_cg = "CG",
+    linear_solver_gmres = "GMRES",
 
   section_boundary_conditions = "Boundary conditions",
       solid_dirichlet_labels = "Displacement boundaries",

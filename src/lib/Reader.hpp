@@ -257,6 +257,9 @@ constexpr int dim = 3;
                     &&
                     dirichlet_values.size() == dirichlet_components.size(),
                     ExcMessage("Inconsistent displacement boundary conditions"));
+        for (const auto & comp : dirichlet_components)
+          AssertThrow(comp < 3 && comp >= 0, ExcDimensionMismatch(comp, dim));
+
         model.set_solid_dirichlet_boundary_conditions(dirichlet_labels,
                                                       dirichlet_components,
                                                       dirichlet_values);
@@ -273,6 +276,10 @@ constexpr int dim = 3;
         AssertThrow(neumann_labels.size() == neumann_values.size() &&
                     neumann_values.size() == neumann_components.size(),
                     ExcMessage("Inconsistent stress boundary conditions"));
+
+        for (const auto & comp : dirichlet_components)
+          AssertThrow(comp < 3 && comp >= 0, ExcDimensionMismatch(comp, dim));
+
         model.set_solid_neumann_boundary_conditions(neumann_labels,
                                                     neumann_components,
                                                     neumann_values);
@@ -292,6 +299,26 @@ constexpr int dim = 3;
       model.t_max =
           parser.get_double(Keywords::t_max) *
           model.units.time();
+      // linear solvers
+      const std::string fluid_linear_solver =
+          parser.get(Keywords::fluid_linear_solver, Keywords::linear_solver_cg);
+      if (fluid_linear_solver == Keywords::linear_solver_direct)
+        model.set_fluid_linear_solver(Model::LinearSolverType::Direct);
+      else if (fluid_linear_solver == Keywords::linear_solver_cg)
+        model.set_fluid_linear_solver(Model::LinearSolverType::CG);
+      else if (fluid_linear_solver == Keywords::linear_solver_gmres)
+        model.set_fluid_linear_solver(Model::LinearSolverType::GMRES);
+      else
+        AssertThrow(false, ExcNotImplemented());
+
+      const std::string solid_linear_solver =
+          parser.get(Keywords::solid_linear_solver, Keywords::linear_solver_cg);
+      if (solid_linear_solver == Keywords::linear_solver_direct)
+        model.set_solid_linear_solver(Model::LinearSolverType::Direct);
+      else if (solid_linear_solver == Keywords::linear_solver_cg)
+        model.set_solid_linear_solver(Model::LinearSolverType::CG);
+      else
+        AssertThrow(false, ExcNotImplemented());
     }
   } // eom
 

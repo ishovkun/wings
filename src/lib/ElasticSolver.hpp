@@ -249,7 +249,6 @@ assemble_system(const TrilinosWrappers::MPI::Vector & pressure_vector)
           cell_rhs(i)  +=
               alpha*p_value*trace(grad_xi_u[i])*fe_values.JxW(q);
         }  // end i loop
-
       }  // end q loop
 
       // impose neumann BC's
@@ -269,21 +268,26 @@ assemble_system(const TrilinosWrappers::MPI::Vector & pressure_vector)
             const unsigned int id = model.solid_neumann_labels[l];
 
             if (face_boundary_id == id)
+            {
+              // pcout << "at neumann boundary " << id << std::endl;
+
               for (unsigned int i=0; i<dofs_per_cell; ++i)
               {
-                // pcout << "found boundary " << id << std::endl;
-
                 const unsigned int component_i =
                     fe.system_to_component_index(i).first;
+                // pcout << "trying component " << component_i << std::endl;
+
                 const unsigned int neumann_component =
                     model.solid_neumann_components[l];
 
                 if (component_i == neumann_component)
                   for (unsigned int q=0; q<n_face_q_points; ++q)
                   {
-                    double neumann_value =
+                    const double neumann_value =
                         model.solid_neumann_values[l] *
                         fe_face_values.normal_vector(q)[component_i];
+
+                    // pcout << "adding stuff " << neumann_value << std::endl;
 
                     cell_rhs(i) +=
                         fe_face_values.shape_value(i, q) *
@@ -291,6 +295,7 @@ assemble_system(const TrilinosWrappers::MPI::Vector & pressure_vector)
                         fe_face_values.JxW(q);
                   }  // end of q_point loop
               }  // end of i loop
+            } // end at neumann boundary
 
           }  // end loop neumann labels
         } // end face loop
@@ -312,25 +317,40 @@ template<int dim>
 unsigned int
 ElasticSolver<dim>::solve()
 {
+  // setup CG solver
+  TrilinosWrappers::SolverCG::AdditionalData data_cg;
   double tol = 1e-10*rhs_vector.l2_norm();
   if (tol == 0.0)
     tol = 1e-10;
   SolverControl solver_control(1000, tol);
 
-  // preconditioner
-  TrilinosWrappers::PreconditionAMG preconditioner;
-  TrilinosWrappers::PreconditionAMG::AdditionalData data_amg;
-  // data_amg.constant_modes = constant_modes;
-  data_amg.elliptic = true;
-  data_amg.higher_order_elements = true;
-  data_amg.smoother_sweeps = 2;
-  data_amg.aggregation_threshold = 0.02;
-  preconditioner.initialize(system_matrix, data_amg);
+  if (model.linear_solver_solid == Model::LinearSolverType::CG)
+  {
+    TrilinosWrappers::SolverCG solver(solver_control, data_cg);
 
-  TrilinosWrappers::SolverCG::AdditionalData data_cg;
-  TrilinosWrappers::SolverCG solver(solver_control, data_cg);
+    // setup AMG preconditioner
+    TrilinosWrappers::PreconditionAMG preconditioner;
+    TrilinosWrappers::PreconditionAMG::AdditionalData data_amg;
+    // data_amg.constant_modes = constant_modes;
+    data_amg.elliptic = true;
+    data_amg.higher_order_elements = true;
+    data_amg.smoother_sweeps = 2;
+    data_amg.aggregation_threshold = 0.02;
+    preconditioner.initialize(system_matrix, data_amg);
 
-  solver.solve(system_matrix, solution, rhs_vector, preconditioner);
+    // solve linear system
+    solver.solve(system_matrix, solution, rhs_vector, preconditioner);
+  }
+  else if (model.linear_solver_solid == Model::LinearSolverType::Direct)
+  { // direct solver
+    TrilinosWrappers::SolverDirect
+        solver(solver_control, TrilinosWrappers::SolverDirect::AdditionalData());
+    solver.solve(system_matrix, solution, rhs_vector);
+  }
+  else
+  {
+    AssertThrow(false, ExcNotImplemented());
+  }
 
   constraints.distribute(solution);
 

@@ -246,15 +246,6 @@ void Simulator<dim>::run()
   fluid_solver.setup_dofs();
   solid_solver.setup_dofs();
 
-  // solid_solver.assemble_system(fluid_solver.pressure_relevant);
-  // CellValues::CellValuesBase<dim> cell_values_pressure(model),
-  //                                 neighbor_values_pressure(model);
-  // CellValues::CellValuesSaturation<dim> cell_values_saturation(model);
-  // fluid_solver.assemble_system(fluid_solver.pressure_relevant);
-
-  // const auto & solid_system_matrix = solid_solver.get_system_matrix();
-  // solid_system_matrix.print(std::cout, true);
-  // solid_solver.solve();
 
   // initial values
   // fluid_solver.solution = 1e6;
@@ -276,24 +267,23 @@ void Simulator<dim>::run()
   //     saturation_function(pressure_solver.get_dof_handler(),
   //                         saturation_solver.relevant_solution);
 
-  // {
-  //   Vector<double> sat(2);
-  //   std::vector<double> rperm(2);
-  //   sat[0] = 0.2;
-  //   sat[1] = 0.8;
-  //   model.get_relative_permeability(sat, rperm);
-  //   AssertThrow(rperm[0] < DefaultValues::small_number,
-  //               ExcMessage("bug in rel perm"));
-  //   AssertThrow(Math::relative_difference(rperm[1], 0.8)  < DefaultValues::small_number,
-  //               ExcMessage("bug in rel perm"));
-  // }
-
-  double time = 0;
-  double time_step = model.min_time_step;
-
   CellValues::CellValuesBase<dim>
       cell_values(model), neighbor_values(model);
+
+  // double time = 0;
+  double time_step = model.min_time_step;
+
+  { // geomechanics initialization step
+    solid_solver.assemble_system(fluid_solver.pressure_relevant);
+    solid_solver.solve();
+    solid_solver.relevant_solution = solid_solver.solution;
+  }
+
+  solid_solver.solution.print(std::cout, 4, true, false);
+
   fluid_solver.assemble_pressure_system(cell_values, neighbor_values, time_step);
+  const auto & system_matrix = fluid_solver.get_system_matrix();
+  system_matrix.print(std::cout, true);
   // unsigned int time_step_number = 0;
 
   // while(time <= model.t_max)

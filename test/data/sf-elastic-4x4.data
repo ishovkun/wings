@@ -6,12 +6,12 @@ Mesh file                  3x3x1_boundary_ids.msh /
 
 subsection Boundary conditions
 
-Displacement boundaries 0 4 /
-Displacement components 0 2 /
-Displacement values 0 0 /
-Stress boundaries 5 /
-Stress components 3 /
-Stress values 20 /
+Displacement boundaries   0  2  3  4 /
+Displacement components   0  1  1  2 /
+Displacement values       0  0  0  0 /
+Stress boundaries         5 /
+Stress components         2 /
+Stress values            -20 /
 
 subsection Equation data
 
@@ -37,3 +37,4 @@ Minimum time step    1e-5 /
 T max                100 /
 FSS tolerance        1e-8 /
 Max FSS steps        30 /
+Linear solver solid  Direct /

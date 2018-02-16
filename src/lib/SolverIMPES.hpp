@@ -595,6 +595,7 @@ SolverIMPES<dim>::solve_pressure_system()
     tol = 1e-10;
   SolverControl solver_control(1000, tol);
 
+  if (model.linear_solver_fluid == Model::LinearSolverType::CG)
   { // iterative solver
     TrilinosWrappers::SolverCG::AdditionalData additional_data_cg;
     TrilinosWrappers::SolverCG
@@ -604,12 +605,12 @@ SolverIMPES<dim>::solve_pressure_system()
     preconditioner.initialize(system_matrix, additional_data_amg);
     solver.solve(system_matrix, solution, rhs_vector, preconditioner);
   }
-
-  // { // direct solver
-  //   TrilinosWrappers::SolverDirect
-  //       solver(solver_control, TrilinosWrappers::SolverDirect::AdditionalData());
-  //   solver.solve(system_matrix, solution, rhs_vector);
-  // }
+  else if (model.linear_solver_solid == Model::LinearSolverType::Direct)
+  { // direct solver
+    TrilinosWrappers::SolverDirect
+        solver(solver_control, TrilinosWrappers::SolverDirect::AdditionalData());
+    solver.solve(system_matrix, solution, rhs_vector);
+  }
 
   return solver_control.last_step();
 } // eom
