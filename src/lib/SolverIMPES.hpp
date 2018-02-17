@@ -22,7 +22,7 @@
 #include <CellValues/CellValuesBase.hpp>
 #include <CellValues/CellValuesSaturation.hpp>
 #include <ExtraFEData.hpp>
-
+#include <ScaleOutputVector.hpp>
 
 
 namespace FluidSolvers
@@ -62,6 +62,12 @@ class SolverIMPES
                     const TrilinosWrappers::MPI::Vector & displacement_vector,
                     const TrilinosWrappers::MPI::Vector & old_displacement_vector,
                     const FEValuesExtractors::Vector    & extractor);
+  /*
+   * Attach pressure and saturation vectors to the DataOut object.
+   * This method is used for generating field reports
+   */
+  void attach_data(DataOut<dim> & data_out) const;
+
   // accessing private members
   const TrilinosWrappers::SparseMatrix & get_system_matrix();
   const TrilinosWrappers::MPI::Vector  & get_rhs_vector();
@@ -660,10 +666,31 @@ SolverIMPES<dim>::get_dof_handler()
 }  // eom
 
 
+
 template <int dim>
 const FE_DGQ<dim> &
 SolverIMPES<dim>::get_fe()
 {
   return fe;
 }  // eom
+
+
+
+template<int dim>
+void
+SolverIMPES<dim>::attach_data(DataOut<dim> & data_out) const
+{
+  data_out.attach_dof_handler(dof_handler);
+  // scale pressure by bar/psi/whatever
+  Output::ScaleOutputVector<dim> pressure_scaler(Keywords::pressure_vector,
+                                                 model.units.pressure());
+  // data_out.add_data_vector(pressure_relevant, Keywords::pressure_vector,
+  //                          DataOut<dim>::type_dof_data);
+  data_out.add_data_vector(pressure_relevant, pressure_scaler);
+  data_out.add_data_vector(saturation_relevant, Keywords::saturation_water_vector,
+                           DataOut<dim>::type_dof_data);
+}  // end attach_data
+
+
+
 }  // end of namespace

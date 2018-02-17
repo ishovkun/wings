@@ -30,6 +30,7 @@ ADD_LIBRARY(wings SHARED
   LookupTable.hpp
   Wellbore.hpp
   OutputHelper.hpp
+  ScaleOutputVector.hpp
 )
 
 DEAL_II_SETUP_TARGET(wings)

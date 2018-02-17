@@ -23,7 +23,6 @@
 // #include <FEFunction/FEFunctionPVT.hpp>
 
 
-
 namespace Wings
 {
 using namespace dealii;
@@ -42,9 +41,9 @@ class Simulator
 
  private:
   void refine_mesh();
-  // void field_report(const double time_step,
-  //                   const unsigned int time_step_number,
-  //                   const FluidSolvers::SaturationSolver<dim> &saturation_solver);
+  void field_report(const double                           time_step,
+                    const unsigned int                     time_step_number,
+                    const FluidSolvers::SolverIMPES<dim> & fluid_solver);
 
   MPI_Comm                                  mpi_communicator;
   parallel::distributed::Triangulation<dim> triangulation;
@@ -203,25 +202,26 @@ void Simulator<dim>::refine_mesh()
 
 
 
-// template <int dim>
-// void
-// Simulator<dim>::
-// field_report(const double time,
-//              const unsigned int time_step_number,
-//              const FluidSolvers::SaturationSolver<dim> &saturation_solver)
-// {
-//   DataOut<dim> data_out;
+template <int dim>
+void
+Simulator<dim>::
+field_report(const double time,
+             const unsigned int time_step_number,
+             const FluidSolvers::SolverIMPES<dim> &fluid_solver)
+{
+  DataOut<dim> data_out;
 
-//   data_out.attach_dof_handler(pressure_solver.get_dof_handler());
-//   data_out.add_data_vector(pressure_solver.relevant_solution, "pressure",
-//                            DataOut<dim>::type_dof_data);
-//   data_out.add_data_vector(saturation_solver.relevant_solution[0], "Sw",
-//                            DataOut<dim>::type_dof_data);
-//   data_out.build_patches();
+  // data_out.attach_dof_handler(pressure_solver.get_dof_handler());
+  // data_out.add_data_vector(pressure_solver.relevant_solution, "pressure",
+  //                          DataOut<dim>::type_dof_data);
+  // data_out.add_data_vector(saturation_solver.relevant_solution[0], "Sw",
+  //                          DataOut<dim>::type_dof_data);
+  fluid_solver.attach_data(data_out);
+  data_out.build_patches();
 
-//   output_helper.write_output(time, time_step_number, data_out);
+  output_helper.write_output(time, time_step_number, data_out);
 
-// }  // eom
+}  // eom
 
 
 

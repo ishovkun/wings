@@ -89,5 +89,9 @@ namespace Keywords
       pvtu_file_suffix = "pvtu",
       pvd_file_name = "solution.pvd";
 
+  const std::string
+      pressure_vector = "pressure",
+      saturation_water_vector = "Sw";
+
   /* }; */
 }
