@@ -298,6 +298,8 @@ void Simulator<dim>::run()
 
   solid_solver.solution.print(std::cout, 4, true, false);
 
+  // now we need to check if the strains are correct
+
   // fluid_solver.assemble_pressure_system(cell_values, neighbor_values, time_step);
   // const auto & system_matrix = fluid_solver.get_system_matrix();
   // system_matrix.print(std::cout, true);

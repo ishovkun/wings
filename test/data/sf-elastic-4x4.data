@@ -14,7 +14,7 @@ Displacement values      0  0  0  0  0 /
 #                       top
 Stress boundaries        5 /
 Stress components        2 /
-Stress values            -1 /
+Stress values            -1e6 /
 
 subsection Equation data
 

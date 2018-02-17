@@ -284,9 +284,12 @@ constexpr int dim = 3;
         const auto dirichlet_components =
             parser.get_number_list<int>(Keywords::solid_dirichlet_components,
                                         std::string("\t "));
-        const auto dirichlet_values =
+        auto dirichlet_values =
             parser.get_number_list<double>(Keywords::solid_dirichlet_values,
                                            std::string("\t "));
+        for (unsigned int i=0; i < dirichlet_values.size(); ++i)
+          neumann_values[i] *= model.units.length();
+
         AssertThrow(dirichlet_labels.size() > 0,
                     ExcMessage("Need at least one Dirichlet boundary"));
         AssertThrow(dirichlet_labels.size() == dirichlet_values.size()
@@ -306,9 +309,13 @@ constexpr int dim = 3;
         const auto neumann_components =
             parser.get_number_list<int>(Keywords::solid_neumann_components,
                                         std::string("\t "), std::vector<int>());
-        const auto neumann_values =
+        auto neumann_values =
             parser.get_number_list<double>(Keywords::solid_neumann_values,
                                            std::string("\t "), std::vector<double>());
+        // scale by units of pressure
+        for (unsigned int i=0; i<neumann_values.size(); ++i)
+          neumann_values[i] *= model.units.pressure();
+
         AssertThrow(neumann_labels.size() == neumann_values.size() &&
                     neumann_values.size() == neumann_components.size(),
                     ExcMessage("Inconsistent stress boundary conditions"));
