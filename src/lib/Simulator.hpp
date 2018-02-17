@@ -240,29 +240,29 @@ void Simulator<dim>::run()
 
   // output_helper.prepare_output_directories();
 
-  // FluidSolvers::SolverIMPES<dim> fluid_solver(mpi_communicator,
-  //                                             triangulation,
-  //                                             model, pcout);
-  // fluid_solver.setup_dofs();
+  // create fluid and solid solver objects
+  FluidSolvers::SolverIMPES<dim> fluid_solver(mpi_communicator,
+                                              triangulation,
+                                              model, pcout);
+
+  SolidSolvers::ElasticSolver<dim>
+      solid_solver(mpi_communicator, triangulation, model, pcout);
+
+  // couple solvers
+  const FEValuesExtractors::Vector displacement(0);
+  solid_solver.set_coupling(fluid_solver.get_dof_handler());
+  fluid_solver.set_coupling(solid_solver.get_dof_handler(),
+                            solid_solver.relevant_solution,
+                            solid_solver.old_solution,
+                            displacement);
+
+  fluid_solver.setup_dofs();
+  solid_solver.setup_dofs();
 
   // fluid_solver.solution = 0.2;
   // fluid_solver.saturation_relevant[0] = fluid_solver.solution;
   // fluid_solver.saturation_relevant[1] = 1.0;
   // fluid_solver.saturation_relevant[1] -= fluid_solver.solution;
-
-  // SolidSolvers::ElasticSolver<dim>
-  //     solid_solver(mpi_communicator, triangulation, model, pcout);
-
-  // const FEValuesExtractors::Vector displacement(0);
-  // solid_solver.set_coupling(fluid_solver.get_dof_handler());
-  // fluid_solver.set_coupling(solid_solver.get_dof_handler(),
-  //                           solid_solver.relevant_solution,
-  //                           solid_solver.old_solution,
-  //                           displacement);
-
-  // fluid_solver.setup_dofs();
-  // solid_solver.setup_dofs();
-
 
   // initial values
   // fluid_solver.solution = 1e6;
@@ -290,13 +290,13 @@ void Simulator<dim>::run()
   // // double time = 0;
   // double time_step = model.min_time_step;
 
-  // { // geomechanics initialization step
-  //   solid_solver.assemble_system(fluid_solver.pressure_relevant);
-  //   solid_solver.solve();
-  //   solid_solver.relevant_solution = solid_solver.solution;
-  // }
+  { // geomechanics initialization step
+    solid_solver.assemble_system(fluid_solver.pressure_relevant);
+    solid_solver.solve();
+    solid_solver.relevant_solution = solid_solver.solution;
+  }
 
-  // solid_solver.solution.print(std::cout, 4, true, false);
+  solid_solver.solution.print(std::cout, 4, true, false);
 
   // fluid_solver.assemble_pressure_system(cell_values, neighbor_values, time_step);
   // const auto & system_matrix = fluid_solver.get_system_matrix();
