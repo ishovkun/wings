@@ -89,9 +89,45 @@ constexpr int dim = 3;
         parser.get_int(Keywords::global_refinement_steps, 0);
       model.n_adaptive_steps =
         parser.get_int(Keywords::adaptive_refinement_steps, 0);
-      model.mesh_file =
-        boost::filesystem::path(fname).parent_path() /
-        parser.get(Keywords::mesh_file);
+
+      auto tri_str =
+          parser.get_str_list(Keywords::triangulation, std::string("\t "));
+
+      if (tri_str.size() == 9) // create mesh
+      {
+        model.mesh_config.type = Model::MeshType::Create;
+        for (int i=0; i<dim; ++i)
+          model.mesh_config.n_cells[i] = Parsers::convert<int>(tri_str[i]);
+
+        Point<dim> p1, p2;
+        p1[0] = Parsers::convert<double>(tri_str[3]);
+        p1[1] = Parsers::convert<double>(tri_str[4]);
+        p1[2] = Parsers::convert<double>(tri_str[5]);
+        p2[0] = Parsers::convert<double>(tri_str[6]);
+        p2[1] = Parsers::convert<double>(tri_str[7]);
+        p2[2] = Parsers::convert<double>(tri_str[8]);
+        model.mesh_config.points = std::make_pair(p1, p2);
+      }
+      else if (tri_str.size() == 2)
+      {
+        if (tri_str[0] == Keywords::file_msh)
+          model.mesh_config.type = Model::MeshType::Msh;
+        else if (tri_str[0] == Keywords::file_abaqus)
+          model.mesh_config.type = Model::MeshType::Abaqus;
+        else
+          AssertThrow(false, ExcMessage("Wrong Triangulation entry"));
+
+        // std::cout <<
+        model.mesh_config.file =
+            boost::filesystem::path(fname).parent_path() / tri_str[1];
+      }
+      else
+      {
+        AssertThrow(false, ExcMessage("Wrong Triangulation entry"));
+      }
+      // model.mesh_file =
+      //   boost::filesystem::path(fname).parent_path() /
+      //   parser.get(Keywords::mesh_file);
       // std::cout << model.mesh_file << std::endl;
     }
     {  // equation data

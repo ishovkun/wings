@@ -13,6 +13,9 @@ namespace Keywords
   const std::string
   section_mesh = "Mesh",
     mesh_file = "Mesh file",
+    triangulation = "Triangulation",
+    file_msh = "msh",
+    file_abaqus = "abaqus",
     global_refinement_steps = "Global refinement steps",
     adaptive_refinement_steps = "Adaptive refinement steps",
     local_refinement_regions = "Local refinement regions",

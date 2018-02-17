@@ -78,11 +78,17 @@ void Simulator<dim>::create_mesh()
 {
   // make grid with 102x1x1 elements,
   // hx = hy = hz = h = 25 ft
-  std::vector<unsigned int > repetitions = {3, 3, 1};
+  // std::vector<unsigned int > repetitions = {3, 3, 1};
+  // GridGenerator::subdivided_hyper_rectangle(triangulation,
+  //                                           repetitions,
+  //                                           Point<dim>(0, 0, -0.5),
+  //                                           Point<dim>(3, 3, 0.5));
+  const auto & p1 = model.mesh_config.points.first;
+  const auto & p2 = model.mesh_config.points.second;
+
   GridGenerator::subdivided_hyper_rectangle(triangulation,
-                                            repetitions,
-                                            Point<dim>(0, 0, -0.5),
-                                            Point<dim>(3, 3, 0.5));
+                                            model.mesh_config.n_cells,
+                                            p1, p2);
 
   // make boundary ids
   typename Triangulation<3>::active_cell_iterator
@@ -95,41 +101,47 @@ void Simulator<dim>::create_mesh()
       const Point<dim> face_center = cell->face(f)->center();
       if (cell->face(f)->at_boundary())
       {
-        if (abs(face_center[0])<1e-6)
+        // left
+        if (abs(face_center[0] - p1[0]) < DefaultValues::small_number_geometry)
         {
           cell->face(f)->set_boundary_id(0);
-          std::cout << "left " << cell->center() << "\t" << f << std::endl;
+          // std::cout << "left " << cell->center() << "\t" << f << std::endl;
         }
-        if (abs(face_center[0] - 3.0)<1e-6)
+        // right
+        if (abs(face_center[0] - p2[0]) < DefaultValues::small_number_geometry)
         {
           cell->face(f)->set_boundary_id(1);
-          // std::cout << "right" << std::endl;
-          std::cout << "right " << cell->center() << "\t" << f << std::endl;
+          // std::cout << "right " << cell->center() << "\t" << f << std::endl;
         }
-        if (abs(face_center[1])<1e-6)
+        // front
+        if (abs(face_center[1] - p1[1]) < DefaultValues::small_number_geometry)
         {
           cell->face(f)->set_boundary_id(2);
           // std::cout << "front" << std::endl;
-          std::cout << "front " << cell->center() << "\t" << f << std::endl;
+          // std::cout << "front " << cell->center() << "\t" << f << std::endl;
         }
-        if (abs(face_center[1] - 3.0)<1e-6)
+        // back
+        if (abs(face_center[1] - p2[1]) < DefaultValues::small_number_geometry)
         {
           cell->face(f)->set_boundary_id(3);
-          std::cout << "back" << std::endl;
+          // std::cout << "back" << std::endl;
         }
-        if (abs(face_center[2] - 0.5)<1e-6)
+        // bottom
+        if (abs(face_center[2] - p1[2]) < DefaultValues::small_number_geometry)
         {
           cell->face(f)->set_boundary_id(4);
-          std::cout << "bottom" << std::endl;
+          // std::cout << "bottom" << std::endl;
         }
-        if (abs(face_center[2] + 0.5)<1e-6)
+        // top
+        if (abs(face_center[2] - p2[2]) < DefaultValues::small_number_geometry)
         {
           cell->face(f)->set_boundary_id(5);
-          std::cout << "top" << std::endl;
+          // std::cout << "top" << std::endl;
         }
-      }
+      }  // end if face at boundary
 
-    }
+    }  // end cell and face loop
+
   GridOutFlags::Msh flags(/* write_faces = */ true,
                           /* write_lines = */ false);
   GridOut grid_out;
@@ -149,13 +161,16 @@ void Simulator<dim>::read_mesh(unsigned int verbosity)
 {
   GridIn<dim> gridin;
   gridin.attach_triangulation(triangulation);
-  std::ifstream f(model.mesh_file.string());
+  std::ifstream f(model.mesh_config.file.string());
 
   if (verbosity > 0)
-    pcout << "Reading mesh file " << model.mesh_file << std::endl;
-  // typename GridIn<dim>::format format = gridin<dim>::ucd;
-  // gridin.read(f, format);
-  gridin.read_msh(f);
+    pcout << "Reading mesh file " << model.mesh_config.file << std::endl;
+
+  if (model.mesh_config.type == Model::MeshType::Msh)
+    gridin.read_msh(f);
+  else if (model.mesh_config.type == Model::MeshType::Abaqus)
+    gridin.read_abaqus(f);
+
   GridTools::scale(model.units.length(), triangulation);
 }  // eom
 
@@ -218,33 +233,35 @@ void Simulator<dim>::run()
   output_helper.set_case_name("solution");
 
 
-  read_mesh(/* verbosity = */ 1);
-  // create_mesh();
+  if (model.mesh_config.type == Model::MeshType::Create)
+    create_mesh();
+  else
+    read_mesh(/* verbosity = */ 1);
 
-  output_helper.prepare_output_directories();
+  // output_helper.prepare_output_directories();
 
-  FluidSolvers::SolverIMPES<dim> fluid_solver(mpi_communicator,
-                                              triangulation,
-                                              model, pcout);
-  fluid_solver.setup_dofs();
+  // FluidSolvers::SolverIMPES<dim> fluid_solver(mpi_communicator,
+  //                                             triangulation,
+  //                                             model, pcout);
+  // fluid_solver.setup_dofs();
 
   // fluid_solver.solution = 0.2;
   // fluid_solver.saturation_relevant[0] = fluid_solver.solution;
   // fluid_solver.saturation_relevant[1] = 1.0;
   // fluid_solver.saturation_relevant[1] -= fluid_solver.solution;
 
-  SolidSolvers::ElasticSolver<dim>
-      solid_solver(mpi_communicator, triangulation, model, pcout);
+  // SolidSolvers::ElasticSolver<dim>
+  //     solid_solver(mpi_communicator, triangulation, model, pcout);
 
-  const FEValuesExtractors::Vector displacement(0);
-  solid_solver.set_coupling(fluid_solver.get_dof_handler());
-  fluid_solver.set_coupling(solid_solver.get_dof_handler(),
-                            solid_solver.relevant_solution,
-                            solid_solver.old_solution,
-                            displacement);
+  // const FEValuesExtractors::Vector displacement(0);
+  // solid_solver.set_coupling(fluid_solver.get_dof_handler());
+  // fluid_solver.set_coupling(solid_solver.get_dof_handler(),
+  //                           solid_solver.relevant_solution,
+  //                           solid_solver.old_solution,
+  //                           displacement);
 
-  fluid_solver.setup_dofs();
-  solid_solver.setup_dofs();
+  // fluid_solver.setup_dofs();
+  // solid_solver.setup_dofs();
 
 
   // initial values
@@ -267,23 +284,23 @@ void Simulator<dim>::run()
   //     saturation_function(pressure_solver.get_dof_handler(),
   //                         saturation_solver.relevant_solution);
 
-  CellValues::CellValuesBase<dim>
-      cell_values(model), neighbor_values(model);
+  // CellValues::CellValuesBase<dim>
+  //     cell_values(model), neighbor_values(model);
 
-  // double time = 0;
-  double time_step = model.min_time_step;
+  // // double time = 0;
+  // double time_step = model.min_time_step;
 
-  { // geomechanics initialization step
-    solid_solver.assemble_system(fluid_solver.pressure_relevant);
-    solid_solver.solve();
-    solid_solver.relevant_solution = solid_solver.solution;
-  }
+  // { // geomechanics initialization step
+  //   solid_solver.assemble_system(fluid_solver.pressure_relevant);
+  //   solid_solver.solve();
+  //   solid_solver.relevant_solution = solid_solver.solution;
+  // }
 
-  solid_solver.solution.print(std::cout, 4, true, false);
+  // solid_solver.solution.print(std::cout, 4, true, false);
 
-  fluid_solver.assemble_pressure_system(cell_values, neighbor_values, time_step);
-  const auto & system_matrix = fluid_solver.get_system_matrix();
-  system_matrix.print(std::cout, true);
+  // fluid_solver.assemble_pressure_system(cell_values, neighbor_values, time_step);
+  // const auto & system_matrix = fluid_solver.get_system_matrix();
+  // system_matrix.print(std::cout, true);
   // unsigned int time_step_number = 0;
 
   // while(time <= model.t_max)

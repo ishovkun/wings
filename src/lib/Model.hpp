@@ -33,11 +33,26 @@ enum FluidCouplingStrategy {None, FixedStressSplit};
 
 enum LinearSolverType {Direct, CG, GMRES};
 
+// whether to request to create mesh or read in .msh or abaqus formats
+enum MeshType {Create, Msh, Abaqus};
+
 // This is to extend to functions and correlations instead of tables
 struct ModelConfig
 {
   PVTType pvt_oil, pvt_water, pvt_gas;
 };
+
+struct MeshConfig
+{
+  MeshConfig() {n_cells.resize(3);}
+  MeshType type;
+  // number of cells in each direction
+  std::vector<unsigned int>    n_cells;
+  // two corner points of the parallelepiped mesh
+  std::pair<Point<3>,Point<3>> points;
+  boost::filesystem::path      file;
+};
+
 
 template <int dim>
 class Model
@@ -152,7 +167,6 @@ class Model
   std::vector< std::pair< Point<dim>,Point<dim> > >
   local_prerefinement_region;
   Units::Units               units;
-  boost::filesystem::path    mesh_file;
   std::vector<Wellbore<dim>> wells;
   Schedule::Schedule         schedule;
   double                     fss_tolerance,
@@ -166,10 +180,11 @@ class Model
   ModelConfig                config; // not used anywhere
   LinearSolverType           linear_solver_solid,
                              linear_solver_fluid;
+  MeshConfig                 mesh_config;
+  MeshType                   mesh_type;
 
  protected:
-  std::string                mesh_file_name,
-                             input_file_name;
+  std::string                input_file_name;
   double                     density_sc_w_constant,
                              density_sc_o_constant,
                              porosity,

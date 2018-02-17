@@ -224,14 +224,16 @@ assemble_system(const TrilinosWrappers::MPI::Vector & pressure_vector)
 			const double lame_constant = E*nu/((1.+nu)*(1.-2*nu));
 			const double shear_modulus = 0.5*E/(1.+nu);
       const double alpha = model.get_biot_coefficient();
+      // pcout << "E = " << E  << std::endl;
+      // pcout << "nu = " << nu  << std::endl;
 
       for (unsigned int q=0; q<n_q_points; ++q)
       {
         // compute stresses and strains for each local dof
         for (unsigned int k=0; k<dofs_per_cell; ++k)
         {
-					grad_xi_u[k]   = fe_values[displacement].gradient(k, q);
-					eps_u[k] 			 = 0.5*(grad_xi_u[k] + transpose(grad_xi_u[k]));
+					grad_xi_u[k] = fe_values[displacement].gradient(k, q);
+					eps_u[k] 		 = 0.5*(grad_xi_u[k] + transpose(grad_xi_u[k]));
           sigma_u[k] =
               lame_constant*trace(eps_u[k])*identity_tensor +
               2*shear_modulus*eps_u[k];
@@ -241,7 +243,7 @@ assemble_system(const TrilinosWrappers::MPI::Vector & pressure_vector)
         {
           for (unsigned int j=0; j<dofs_per_cell; ++j)
           {
-            cell_matrix(i, j ) +=
+            cell_matrix(i, j) +=
                 scalar_product(sigma_u[j], eps_u[i]) *
                 fe_values.JxW(q);
           } // end j loop
