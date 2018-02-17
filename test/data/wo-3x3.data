@@ -2,7 +2,7 @@ subsection Mesh
 
 Global refinement steps    4 /
 Adaptive refinement steps  4 /
-Mesh file                  3x3x1.msh /
+Triangulation  msh  3x3x1.msh /
 # Local refinement regions 16, 24, 17.5, 22.5, 0 ,0 /
 
 subsection Well data

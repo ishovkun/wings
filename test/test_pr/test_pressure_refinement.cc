@@ -74,7 +74,7 @@ namespace Wings
     // std::cout << "Reading mesh file "
     //           << model.mesh_file.string()
     //           << std::endl;
-    std::ifstream f(model.mesh_file.string());
+    std::ifstream f(model.mesh_config.file.string());
 
     // typename GridIn<dim>::Format format = GridIn<dim>::ucd;
     // gridin.read(f, format);

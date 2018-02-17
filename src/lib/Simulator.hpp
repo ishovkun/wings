@@ -299,6 +299,10 @@ void Simulator<dim>::run()
   solid_solver.solution.print(std::cout, 4, true, false);
 
   // now we need to check if the strains are correct
+  const double E = model.get_young_modulus->value(Point<3>(0,0,0));
+  const double nu = model.get_poisson_ratio->value(Point<3>(0,0,0));
+  const double sigma_v = -model.solid_neumann_values[0];
+  const double sigma_h = sigma_v/E * (1.0 - 2*nu*nu/(1.0 - nu));
 
   // fluid_solver.assemble_pressure_system(cell_values, neighbor_values, time_step);
   // const auto & system_matrix = fluid_solver.get_system_matrix();

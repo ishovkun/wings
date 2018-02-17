@@ -288,7 +288,7 @@ constexpr int dim = 3;
             parser.get_number_list<double>(Keywords::solid_dirichlet_values,
                                            std::string("\t "));
         for (unsigned int i=0; i < dirichlet_values.size(); ++i)
-          neumann_values[i] *= model.units.length();
+          dirichlet_values[i] *= model.units.length();
 
         AssertThrow(dirichlet_labels.size() > 0,
                     ExcMessage("Need at least one Dirichlet boundary"));

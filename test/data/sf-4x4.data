@@ -1,6 +1,6 @@
 subsection Mesh
 
-Mesh file                  domain.msh /
+Triangulation msh domain.msh /
 
 subsection Well data
 

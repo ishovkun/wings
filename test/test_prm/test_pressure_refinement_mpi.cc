@@ -63,7 +63,7 @@ namespace Wings
   {
     GridIn<dim> gridin;
     gridin.attach_triangulation(triangulation);
-    std::ifstream f(model.mesh_file.string());
+    std::ifstream f(model.mesh_config.file.string());
 
     // typename GridIn<dim>::format format = gridin<dim>::ucd;
     // gridin.read(f, format);

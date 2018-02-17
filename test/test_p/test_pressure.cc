@@ -66,10 +66,7 @@ namespace WingTest
   {
     GridIn<dim> gridin;
     gridin.attach_triangulation(triangulation);
-    std::ifstream f(model.mesh_file.string());
-
-    // typename GridIn<dim>::Format format = GridIn<dim>::ucd;
-    // gridin.read(f, format);
+    std::ifstream f(model.mesh_config.file.string());
     gridin.read_msh(f);
   }  // eom
 
