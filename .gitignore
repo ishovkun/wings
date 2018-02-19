@@ -12,3 +12,4 @@ build/
 *.pyc
 Testing
 .dir-locals.el
+.vscode

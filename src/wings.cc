@@ -10,7 +10,7 @@ int main(int argc, char *argv[])
   try
   {
     using namespace dealii;
-    dealii::deallog.depth_console (0);
+    dealii::deallog.depth_console(0);
     Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
     std::string input_file_name = Parsers::parse_command_line(argc, argv);
     Wings::Simulator<3> simulator(input_file_name);

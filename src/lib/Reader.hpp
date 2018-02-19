@@ -43,11 +43,11 @@ constexpr int dim = 3;
                  const Tensor<1,dim> & anisotropy,
                  const SyntaxParser  & parser);
 
-    ConditionalOStream                    & pcout;
-    Model::Model<dim>                     & model;
-    int                                    verbosity;
-    std::string                            input_text;
-    std::string                            input_file_name;
+    ConditionalOStream & pcout;
+    Model::Model<dim>  & model;
+    int                 verbosity;
+    std::string         input_text;
+    std::string         input_file_name;
   }; //
 
 

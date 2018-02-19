@@ -22,7 +22,6 @@
 #include <FEFunction/FEFunction.hpp>
 // #include <FEFunction/FEFunctionPVT.hpp>
 
-
 namespace Wings
 {
 using namespace dealii;
