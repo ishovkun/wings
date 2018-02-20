@@ -5,6 +5,7 @@
 
 namespace Output
 {
+using namespace dealii;
 
 template <int dim>
 class ScaleOutputVector : public DataPostprocessorScalar<dim>

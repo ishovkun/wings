@@ -258,36 +258,21 @@ void Simulator<dim>::run()
   fluid_solver.setup_dofs();
   solid_solver.setup_dofs();
 
-  // fluid_solver.solution = 0.2;
-  // fluid_solver.saturation_relevant[0] = fluid_solver.solution;
-  // fluid_solver.saturation_relevant[1] = 1.0;
-  // fluid_solver.saturation_relevant[1] -= fluid_solver.solution;
+  model.locate_wells(fluid_solver.get_dof_handler());
 
-  // initial values
-  // fluid_solver.solution = 1e6;
-  // fluid_solver.pressure_relevant = fluid_solver.solution;
+  CellValues::CellValuesBase<dim> cell_values(model),
+                                  neighbor_values(model);
+  CellValues::CellValuesSaturation<dim> cell_values_saturation(model);
 
-  // pressure_solver.relevant_solution = pressure_solver.solution;
-  // saturation_solver.relevant_solution[0] = saturation_solver.solution[0];
-
-  // model.locate_wells(pressure_solver.get_dof_handler());
-
-  // CellValues::CellValuesBase<dim> cell_values_pressure(model),
-  //                                 neighbor_values_pressure(model);
-  // CellValues::CellValuesSaturation<dim> cell_values_saturation(model);
-
-  // FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
-  //     pressure_function(pressure_solver.get_dof_handler(),
-  //                       pressure_solver.relevant_solution);
-  // FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
-  //     saturation_function(pressure_solver.get_dof_handler(),
-  //                         saturation_solver.relevant_solution);
-
-  // CellValues::CellValuesBase<dim>
-  //     cell_values(model), neighbor_values(model);
+  FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
+      pressure_function(fluid_solver.get_dof_handler(),
+                        fluid_solver.pressure_relevant);
+  FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
+      saturation_function(fluid_solver.get_dof_handler(),
+                          fluid_solver.saturation_relevant);
 
   // // double time = 0;
-  // double time_step = model.min_time_step;
+  double time_step = model.min_time_step;
 
   { // geomechanics initialization step
     solid_solver.assemble_system(fluid_solver.pressure_relevant);
@@ -300,50 +285,75 @@ void Simulator<dim>::run()
   // now we need to check if the strains are correct
   const double E = model.get_young_modulus->value(Point<3>(0,0,0));
   const double nu = model.get_poisson_ratio->value(Point<3>(0,0,0));
+  const double bulk_modulus = E/3.0/(1.0-2.0*nu);
   const double sigma_v = -model.solid_neumann_values[0];
-  const double eps_v = sigma_v/E * (1.0 - 2*nu*nu/(1.0 - nu));
-  // const double sigma_h = nu/(1-nu) * sigma_v;
-  pcout << "eps_v = " << eps_v << std::endl;
+  const double eps_v = -( sigma_v/E * (1.0 - 2*nu*nu/(1.0 - nu)) );
 
+  const double tol = DefaultValues::small_number;
+  // pcout << "eps_v" << eps_v << std::endl;
+  // test vertical strain
   for (unsigned int i=0; i<solid_solver.solution.size(); ++i)
+    // check only non-zero components
+    // those that are vertical and not at constrained boundaries
     if (abs(solid_solver.solution[i]) > DefaultValues::small_number)
-      pcout << "num[" << i << "] = " << solid_solver.solution[i] << std::endl;
-
-  // fluid_solver.assemble_pressure_system(cell_values, neighbor_values, time_step);
-  // const auto & system_matrix = fluid_solver.get_system_matrix();
-  // system_matrix.print(std::cout, true);
-  // unsigned int time_step_number = 0;
-
-  // while(time <= model.t_max)
-  // {
-  //   time += time_step;
-  //   pressure_solver.old_solution = pressure_solver.solution;
-
-  //   pcout << "time " << time << std::endl;
-  //   model.update_well_controls(time);
-  //   model.update_well_productivities(pressure_function, saturation_function);
-
-  //   { // solve for pressure
-  //     pressure_solver.assemble_system(cell_values_pressure, neighbor_values_pressure,
-  //                                     time_step,
-  //                                     saturation_solver.relevant_solution);
-  //     pressure_solver.solve();
-  //     pressure_solver.relevant_solution = pressure_solver.solution;
-  //   }
-
-  //   { // solve for saturation
-  //     saturation_solver.solve(cell_values_saturation,
-  //                             neighbor_values_pressure,
-  //                             time_step,
-  //                             pressure_solver.relevant_solution,
-  //                             pressure_solver.old_solution);
-  //     saturation_solver.relevant_solution[0] = saturation_solver.solution[0];
-  //     saturation_solver.relevant_solution[1] = saturation_solver.solution[1];
-  //   }
+      if (Math::relative_difference(solid_solver.solution[i],
+                                    eps_v) > DefaultValues::small_number)
+      {
+        pcout << "num[" << i << "] = " << solid_solver.solution[i] << std::endl;
+        pcout << "an[" << i << "] = " << eps_v << std::endl;
+        AssertThrow(false, ExcMessage("num["+std::to_string(i)+"] is wrong"));
+      }
 
 
+  fluid_solver.assemble_pressure_system(cell_values,
+                                        neighbor_values, time_step);
+
+  const auto & rhs_vector = fluid_solver.get_rhs_vector();
+  // rhs_vector.print(std::cout, 3, true, false);
+
+  // Since we have no wellbores and initial pressure is 0,
+  // the pressure rhs term only should contain the poroelastic term
+  // - alpha/B_fluid d e_v / dt
+  // Since fluid formulation uses piecewise constants, volumetric strain
+  // in each dof is the same
+  // We constrained all horizontal strains, so the volumetric strain is equal
+  // to the vertical strain
+  const double alpha = model.get_biot_coefficient();
+  double rhs_an = -alpha*eps_v/time_step;
+  for (unsigned int i=0; i<rhs_vector.size(); ++i)
+    if (Math::relative_difference(rhs_vector[i],
+                                  rhs_an) > tol)
+    {
+      pcout << "num[" << i << "] = " << rhs_vector[i] << std::endl;
+      pcout << "an[" << i << "] = " << rhs_an << std::endl;
+      AssertThrow(false, ExcMessage("num["+std::to_string(i)+"] is wrong"));
+    }
+
+  // diagonal of the system matrix should have some new terms
+  const auto & system_matrix = fluid_solver.get_system_matrix();
+
+  const double k = model.get_permeability->value(Point<dim>(1,1,1), 1);
+  // pcout << "perm = " << k << std::endl;
+  const double mu = 1e-3;
+  const double B_w = 1;
+  const double cw = 5e-10;
+  const double h = 1;
+  const double phi = model.get_porosity->value(Point<dim>(1,1,1), 1);
+  // // Compute transmissibility and mass matrix entries
+  const double T = 1./mu/B_w*(k/h)*h*h;
+  const double B = h*h*h/B_w*(phi*cw + alpha*alpha/bulk_modulus);
   //   field_report(time, time_step_number, saturation_solver);
 
+  // // Testing A(0, 0) - two neighbors
+  int dof = 0;
+  double num = system_matrix(dof, dof);
+  double an = B/time_step + 2*T;
+  // if (Math::relative_difference(num, an) > tol)
+  // {
+    pcout << "num[" << dof << ", " << dof << "] " << num << std::endl;
+    pcout << "an[" << dof << ", " << dof << "] " << an << std::endl;
+    pcout << "rdiff " << Math::relative_difference(num, an) << std::endl;
+  // }
   //   time_step_number++;
   // } // end time loop
 

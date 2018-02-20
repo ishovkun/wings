@@ -76,7 +76,8 @@ namespace Units
       fluid_rate_constant = 1;
       gas_rate_constant = 1;
       stiffness_constant = 1;
-      permeability_constant = 1;
+      /* permeability_constant = 1; */
+      permeability_constant = milidarcy;
       density_constant = 1;
     }
     else if (unit_system == field_units)

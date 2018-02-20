@@ -10,6 +10,7 @@
 #include <deal.II/base/config.h>  // for numbers::is_nan
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/utilities.h>
+#include <deal.II/numerics/data_out.h>
 // Trilinos stuff
 #include <deal.II/lac/trilinos_vector.h>
 #include <deal.II/lac/generic_linear_algebra.h>

@@ -425,7 +425,7 @@ get_matrix_cell_entry(const double time_step) const
     const double E = model.get_young_modulus->value(this->cell_coord);
     const double nu = model.get_poisson_ratio->value(this->cell_coord);
     const double bulk_modulus = E/3.0/(1.0-2.0*nu);
-    entry += alpha*alpha/bulk_modulus/time_step;
+    entry += cell_volume/B_w * alpha*alpha/bulk_modulus/time_step;
   }
 
   return entry;
@@ -450,6 +450,7 @@ get_rhs_cell_entry(const double time_step,
     entry += c1p * pressure/time_step; // B matrix
     entry += vector_Q_phase[0];  // Q vector
     entry += -c1e*delta_div_u/time_step; // poroelastic
+    // std::cout << -c1e*delta_div_u/time_step << std::endl;
   }
   else if (model.fluid_model == Model::FluidModelType::DeadOil)
   {
@@ -475,6 +476,7 @@ get_rhs_cell_entry(const double time_step,
     const double nu = model.get_poisson_ratio->value(this->cell_coord);
     const double bulk_modulus = E/3.0/(1.0-2.0*nu);
     entry += alpha*alpha/bulk_modulus/time_step * pressure;
+    // std::cout << alpha*alpha/bulk_modulus/time_step * pressure << std::endl;
   }
   return entry;
 } // eom
