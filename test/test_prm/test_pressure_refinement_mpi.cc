@@ -106,9 +106,14 @@ namespace Wings
 
     refine_mesh();
     // return;
+    CellValues::CellValuesBase<dim>
+        cell_values(model), neighbor_values(model);
+    CellValues::CellValuesSaturation<dim> cell_values_saturation(model);
     FluidSolvers::SolverIMPES<dim> fluid_solver(mpi_communicator,
                                                 triangulation,
-                                                model, pcout);
+                                                model, pcout,
+                                                cell_values, neighbor_values,
+                                                cell_values_saturation);
 
     fluid_solver.setup_dofs();
 
@@ -211,10 +216,7 @@ namespace Wings
     // pcout << "wells checked " << std::endl;
 
 
-    CellValues::CellValuesBase<dim>
-      cell_values(model), neighbor_values(model);
-    fluid_solver.assemble_pressure_system(cell_values, neighbor_values,
-                                          time_step);
+    fluid_solver.assemble_pressure_system(time_step);
 
     // -----------------------------------------------------------------------
     // RHS vector

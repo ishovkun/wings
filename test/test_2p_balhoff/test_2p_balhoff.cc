@@ -103,9 +103,14 @@ namespace Wings
     read_mesh();
     // refine_mesh();
 
+    CellValues::CellValuesBase<dim>
+        cell_values(model), neighbor_values(model);
+    CellValues::CellValuesSaturation<dim> cell_values_saturation(model);
     FluidSolvers::SolverIMPES<dim> fluid_solver(mpi_communicator,
                                                 triangulation,
-                                                model, pcout);
+                                                model, pcout,
+                                                cell_values, neighbor_values,
+                                                cell_values_saturation);
     fluid_solver.setup_dofs();
 
     // initial values
@@ -124,9 +129,6 @@ namespace Wings
     double time = 0;
     double time_step = model.min_time_step;
     model.update_well_controls(time);
-
-    CellValues::CellValuesBase<dim> cell_values_pressure(model),
-                                    neighbor_values_pressure(model);
 
     model.locate_wells(fluid_solver.get_dof_handler());
     // std::vector<TrilinosWrappers::MPI::Vector*> saturation_solution =
@@ -174,9 +176,7 @@ namespace Wings
 
     model.update_well_productivities(pressure_function, saturation_function);
 
-    fluid_solver.assemble_pressure_system(cell_values_pressure,
-                                          neighbor_values_pressure,
-                                          time_step);
+    fluid_solver.assemble_pressure_system(time_step);
 
     // for (auto & id : model.get_well_ids())
     // {
@@ -319,8 +319,6 @@ namespace Wings
     fluid_solver.pressure_relevant = fluid_solver.solution;
 
 
-    CellValues::CellValuesSaturation<dim> cell_values_saturation(model);
-
     if (model.fluid_model != Model::FluidModelType::Liquid)
     {
       // saturation_solver.solve(cell_values_saturation,
@@ -328,8 +326,7 @@ namespace Wings
       //                         time_step,
       //                         fluid_solver.relevant_solution,
       //                         fluid_solver.old_solution);
-      fluid_solver.solve_saturation_system(cell_values_saturation,
-                                           neighbor_values_pressure, time_step);
+      fluid_solver.solve_saturation_system(time_step);
       // fluid_solver.saturation_relevant_solution[0] =
       //     fluid_solver.solution;
       // fluid_solver.saturation_relevant_solution[1] =
@@ -387,15 +384,12 @@ namespace Wings
     model.update_well_productivities(pressure_function, saturation_function);
 
     fluid_solver.pressure_old = fluid_solver.pressure_relevant;
-    fluid_solver.assemble_pressure_system(cell_values_pressure,
-                                          neighbor_values_pressure,
-                                          time_step);
+    fluid_solver.assemble_pressure_system(time_step);
 
     fluid_solver.solve_pressure_system();
     fluid_solver.pressure_relevant = fluid_solver.solution;
 
-    fluid_solver.solve_saturation_system(cell_values_saturation,
-                                         neighbor_values_pressure, time_step);
+    fluid_solver.solve_saturation_system(time_step);
     fluid_solver.saturation_relevant[0] =
         fluid_solver.solution;
 

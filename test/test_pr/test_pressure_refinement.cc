@@ -116,9 +116,14 @@ namespace Wings
     read_mesh();
     refine_mesh();
 
+    CellValues::CellValuesBase<dim>
+        cell_values(model), neighbor_values(model);
+    CellValues::CellValuesSaturation<dim> cell_values_saturation(model);
     FluidSolvers::SolverIMPES<dim> fluid_solver(mpi_communicator,
                                                 triangulation,
-                                                model, pcout);
+                                                model, pcout,
+                                                cell_values, neighbor_values,
+                                                cell_values_saturation);
 
     fluid_solver.setup_dofs();
 
@@ -212,10 +217,7 @@ namespace Wings
 
     model.update_well_productivities(pressure_function, saturation_function);
 
-    CellValues::CellValuesBase<dim>
-      cell_values(model), neighbor_values(model);
-    fluid_solver.assemble_pressure_system(cell_values, neighbor_values,
-                                          time_step);
+    fluid_solver.assemble_pressure_system(time_step);
 
     // for (auto & id : model.get_well_ids())
     // {

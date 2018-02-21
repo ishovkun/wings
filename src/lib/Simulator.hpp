@@ -43,6 +43,10 @@ class Simulator
   void field_report(const double                           time_step,
                     const unsigned int                     time_step_number,
                     const FluidSolvers::SolverIMPES<dim> & fluid_solver);
+  // Solve time step for a blackoil system without geomechanics
+  void solve_time_step_fluid();
+  // Solve time step for a blackoil system with geomechanics
+  void solve_time_step_fluid_mechanics();
 
   MPI_Comm                                  mpi_communicator;
   parallel::distributed::Triangulation<dim> triangulation;
@@ -53,6 +57,7 @@ class Simulator
   Output::OutputHelper<dim>                 output_helper;
   // TimerOutput                               computing_timer;
 };
+
 
 
 template <int dim>
@@ -74,13 +79,6 @@ Simulator<dim>::Simulator(std::string input_file_name_)
 template <int dim>
 void Simulator<dim>::create_mesh()
 {
-  // make grid with 102x1x1 elements,
-  // hx = hy = hz = h = 25 ft
-  // std::vector<unsigned int > repetitions = {3, 3, 1};
-  // GridGenerator::subdivided_hyper_rectangle(triangulation,
-  //                                           repetitions,
-  //                                           Point<dim>(0, 0, -0.5),
-  //                                           Point<dim>(3, 3, 0.5));
   const auto & p1 = model.mesh_config.points.first;
   const auto & p2 = model.mesh_config.points.second;
 
@@ -103,20 +101,16 @@ void Simulator<dim>::create_mesh()
         if (abs(face_center[0] - p1[0]) < DefaultValues::small_number_geometry)
         {
           cell->face(f)->set_boundary_id(0);
-          // std::cout << "left " << cell->center() << "\t" << f << std::endl;
         }
         // right
         if (abs(face_center[0] - p2[0]) < DefaultValues::small_number_geometry)
         {
           cell->face(f)->set_boundary_id(1);
-          // std::cout << "right " << cell->center() << "\t" << f << std::endl;
         }
         // front
         if (abs(face_center[1] - p1[1]) < DefaultValues::small_number_geometry)
         {
           cell->face(f)->set_boundary_id(2);
-          // std::cout << "front" << std::endl;
-          // std::cout << "front " << cell->center() << "\t" << f << std::endl;
         }
         // back
         if (abs(face_center[1] - p2[1]) < DefaultValues::small_number_geometry)
@@ -128,13 +122,11 @@ void Simulator<dim>::create_mesh()
         if (abs(face_center[2] - p1[2]) < DefaultValues::small_number_geometry)
         {
           cell->face(f)->set_boundary_id(4);
-          // std::cout << "bottom" << std::endl;
         }
         // top
         if (abs(face_center[2] - p2[2]) < DefaultValues::small_number_geometry)
         {
           cell->face(f)->set_boundary_id(5);
-          // std::cout << "top" << std::endl;
         }
       }  // end if face at boundary
 
@@ -146,7 +138,7 @@ void Simulator<dim>::create_mesh()
   grid_out.set_flags(flags);
   // std::ofstream out ("bl-mesh.vtk ");
   // grid_out.write_vtk(triangulation, out);
-  std::ofstream out("3x3x1_1m3.msh");
+  std::ofstream out(input_file + ".msh");
   grid_out.write_msh(triangulation, out);
 
   GridTools::scale(model.units.length(), triangulation);
@@ -223,6 +215,13 @@ field_report(const double time,
 }  // eom
 
 
+template<int dim>
+void
+Simulator<dim>::solve_time_step_fluid()
+{
+
+}  // end solve_time_step_fluid
+
 
 template <int dim>
 void Simulator<dim>::run()
@@ -239,11 +238,17 @@ void Simulator<dim>::run()
 
   // output_helper.prepare_output_directories();
 
-  // create fluid and solid solver objects
+  // define fluid object
+  CellValues::CellValuesBase<dim> cell_values(model),
+                                  neighbor_values(model);
+  CellValues::CellValuesSaturation<dim> cell_values_saturation(model);
   FluidSolvers::SolverIMPES<dim> fluid_solver(mpi_communicator,
                                               triangulation,
-                                              model, pcout);
+                                              model, pcout,
+                                              cell_values, neighbor_values,
+                                              cell_values_saturation);
 
+  // define solid object
   SolidSolvers::ElasticSolver<dim>
       solid_solver(mpi_communicator, triangulation, model, pcout);
 
@@ -260,10 +265,6 @@ void Simulator<dim>::run()
 
   model.locate_wells(fluid_solver.get_dof_handler());
 
-  CellValues::CellValuesBase<dim> cell_values(model),
-                                  neighbor_values(model);
-  CellValues::CellValuesSaturation<dim> cell_values_saturation(model);
-
   FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
       pressure_function(fluid_solver.get_dof_handler(),
                         fluid_solver.pressure_relevant);
@@ -275,98 +276,18 @@ void Simulator<dim>::run()
   double time_step = model.min_time_step;
 
   { // geomechanics initialization step
+    // solid.solver.initialize(fluid_solver.pressure_relevant);
     solid_solver.assemble_system(fluid_solver.pressure_relevant);
     solid_solver.solve();
     solid_solver.relevant_solution = solid_solver.solution;
   }
 
   // solid_solver.solution.print(std::cout, 4, true, false);
-
-  // now we need to check if the strains are correct
-  const double E = model.get_young_modulus->value(Point<3>(0,0,0));
-  const double nu = model.get_poisson_ratio->value(Point<3>(0,0,0));
-  const double bulk_modulus = E/3.0/(1.0-2.0*nu);
-  const double sigma_v = -model.solid_neumann_values[0];
-  const double eps_v = -( sigma_v/E * (1.0 - 2*nu*nu/(1.0 - nu)) );
-
-  const double tol = DefaultValues::small_number;
-  // pcout << "eps_v" << eps_v << std::endl;
-  // test vertical strain
-  for (unsigned int i=0; i<solid_solver.solution.size(); ++i)
-    // check only non-zero components
-    // those that are vertical and not at constrained boundaries
-    if (abs(solid_solver.solution[i]) > DefaultValues::small_number)
-      if (Math::relative_difference(solid_solver.solution[i],
-                                    eps_v) > DefaultValues::small_number)
-      {
-        pcout << "num[" << i << "] = " << solid_solver.solution[i] << std::endl;
-        pcout << "an[" << i << "] = " << eps_v << std::endl;
-        AssertThrow(false, ExcMessage("num["+std::to_string(i)+"] is wrong"));
-      }
+  // fluid_solver.initialize(cell_values, neighbor_values, time_step);
 
 
-  fluid_solver.assemble_pressure_system(cell_values,
-                                        neighbor_values, time_step);
 
-  const auto & rhs_vector = fluid_solver.get_rhs_vector();
-  // rhs_vector.print(std::cout, 3, true, false);
-
-  // Since we have no wellbores and initial pressure is 0,
-  // the pressure rhs term only should contain the poroelastic term
-  // - alpha/B_fluid d e_v / dt
-  // Since fluid formulation uses piecewise constants, volumetric strain
-  // in each dof is the same
-  // We constrained all horizontal strains, so the volumetric strain is equal
-  // to the vertical strain
-  const double alpha = model.get_biot_coefficient();
-  double rhs_an = -alpha*eps_v/time_step;
-  for (unsigned int i=0; i<rhs_vector.size(); ++i)
-    if (Math::relative_difference(rhs_vector[i],
-                                  rhs_an) > tol)
-    {
-      pcout << "num[" << i << "] = " << rhs_vector[i] << std::endl;
-      pcout << "an[" << i << "] = " << rhs_an << std::endl;
-      AssertThrow(false, ExcMessage("num["+std::to_string(i)+"] is wrong"));
-    }
-
-  // diagonal of the system matrix should have some new terms
-  const auto & system_matrix = fluid_solver.get_system_matrix();
-
-  const double k = model.get_permeability->value(Point<dim>(1,1,1), 1);
-  // pcout << "perm = " << k << std::endl;
-  const double mu = 1e-3;
-  const double B_w = 1;
-  const double cw = 5e-10;
-  const double h = 1;
-  const double phi = model.get_porosity->value(Point<dim>(1,1,1), 1);
-  // // Compute transmissibility and mass matrix entries
-  const double T = 1./mu/B_w*(k/h)*h*h;
-  const double rec_N = (alpha - phi) * (1.0-alpha)/bulk_modulus;
-  const double B = h*h*h/B_w*(phi*cw + rec_N);
-  // rock compressibility
-  const double fss =  + alpha*alpha/bulk_modulus;
-  //   field_report(time, time_step_number, saturation_solver);
-
-
-  // Testing matrix diagonal
-  int dof = 0;
-  double num = system_matrix(dof, dof);
-  double an = B/time_step + fss/time_step + 2*T;
-  if (Math::relative_difference(num, an) > tol)
-  {
-    pcout << "num[" << dof << ", " << dof << "] " << num << std::endl;
-    pcout << "an[" << dof << ", " << dof << "] " << an << std::endl;
-    pcout << "rdiff " << Math::relative_difference(num, an) << std::endl;
-  }
-  dof = 1;
-  num = system_matrix(dof, dof);
-  an = B/time_step + fss/time_step + 3*T;
-  if (Math::relative_difference(num, an) > tol)
-  {
-    pcout << "num[" << dof << ", " << dof << "] " << num << std::endl;
-    pcout << "an[" << dof << ", " << dof << "] " << an << std::endl;
-    pcout << "rdiff " << Math::relative_difference(num, an) << std::endl;
-  }
+  fluid_solver.assemble_pressure_system(time_step);
 
 
 } // eom

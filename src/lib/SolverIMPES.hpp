@@ -35,24 +35,24 @@ template <int dim>
 class SolverIMPES
 {
  public:
-  SolverIMPES(MPI_Comm                                  &mpi_communicator_,
-              parallel::distributed::Triangulation<dim> &triangulation_,
-              const Model::Model<dim>                   &model_,
-              ConditionalOStream                        &pcout_);
+  /* TODO: initialization description */
+  SolverIMPES(MPI_Comm                                    & mpi_communicator_,
+              parallel::distributed::Triangulation<dim>   & triangulation_,
+              const Model::Model<dim>                     & model_,
+              ConditionalOStream                          & pcout_,
+              const CellValues::CellValuesBase<dim>       & cell_values,
+              const CellValues::CellValuesBase<dim>       & cell_values_neighbor,
+              const CellValues::CellValuesSaturation<dim> & cell_values_saturation);
   ~SolverIMPES();
   /* setup degrees of freedom for the current triangulation
    * and allocate memory for solution vectors */
   void setup_dofs();
   // Implicit pressure system: Fill matrix and rhs vector
-  void assemble_pressure_system(CellValues::CellValuesBase<dim> & cell_values,
-                                CellValues::CellValuesBase<dim> & neighbor_values,
-                                const double                      time_step);
+  void assemble_pressure_system(const double time_step);
   /*
    * solve saturation system explicitly.
    */
-  void solve_saturation_system(CellValues::CellValuesSaturation<dim> & cell_values,
-                               CellValues::CellValuesBase<dim>       & neighbor_values,
-                               const double                            time_step);
+  void solve_saturation_system(const double time_step);
   /*
    * solve linear system syste_matrix*pressure_solution = rhs_vector
    * returns the number of solver steps
@@ -104,15 +104,21 @@ class SolverIMPES
   const FEValuesExtractors::Vector          * p_displacement_extractor;
   bool coupled_with_solid;
 
+  CellValues::CellValuesBase<dim>       cell_values;
+  CellValues::CellValuesBase<dim>       cell_values_neighbor;
+  CellValues::CellValuesSaturation<dim> cell_values_saturation;
 };
 
 
 template <int dim>
 SolverIMPES<dim>::
-SolverIMPES(MPI_Comm                                  &mpi_communicator_,
-            parallel::distributed::Triangulation<dim> &triangulation_,
-            const Model::Model<dim>                   &model_,
-            ConditionalOStream                        &pcout_)
+SolverIMPES(MPI_Comm                                    & mpi_communicator_,
+            parallel::distributed::Triangulation<dim>   & triangulation_,
+            const Model::Model<dim>                     & model_,
+            ConditionalOStream                          & pcout_,
+            const CellValues::CellValuesBase<dim>       & cell_values,
+            const CellValues::CellValuesBase<dim>       & cell_values_neighbor,
+            const CellValues::CellValuesSaturation<dim> & cell_values_saturation)
     :
     mpi_communicator(mpi_communicator_),
     triangulation(triangulation_),
@@ -123,7 +129,10 @@ SolverIMPES(MPI_Comm                                  &mpi_communicator_,
     // saturation_solution(model.n_phases()),
     saturation_relevant(model.n_phases()),
     saturation_old(model.n_phases() - 1),  // old solution n-1 phases
-    coupled_with_solid(false)
+    coupled_with_solid(false),
+    cell_values(cell_values),
+    cell_values_neighbor(cell_values_neighbor),
+    cell_values_saturation(cell_values_saturation)
 {}  // eom
 
 
@@ -174,9 +183,7 @@ void SolverIMPES<dim>::setup_dofs()
 template <int dim>
 void
 SolverIMPES<dim>::
-assemble_pressure_system(CellValues::CellValuesBase<dim> & cell_values,
-                         CellValues::CellValuesBase<dim> & neighbor_values,
-                         const double                      time_step)
+assemble_pressure_system(const double time_step)
 {
   // Only one integration point in FVM
   QGauss<dim>   quadrature_formula(1);
@@ -304,8 +311,8 @@ assemble_pressure_system(CellValues::CellValuesBase<dim> & cell_values,
             const double dS = cell->face(f)->measure();  // face area
 
             // assemble local matrix and distribute
-            neighbor_values.update(neighbor, p_neighbor, extra_values);
-            cell_values.update_face_values(neighbor_values, normal, dS);
+            cell_values_neighbor.update(neighbor, p_neighbor, extra_values);
+            cell_values.update_face_values(cell_values_neighbor, normal, dS);
 
             // distribute
             neighbor->get_dof_indices(dof_indices_neighbor);
@@ -352,9 +359,9 @@ assemble_pressure_system(CellValues::CellValuesBase<dim> & cell_values,
               const double dS = fe_subface_values.JxW(q_point);
 
               // update neighbor
-              neighbor_values.update(neighbor, p_neighbor, extra_values);
+              cell_values_neighbor.update(neighbor, p_neighbor, extra_values);
               // update face values
-              cell_values.update_face_values(neighbor_values, normal, dS);
+              cell_values.update_face_values(cell_values_neighbor, normal, dS);
 
               // distribute
               neighbor->get_dof_indices(dof_indices_neighbor);
@@ -383,9 +390,7 @@ assemble_pressure_system(CellValues::CellValuesBase<dim> & cell_values,
 template <int dim>
 void
 SolverIMPES<dim>::
-solve_saturation_system(CellValues::CellValuesSaturation<dim> & cell_values,
-                        CellValues::CellValuesBase<dim>       & neighbor_values,
-                        const double                            time_step)
+solve_saturation_system(const double time_step)
 {
   // Only one integration point in FVM
   QGauss<dim>       quadrature_formula(1);
@@ -469,17 +474,13 @@ solve_saturation_system(CellValues::CellValuesSaturation<dim> & cell_values,
       const double p = p_values[q_point];
       const double Sw_old = extra_values.saturation[0];
 
-      // std::cout << "value1 c1w = " << cell_values.c1p << std::endl;
-      // std::cout << "value1 c1p = " << cell_values.c1w << std::endl;
-      cell_values.update(cell, p, extra_values);
-      // std::cout << "value2 c1p = " << cell_values.c1p << std::endl;
-      // std::cout << "value2 c1w = " << cell_values.c1w << std::endl;
-      // std::cout << "value2 c1p/c1w = " << cell_values.c1p / cell_values.c1w << std::endl;
-      // std::cout << "value_weird c1p/c1w = " << cell_values.get_B(0) << std::endl;
-      cell_values.update_wells(cell, p);
+      // cell_values.update(cell, p, extra_values);
+      // cell_values.update_wells(cell, p);
+      cell_values_saturation.update(cell, p, extra_values);
+      cell_values_saturation.update_wells(cell, p);
 
       double solution_increment =
-          cell_values.get_rhs_cell_entry(time_step, p, p_old, 0);
+          cell_values_saturation.get_rhs_cell_entry(time_step, p, p_old, 0);
 
       cell->get_dof_indices(dof_indices);
       const unsigned int i = dof_indices[q_point];
@@ -519,10 +520,12 @@ solve_saturation_system(CellValues::CellValuesSaturation<dim> & cell_values,
             const double dS = cell->face(f)->measure();  // face area
 
             // assemble local matrix and distribute
-            neighbor_values.update(neighbor, p_neighbor, extra_values);
-            cell_values.update_face_values(neighbor_values, normal, dS);
+            cell_values_neighbor.update(neighbor, p_neighbor, extra_values);
+            cell_values_saturation.update_face_values(cell_values_neighbor,
+                                                      normal, dS);
 
-            solution_increment += cell_values.get_rhs_face_entry(time_step, 0);
+            solution_increment +=
+                cell_values_saturation.get_rhs_face_entry(time_step, 0);
 
           }
           // case neighbor finer
@@ -563,13 +566,14 @@ solve_saturation_system(CellValues::CellValuesSaturation<dim> & cell_values,
               const double dS = fe_subface_values.JxW(q_point);
 
               // update neighbor
-              neighbor_values.update(neighbor, p_neighbor, extra_values);
+              cell_values_neighbor.update(neighbor, p_neighbor, extra_values);
 
               // update face values
-              cell_values.update_face_values(neighbor_values, normal, dS);
+              cell_values_saturation.update_face_values(cell_values_neighbor, normal, dS);
 
               // distribute
-              solution_increment += cell_values.get_rhs_face_entry(time_step, 0);
+              solution_increment +=
+                  cell_values_saturation.get_rhs_face_entry(time_step, 0);
             }
           } // end case neighbor is finer
 
