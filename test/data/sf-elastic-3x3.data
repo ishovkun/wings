@@ -26,7 +26,8 @@ Poisson ratio           0.3 /
 # Biot coefficient        1.0 / # with 1 matrix doesn't change
 Biot coefficient        0.8 /
 Density water           1000 /
-Permeability            bitmap perm4x4_homog.dat /
+# Permeability            bitmap perm4x4_homog.dat /
+Permeability            1800 /
 Porosity                0.3 /
 Perm anisotropy         1, 1, 1 /
 
