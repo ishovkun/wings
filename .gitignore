@@ -13,3 +13,6 @@ build/
 Testing
 .dir-locals.el
 .vscode
+/CTestTestfile.cmake
+/*.cmake
+*.cmake
