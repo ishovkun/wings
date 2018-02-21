@@ -253,7 +253,6 @@ solve_time_step_fluid_mechanics(FluidSolvers::SolverIMPES<dim>   & fluid_solver,
                                 SolidSolvers::ElasticSolver<dim> & solid_solver,
                                 const double                       time_step)
 {
-  // update wells
   FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
       pressure_function(fluid_solver.get_dof_handler(),
                         fluid_solver.pressure_relevant);
@@ -263,10 +262,13 @@ solve_time_step_fluid_mechanics(FluidSolvers::SolverIMPES<dim>   & fluid_solver,
   TrilinosWrappers::MPI::Vector pressure_old_iter(fluid_solver.pressure_relevant);
 
   int fss_step = 0;
-  while(fss_step < model.max_fss_steps);
+  while(fss_step < model.max_coupling_steps)
   {
     fss_step++;
-    model.update_well_productivities(pressure_function, saturation_function);
+    pcout << "fss step " << fss_step << " of " << model.max_coupling_steps
+          << std::flush;
+
+    // model.update_well_productivities(pressure_function, saturation_function);
     pressure_old_iter = fluid_solver.pressure_relevant;
 
     {// solve for fluid flow
@@ -295,7 +297,9 @@ solve_time_step_fluid_mechanics(FluidSolvers::SolverIMPES<dim>   & fluid_solver,
     }
     error = Utilities::MPI::sum(error, mpi_communicator);
     error /= abs(fluid_solver.pressure_relevant.mean_value());
-    if (error < model.fss_tolerance)
+    pcout << "\t" << error << std::endl;
+
+    if (error < model.coupling_tolerance)
       return;
   } // end fss loop
 
@@ -365,22 +369,23 @@ void Simulator<dim>::run()
   while (time < model.t_max)
   {
     double time_step = model.min_time_step;
+    time += time_step;
     pcout << "Time " << time << "; time step " << time_step << std::endl;
 
     fluid_solver.pressure_old = fluid_solver.pressure_relevant;
     model.update_well_controls(time);
-    try
-    {
-    if (model.solid_model == Model::SolidModelType::Compressibility)
-      solve_time_step_fluid(fluid_solver, time_step);
-    else if (model.solid_model == Model::SolidModelType::Elasticity)
-      solve_time_step_fluid_mechanics(fluid_solver, solid_solver, time_step);
-    }
-    catch (...)
-    {
-      // truncate time step
-      AssertThrow(false, ExcNotImplemented());
-    }
+    // try
+    // {
+      if (model.solid_model == Model::SolidModelType::Compressibility)
+        solve_time_step_fluid(fluid_solver, time_step);
+      else if (model.solid_model == Model::SolidModelType::Elasticity)
+        solve_time_step_fluid_mechanics(fluid_solver, solid_solver, time_step);
+    // }
+    // catch (...)
+    // {
+    //   // truncate time step
+    //   AssertThrow(false, ExcNotImplemented());
+    // }
 
   } // end time loop
 

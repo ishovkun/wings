@@ -38,8 +38,8 @@ PVT water
 
 subsection Solver
 
-Minimum time step    1e-5 /
-T max                100 /
-FSS tolerance        1e-8 /
-Max FSS steps        30 /
+Minimum time step    1e-2 /
+T max                1e-1 /
+Coupling tolerance        1e-5 /
+Max coupling steps        30 /
 Linear solver solid  Direct /

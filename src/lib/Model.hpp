@@ -169,10 +169,10 @@ class Model
   Units::Units               units;
   std::vector<Wellbore<dim>> wells;
   Schedule::Schedule         schedule;
-  double                     fss_tolerance,
+  double                     coupling_tolerance,
                              min_time_step,
                              t_max;
-  int                        max_fss_steps;
+  int                        max_coupling_steps;
 
   FluidModelType             fluid_model;
   SolidModelType             solid_model;

@@ -342,7 +342,9 @@ constexpr int dim = 3;
       model.t_max =
           parser.get_double(Keywords::t_max) *
           model.units.time();
+
       // linear solvers
+      // fluid
       const std::string fluid_linear_solver =
           parser.get(Keywords::fluid_linear_solver, Keywords::linear_solver_cg);
       if (fluid_linear_solver == Keywords::linear_solver_direct)
@@ -353,7 +355,7 @@ constexpr int dim = 3;
         model.set_fluid_linear_solver(Model::LinearSolverType::GMRES);
       else
         AssertThrow(false, ExcNotImplemented());
-
+      // solid
       const std::string solid_linear_solver =
           parser.get(Keywords::solid_linear_solver, Keywords::linear_solver_cg);
       if (solid_linear_solver == Keywords::linear_solver_direct)
@@ -362,7 +364,13 @@ constexpr int dim = 3;
         model.set_solid_linear_solver(Model::LinearSolverType::CG);
       else
         AssertThrow(false, ExcNotImplemented());
-    }
+
+      // tolerance maximum iterations (not required)
+      const double coupling_tol = parser.get_double(Keywords::coupling_tolerance, 1e-10);
+      const int n_coupling_steps = parser.get_int(Keywords::max_coupling_steps, 20);
+      model.coupling_tolerance = coupling_tol;
+      model.max_coupling_steps = n_coupling_steps;
+    }  // end solver section
   } // eom
 
 
