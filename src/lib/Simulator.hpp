@@ -377,26 +377,30 @@ void Simulator<dim>::run()
   }
 
   double time = 0;
+  int time_step_number = 0;
   while (time < model.t_max)
   {
     double time_step = model.min_time_step;
     time += time_step;
+    time_step_number++;
     pcout << "Time " << time << "; time step " << time_step << std::endl;
 
     fluid_solver.pressure_old = fluid_solver.pressure_relevant;
     model.update_well_controls(time);
     // try
     // {
-      if (model.solid_model == Model::SolidModelType::Compressibility)
-        solve_time_step_fluid(fluid_solver, time_step);
-      else if (model.solid_model == Model::SolidModelType::Elasticity)
-        solve_time_step_fluid_mechanics(fluid_solver, solid_solver, time_step);
+    if (model.solid_model == Model::SolidModelType::Compressibility)
+      solve_time_step_fluid(fluid_solver, time_step);
+    else if (model.solid_model == Model::SolidModelType::Elasticity)
+      solve_time_step_fluid_mechanics(fluid_solver, solid_solver, time_step);
     // }
     // catch (...)
     // {
     //   // truncate time step
     //   AssertThrow(false, ExcNotImplemented());
     // }
+
+    // field_report(time, time_step_number, fluid_solver);
 
   } // end time loop
 
