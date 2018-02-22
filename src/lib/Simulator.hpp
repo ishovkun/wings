@@ -337,16 +337,21 @@ void Simulator<dim>::run()
   SolidSolvers::ElasticSolver<dim>
       solid_solver(mpi_communicator, triangulation, model, pcout);
 
+  // pcout << "solid definition sucess" << std::endl;
+
   // couple solvers
-  const FEValuesExtractors::Vector displacement(0);
-  solid_solver.set_coupling(fluid_solver.get_dof_handler());
-  fluid_solver.set_coupling(solid_solver.get_dof_handler(),
-                            solid_solver.relevant_solution,
-                            solid_solver.old_solution,
-                            displacement);
+  if (model.solid_model != Model::SolidModelType::Compressibility)
+  {
+    const FEValuesExtractors::Vector displacement(0);
+    solid_solver.set_coupling(fluid_solver.get_dof_handler());
+    fluid_solver.set_coupling(solid_solver.get_dof_handler(),
+                              solid_solver.relevant_solution,
+                              solid_solver.old_solution,
+                              displacement);
+    solid_solver.setup_dofs();
+  }
 
   fluid_solver.setup_dofs();
-  solid_solver.setup_dofs();
 
   model.locate_wells(fluid_solver.get_dof_handler());
 
@@ -357,13 +362,13 @@ void Simulator<dim>::run()
       saturation_function(fluid_solver.get_dof_handler(),
                           fluid_solver.saturation_relevant);
 
-
   { // fluid initialization step
     fluid_solver.pressure_relevant = model.reference_pressure;
     if (model.n_phases() == 2)
       fluid_solver.saturation_relevant[0] = model.initial_saturation_water;
   }
 
+  if (model.solid_model != Model::SolidModelType::Compressibility)
   { // geomechanics initialization step
     // solid.solver.initialize(fluid_solver.pressure_relevant);
     solid_solver.assemble_system(fluid_solver.pressure_relevant);
