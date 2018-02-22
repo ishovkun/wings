@@ -19,6 +19,14 @@ struct ExtraValues
   ExtraValues(const int n_phases = 3) {saturation.reinit(n_phases);}
   Vector<double> saturation;
   double div_u, div_old_u;
+  double pressure;
+};
+
+
+struct FaceValues
+{
+  double      area;
+  tensor<1,3> normal;
 };
 
 
