@@ -24,6 +24,12 @@ namespace Keywords
     well_parameters = "Wells",
     well_schedule = "Schedule",
 
+  section_initial_conditions = "Initial conditions",
+      reference_depth = "Reference depth",
+      reference_pressure = "Reference pressure",
+      initial_saturation_water = "Initial saturation water",
+      initial_saturation_oil = "Initial saturation oil",
+
   section_equation_data = "Equation data" ,
     model_type = "Fluid model",
     model_single_liquid = "Liquid",

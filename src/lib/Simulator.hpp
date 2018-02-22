@@ -56,7 +56,6 @@ class Simulator
   parallel::distributed::Triangulation<dim> triangulation;
   ConditionalOStream                        pcout;
   Model::Model<dim>                         model;
-  // FluidSolvers::PressureSolver<dim>         pressure_solver;
   std::string                               input_file;
   Output::OutputHelper<dim>                 output_helper;
   // TimerOutput                               computing_timer;
@@ -158,13 +157,14 @@ void Simulator<dim>::read_mesh(unsigned int verbosity)
   std::ifstream f(model.mesh_config.file.string());
 
   if (verbosity > 0)
-    pcout << "Reading mesh file " << model.mesh_config.file << std::endl;
+    pcout << "Reading mesh file " << model.mesh_config.file
+          << std::flush;
 
   if (model.mesh_config.type == Model::MeshType::Msh)
     gridin.read_msh(f);
   else if (model.mesh_config.type == Model::MeshType::Abaqus)
     gridin.read_abaqus(f);
-
+  pcout << " OK" << std::endl;
   GridTools::scale(model.units.length(), triangulation);
 }  // eom
 
@@ -357,6 +357,12 @@ void Simulator<dim>::run()
       saturation_function(fluid_solver.get_dof_handler(),
                           fluid_solver.saturation_relevant);
 
+
+  { // fluid initialization step
+    fluid_solver.pressure_relevant = model.reference_pressure;
+    if (model.n_phases() == 2)
+      fluid_solver.saturation_relevant[0] = model.initial_saturation_water;
+  }
 
   { // geomechanics initialization step
     // solid.solver.initialize(fluid_solver.pressure_relevant);

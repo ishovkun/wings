@@ -20,6 +20,10 @@ Schedule
 0,     B,    1,     50,   0;  # producer
 /
 
+subsection Initial conditions
+Reference pressure 1000 /
+Initial saturation water 0.2 /
+
 subsection Equation data
 Fluid model             DeadOil /
 Units                   Field /

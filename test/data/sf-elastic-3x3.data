@@ -6,6 +6,10 @@ Triangulation   3 3 1 0 0 -0.5 3 3 0.5 /
 
 # subsection Well data
 
+subsection Initial conditions
+# Reference depth  0 /
+Reference pressure  0 /
+
 subsection Boundary conditions
 #                       left right front back bottom
 Displacement boundaries  0  1  2  3  4 /

@@ -182,6 +182,8 @@ class Model
                              linear_solver_fluid;
   MeshConfig                 mesh_config;
   MeshType                   mesh_type;
+  double                     reference_pressure;
+  double                     initial_saturation_water, initial_saturation_oil;
 
  protected:
   std::string                input_file_name;

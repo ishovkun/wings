@@ -129,7 +129,22 @@ constexpr int dim = 3;
       //   boost::filesystem::path(fname).parent_path() /
       //   parser.get(Keywords::mesh_file);
       // std::cout << model.mesh_file << std::endl;
-    }
+    } // end section mesh
+    { // initial conditions
+      parser.enter_subsection(Keywords::section_initial_conditions);
+      // reference pressure
+      const double ref_p =
+          parser.get_double(Keywords::reference_pressure);  // required
+      model.reference_pressure = ref_p*model.units.pressure();
+      // TODO: reference depth
+      // Initial saturation
+      if(model.n_phases() > 1)
+      {
+        const double sw_init =
+            parser.get_double(Keywords::initial_saturation_water);
+        model.initial_saturation_water = sw_init;
+      }
+    } // end section init conditions
     {  // equation data
       // Tensor<1,dim> no_anisotropy = Parsers::convert<dim>(default_anisotropy);
       const Tensor<1,dim> no_anisotropy = Point<dim>(1, 1, 1);
