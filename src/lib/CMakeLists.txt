@@ -5,6 +5,7 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/FEFunction)
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/CellValues)
 
 ADD_LIBRARY(wings SHARED
+	AssembleFlowSystem.hpp
   Simulator.hpp
   Reader.hpp
   SyntaxParser.hpp

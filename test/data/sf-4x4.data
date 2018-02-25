@@ -2,6 +2,10 @@ subsection Mesh
 
 Triangulation msh domain.msh /
 
+subsection Initial conditions
+# Reference depth  0 /
+Reference pressure  0 /
+
 subsection Well data
 
 Wells

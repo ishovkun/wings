@@ -18,6 +18,7 @@
 #include <SolverIMPES.hpp>
 // #include <PressureSolver.hpp>
 // #include <SaturationSolver.hpp>
+#include <CellValues/CellValuesPressure.hpp>
 #include <ElasticSolver.hpp>
 #include <FEFunction/FEFunction.hpp>
 // #include <FEFunction/FEFunctionPVT.hpp>
@@ -240,7 +241,7 @@ void Simulator<dim>::run()
   // output_helper.prepare_output_directories();
 
   // create fluid and solid solver objects
-  CellValues::CellValuesBase<dim>
+  CellValues::CellValuesPressure<dim>
       cell_values(model), neighbor_values(model);
   CellValues::CellValuesSaturation<dim> cell_values_saturation(model);
   FluidSolvers::SolverIMPES<dim> fluid_solver(mpi_communicator,

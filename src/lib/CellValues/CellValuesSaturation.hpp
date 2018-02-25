@@ -1,41 +1,39 @@
 #pragma once
 
-#include <CellValues/CellValuesBase.hpp>
+#include <CellValues/CellValuesPressure.hpp>
 
 
 namespace CellValues
 {
 using namespace dealii;
 
-
 /*
- * This class is a modification of CellValuesBase and provides
+ * This class is a modification of CellValuesPressure and provides
  * methods to update rhs vector for the
  * IMPES saturation solver
  */
 template <int dim>
-class CellValuesSaturation : public CellValuesBase<dim>
+class CellValuesSaturation : public CellValuesPressure<dim>
 {
  public:
   CellValuesSaturation(const Model::Model<dim> &model);
   /* Update storage vectors and values for the current face */
-  virtual void update_face_values(const CellValuesBase<dim> &neighbor_data,
-                                  const Tensor<1,dim>       &face_normal,
-                                  const double               dS);
+  virtual void update_face_values(const CellValuesPressure<dim> & neighbor_data,
+                                  const FaceGeometry            & face_values);
   /* Get a rhs entry corresponding to the cell.
    * should be called once after update_values()
    */
   virtual double get_rhs_cell_entry(const double time_step,
                                     const double pressure,
                                     const double old_pressure,
-                                    const int phase) const;
+                                    const int    phase) const;
   /* Get a rhs entry corresponding to the face.
    * should be called once per face after update_face_values()
    */
   virtual double get_rhs_face_entry(const double time_step,
-                                    const int phase) const;
+                                    const int    phase) const;
   // Variables
- private:
+ protected:
   double pressure_difference;
 };
 
@@ -44,19 +42,19 @@ class CellValuesSaturation : public CellValuesBase<dim>
 template <int dim>
 CellValuesSaturation<dim>::CellValuesSaturation(const Model::Model<dim> &model_)
     :
-    CellValuesBase<dim>::CellValuesBase(model_)
+    CellValuesPressure<dim>::CellValuesPressure(model_)
 {}
 
 
 
 template<int dim>
 void
-CellValuesSaturation<dim>::update_face_values(const CellValuesBase<dim> &neighbor_data,
-                                              const Tensor<1,dim>       &face_normal,
-                                              const double               dS)
+CellValuesSaturation<dim>::
+update_face_values(const CellValuesPressure<dim> & neighbor_data,
+                   const FaceGeometry            & face_values)
 {
-  CellValuesBase<dim>::update_face_values(neighbor_data, face_normal, dS);
-  pressure_difference = CellValuesBase<dim>::pressure - neighbor_data.pressure;
+  CellValuesPressure<dim>::update_face_values(neighbor_data, face_values);
+  pressure_difference = this->pressure - neighbor_data.pressure;
 }  // end update_face_values
 
 
@@ -68,21 +66,21 @@ CellValuesSaturation<dim>::get_rhs_face_entry(const double time_step,
                                               const int phase) const
 {
   double result = 0;
-  if (CellValuesBase<dim>::model.fluid_model == Model::FluidModelType::Liquid)
+  if (CellValuesPressure<dim>::model.fluid_model == Model::FluidModelType::Liquid)
   {
     AssertThrow(false, ExcMessage("Cannot solve for single phase"));
   }
-  else if (CellValuesBase<dim>::model.fluid_model == Model::FluidModelType::DeadOil)
+  else if (CellValuesPressure<dim>::model.fluid_model == Model::FluidModelType::DeadOil)
   {
     if (phase == 0)
     {
-      result += - CellValuesBase<dim>::T_w_face * pressure_difference / CellValuesBase<dim>::c1w;
-      result += CellValuesBase<dim>::G_w_face / CellValuesBase<dim>::c1w;
+      result += - this->T_w_face * pressure_difference / this->c1w;
+      result += this->G_w_face / this->c1w;
     }
     else
     {
-      result += - CellValuesBase<dim>::T_o_face * pressure_difference / CellValuesBase<dim>::c2o;
-      result += CellValuesBase<dim>::G_o_face / CellValuesBase<dim>::c2o;
+      result += - this->T_o_face * pressure_difference / this->c2o;
+      result += this->G_o_face / this->c2o;
     }
   }
   else
@@ -102,27 +100,27 @@ CellValuesSaturation<dim>::get_rhs_cell_entry(const double time_step,
                                               const int phase) const
 {
   double result = 0;
-  if (CellValuesBase<dim>::model.fluid_model == Model::FluidModelType::Liquid)
+  if (this->model.fluid_model == Model::FluidModelType::Liquid)
   {
     AssertThrow(false, ExcMessage("Cannot solve for single phase"));
   }
-  else if (CellValuesBase<dim>::model.fluid_model == Model::FluidModelType::DeadOil)
+  else if (this->model.fluid_model == Model::FluidModelType::DeadOil)
   {
     if (phase == 0)
     {
-      result += CellValuesBase<dim>::vector_Q_phase[0] / CellValuesBase<dim>::c1w *
+      result += this->vector_Q_phase[0] / this->c1w *
           time_step;
-      result += CellValuesBase<dim>::c1p / CellValuesBase<dim>::c1w *
+      result += this->c1p / this->c1w *
       (pressure - old_pressure);
-      result += -CellValuesBase<dim>::c1e * CellValuesBase<dim>::delta_div_u;
+      result += -this->c1e * this->delta_div_u;
     }
     else
     {
-      result += CellValuesBase<dim>::vector_Q_phase[1] / CellValuesBase<dim>::c2o *
+      result += this->vector_Q_phase[1] / this->c2o *
           time_step;
-      result += CellValuesBase<dim>::c2p / CellValuesBase<dim>::c2o *
+      result += this->c2p / this->c2o *
           (pressure - old_pressure);
-      result += -CellValuesBase<dim>::c2e * CellValuesBase<dim>::delta_div_u;
+      result += -this->c2e * this->delta_div_u;
     }
   }
   else

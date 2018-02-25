@@ -324,8 +324,8 @@ void Simulator<dim>::run()
   // output_helper.prepare_output_directories();
 
   // define fluid object
-  CellValues::CellValuesBase<dim> cell_values(model),
-                                  neighbor_values(model);
+  CellValues::CellValuesPressure<dim> cell_values(model),
+                                      neighbor_values(model);
   CellValues::CellValuesSaturation<dim> cell_values_saturation(model);
   FluidSolvers::SolverIMPES<dim> fluid_solver(mpi_communicator,
                                               triangulation,
