@@ -206,7 +206,7 @@ constexpr int dim = 3;
         model.set_density_sc_w(rho_w);
       }
 
-      if (model.has_phase(Model::Phase::Oil))
+      if (model.has_phase(Model::Phase::Oleic))
       {
         auto tmp = parser.get_matrix(Keywords::pvt_oil, ";", ",");
         // deadoil: p Bo Co mu_o
@@ -519,7 +519,7 @@ constexpr int dim = 3;
         if (schedule_entry.control.type != Schedule::pressure_control)
           schedule_entry.control.value *= model.units.fluid_rate();  //
       }
-      else if (model.fluid_model == Model::Blackoil)
+      else if (model.fluid_model == Model::BlackOil)
       {
         if (schedule_entry.control.type == Schedule::flow_control_total
             || schedule_entry.control.type == Schedule::flow_control_phase_1

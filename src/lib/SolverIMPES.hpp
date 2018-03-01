@@ -20,9 +20,8 @@
 
 // Custom modules
 #include <Model.hpp>
-#include <CellValues/CellValuesPressure.hpp>
-#include <CellValues/CellValuesSaturation.hpp>
-#include <ExtraFEData.hpp>
+#include <Equations/IMPESPressure.hpp>
+#include <Equations/IMPESSaturation.hpp>
 #include <ScaleOutputVector.hpp>
 #include <AssembleFlowSystem.hpp>
 
@@ -32,18 +31,17 @@ namespace FluidSolvers
 using namespace dealii;
 
 
-template <int dim>
+template <int dim,int n_phases>
 class SolverIMPES
 {
  public:
   /* TODO: initialization description */
-  SolverIMPES(MPI_Comm                                    & mpi_communicator_,
-              parallel::distributed::Triangulation<dim>   & triangulation_,
-              const Model::Model<dim>                     & model_,
-              ConditionalOStream                          & pcout_,
-              const CellValues::CellValuesPressure<dim>   & cell_values,
-              const CellValues::CellValuesPressure<dim>   & cell_values_neighbor,
-              const CellValues::CellValuesSaturation<dim> & cell_values_saturation);
+  SolverIMPES(MPI_Comm                                  & mpi_communicator_,
+              parallel::distributed::Triangulation<dim> & triangulation_,
+              const Model::Model<dim>                   & model_,
+              ConditionalOStream                        & pcout_,
+              Equations::IMPESPressure<n_phases,dim>    & cell_values,
+              Equations::IMPESSaturation<n_phases,dim>  & cell_values_saturation);
   ~SolverIMPES();
   /* setup degrees of freedom for the current triangulation
    * and allocate memory for solution vectors */
@@ -105,21 +103,19 @@ class SolverIMPES
   const FEValuesExtractors::Vector          * p_displacement_extractor;
   bool coupled_with_solid;
 
-  CellValues::CellValuesPressure<dim>   cell_values;
-  CellValues::CellValuesPressure<dim>   cell_values_neighbor;
-  CellValues::CellValuesSaturation<dim> cell_values_saturation;
+  Equations::IMPESPressure<n_phases,dim>   cell_values;
+  Equations::IMPESSaturation<n_phases,dim> cell_values_saturation;
 };
 
 
-template <int dim>
-SolverIMPES<dim>::
-SolverIMPES(MPI_Comm                                    & mpi_communicator_,
-            parallel::distributed::Triangulation<dim>   & triangulation_,
-            const Model::Model<dim>                     & model_,
-            ConditionalOStream                          & pcout_,
-            const CellValues::CellValuesPressure<dim>   & cell_values,
-            const CellValues::CellValuesPressure<dim>   & cell_values_neighbor,
-            const CellValues::CellValuesSaturation<dim> & cell_values_saturation)
+template <int dim,int n_phases>
+SolverIMPES<dim,n_phases>::
+SolverIMPES(MPI_Comm                                  & mpi_communicator_,
+            parallel::distributed::Triangulation<dim> & triangulation_,
+            const Model::Model<dim>                   & model_,
+            ConditionalOStream                        & pcout_,
+            Equations::IMPESPressure<n_phases,dim>    & cell_values,
+            Equations::IMPESSaturation<n_phases,dim>  & cell_values_saturation)
     :
     mpi_communicator(mpi_communicator_),
     triangulation(triangulation_),
@@ -132,20 +128,19 @@ SolverIMPES(MPI_Comm                                    & mpi_communicator_,
     saturation_old(model.n_phases() - 1),  // old solution n-1 phases
     coupled_with_solid(false),
     cell_values(cell_values),
-    cell_values_neighbor(cell_values_neighbor),
     cell_values_saturation(cell_values_saturation)
 {}  // eom
 
 
-template <int dim>
-SolverIMPES<dim>::~SolverIMPES()
+template <int dim,int n_phases>
+SolverIMPES<dim,n_phases>::~SolverIMPES()
 {
   dof_handler.clear();
 }  // eom
 
 
-template <int dim>
-void SolverIMPES<dim>::setup_dofs()
+template <int dim,int n_phases>
+void SolverIMPES<dim,n_phases>::setup_dofs()
 {
   dof_handler.distribute_dofs(fe);
   locally_owned_dofs.clear();
@@ -181,9 +176,9 @@ void SolverIMPES<dim>::setup_dofs()
 
 
 
-template <int dim>
+template <int dim,int n_phases>
 void
-SolverIMPES<dim>::
+SolverIMPES<dim,n_phases>::
 assemble_pressure_system(const double time_step)
 {
   assemble_flow_system
@@ -191,7 +186,7 @@ assemble_pressure_system(const double time_step)
       (dof_handler, *p_solid_dof_handler,
        pressure_relevant, pressure_old, saturation_relevant,
        *p_displacement, *p_old_displacement, *p_displacement_extractor,
-       cell_values, cell_values_neighbor,
+       cell_values,
        system_matrix, rhs_vector,
        time_step, model.n_phases(),
        coupled_with_solid, /* assemble_matrix = */ true);
@@ -232,7 +227,7 @@ assemble_pressure_system(const double time_step)
   // for (auto & c: s_values)
   //   c.resize(face_quadrature_formula.size());
   // // this one stores both saturation values and geomechanics
-  // CellValues::ExtraValues extra_values;
+  // FluidEquations::ExtraValues extra_values;
 
   // const unsigned int q_point = 0;
 
@@ -398,9 +393,9 @@ assemble_pressure_system(const double time_step)
 
 
 
-template <int dim>
+template <int dim,int n_phases>
 void
-SolverIMPES<dim>::
+SolverIMPES<dim,n_phases>::
 solve_saturation_system(const double time_step)
 {
   assemble_flow_system
@@ -408,7 +403,7 @@ solve_saturation_system(const double time_step)
       (dof_handler, *p_solid_dof_handler,
        pressure_relevant, pressure_old, saturation_relevant,
        *p_displacement, *p_old_displacement, *p_displacement_extractor,
-       cell_values_saturation, cell_values_neighbor,
+       cell_values_saturation,
        /*not used*/ system_matrix, /* rhs_vector = */ rhs_vector,
        time_step, model.n_phases(),
        coupled_with_solid, /* assemble_matrix = */ false);
@@ -429,17 +424,6 @@ solve_saturation_system(const double time_step)
           increment = saturation_limits.first - Sw_old;
 
     solution[dof] = Sw_old + increment;
-    //     // solution[0][i] = Sw_old + solution_increment;
-    //     // solution[1][i] = 1.0 - (Sw_old + solution_increment);
-    //     // assert that we are in bounds
-    //     if (Sw_old + solution_increment > (1.0 - So_rw))
-    //       solution_increment = (1.0 - So_rw) - Sw_old;
-    //     else if (Sw_old + solution_increment < Sw_crit)
-    //       solution_increment = Sw_crit - Sw_old;
-
-    //     solution[i] = Sw_old + solution_increment;
-    //     // solution[0][i] = Sw_old + solution_increment;
-    //     // solution[1][i] = 1.0 - (Sw_old + solution_increment);
   } // end dof loop
 
   solution.compress(VectorOperation::insert);
@@ -484,7 +468,7 @@ solve_saturation_system(const double time_step)
   // for (auto & c: s_values)
   //   c.resize(face_quadrature_formula.size());
 
-  // CellValues::ExtraValues extra_values;
+  // FluidEquations::ExtraValues extra_values;
 
   // const double So_rw = model.residual_saturation_oil();  //
   // const double Sw_crit = model.residual_saturation_water();
@@ -648,9 +632,9 @@ solve_saturation_system(const double time_step)
 } // eom
 
 
-template <int dim>
+template <int dim,int n_phases>
 unsigned int
-SolverIMPES<dim>::solve_pressure_system()
+SolverIMPES<dim,n_phases>::solve_pressure_system()
 {
   double tol = 1e-10*rhs_vector.l2_norm();
   if (tol == 0.0)
@@ -679,9 +663,9 @@ SolverIMPES<dim>::solve_pressure_system()
 
 
 
-template<int dim>
+template <int dim,int n_phases>
 void
-SolverIMPES<dim>::
+SolverIMPES<dim,n_phases>::
 set_coupling(const DoFHandler<dim>               & solid_dof_handler,
              const TrilinosWrappers::MPI::Vector & displacement_vector,
              const TrilinosWrappers::MPI::Vector & old_displacement_vector,
@@ -696,45 +680,45 @@ set_coupling(const DoFHandler<dim>               & solid_dof_handler,
 
 
 
-template <int dim>
+template <int dim,int n_phases>
 const TrilinosWrappers::SparseMatrix&
-SolverIMPES<dim>::get_system_matrix()
+SolverIMPES<dim,n_phases>::get_system_matrix()
 {
   return system_matrix;
 }  // eom
 
 
 
-template <int dim>
+template <int dim,int n_phases>
 const TrilinosWrappers::MPI::Vector&
-SolverIMPES<dim>::get_rhs_vector()
+SolverIMPES<dim,n_phases>::get_rhs_vector()
 {
   return rhs_vector;
 }  // eom
 
 
 
-template <int dim>
+template <int dim,int n_phases>
 const DoFHandler<dim> &
-SolverIMPES<dim>::get_dof_handler()
+SolverIMPES<dim,n_phases>::get_dof_handler()
 {
   return dof_handler;
 }  // eom
 
 
 
-template <int dim>
+template <int dim,int n_phases>
 const FE_DGQ<dim> &
-SolverIMPES<dim>::get_fe()
+SolverIMPES<dim,n_phases>::get_fe()
 {
   return fe;
 }  // eom
 
 
 
-template<int dim>
+template <int dim,int n_phases>
 void
-SolverIMPES<dim>::attach_data(DataOut<dim> & data_out) const
+SolverIMPES<dim,n_phases>::attach_data(DataOut<dim> & data_out) const
 {
   data_out.attach_dof_handler(dof_handler);
   // scale pressure by bar/psi/whatever

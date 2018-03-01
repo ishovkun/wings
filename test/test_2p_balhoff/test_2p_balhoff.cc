@@ -13,7 +13,7 @@
 #include <SolverIMPES.hpp>
 #include <FEFunction/FEFunction.hpp>
 // #include <FEFunction/FEFunctionPVT.hpp>
-#include <CellValues/CellValuesSaturation.hpp>
+#include <FluidEquations/FluidEquationsSaturation.hpp>
 
 namespace Wings
 {
@@ -103,9 +103,9 @@ namespace Wings
     read_mesh();
     // refine_mesh();
 
-    CellValues::CellValuesPressure<dim>
+    FluidEquations::FluidEquationsPressure<dim>
         cell_values(model), neighbor_values(model);
-    CellValues::CellValuesSaturation<dim> cell_values_saturation(model);
+    FluidEquations::FluidEquationsSaturation<dim> cell_values_saturation(model);
     FluidSolvers::SolverIMPES<dim> fluid_solver(mpi_communicator,
                                                 triangulation,
                                                 model, pcout,

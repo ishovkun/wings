@@ -169,34 +169,6 @@ void Simulator<dim>::read_mesh(unsigned int verbosity)
 }  // eom
 
 
-
-template <int dim>
-void Simulator<dim>::refine_mesh()
-{
-  typename Triangulation<dim>::active_cell_iterator
-      cell = triangulation.begin_active(),
-      endc = triangulation.end();
-
-  for (;cell != endc; ++cell)
-    if (!cell->is_artificial())
-    {
-      if (
-              abs(cell->center()[0] - 1.5) < DefaultValues::small_number
-              &&
-              abs(cell->center()[1] - 2.5) < DefaultValues::small_number
-          )
-      {
-        cell->set_refine_flag();
-        break;
-      }
-    }
-
-  triangulation.prepare_coarsening_and_refinement();
-  triangulation.execute_coarsening_and_refinement();
-} // eom
-
-
-
 template <int dim>
 void
 Simulator<dim>::
@@ -324,89 +296,89 @@ void Simulator<dim>::run()
   // output_helper.prepare_output_directories();
 
   // define fluid object
-  CellValues::CellValuesPressure<dim> cell_values(model),
-                                      neighbor_values(model);
-  CellValues::CellValuesSaturation<dim> cell_values_saturation(model);
-  FluidSolvers::SolverIMPES<dim> fluid_solver(mpi_communicator,
-                                              triangulation,
-                                              model, pcout,
-                                              cell_values, neighbor_values,
-                                              cell_values_saturation);
+  // FluidEquations::FluidEquationsPressure<dim> cell_values(model),
+  //                                     neighbor_values(model);
+  // FluidEquations::FluidEquationsSaturation<dim> cell_values_saturation(model);
+  // FluidSolvers::SolverIMPES<dim> fluid_solver(mpi_communicator,
+  //                                             triangulation,
+  //                                             model, pcout,
+  //                                             cell_values, neighbor_values,
+  //                                             cell_values_saturation);
 
-  // define solid object
-  SolidSolvers::ElasticSolver<dim>
-      solid_solver(mpi_communicator, triangulation, model, pcout);
+  // // define solid object
+  // SolidSolvers::ElasticSolver<dim>
+  //     solid_solver(mpi_communicator, triangulation, model, pcout);
 
-  // pcout << "solid definition sucess" << std::endl;
+  // // pcout << "solid definition sucess" << std::endl;
 
-  // couple solvers
-  if (model.solid_model != Model::SolidModelType::Compressibility)
-  {
-    const FEValuesExtractors::Vector displacement(0);
-    solid_solver.set_coupling(fluid_solver.get_dof_handler());
-    fluid_solver.set_coupling(solid_solver.get_dof_handler(),
-                              solid_solver.relevant_solution,
-                              solid_solver.old_solution,
-                              displacement);
-    solid_solver.setup_dofs();
-  }
+  // // couple solvers
+  // if (model.solid_model != Model::SolidModelType::Compressibility)
+  // {
+  //   const FEValuesExtractors::Vector displacement(0);
+  //   solid_solver.set_coupling(fluid_solver.get_dof_handler());
+  //   fluid_solver.set_coupling(solid_solver.get_dof_handler(),
+  //                             solid_solver.relevant_solution,
+  //                             solid_solver.old_solution,
+  //                             displacement);
+  //   solid_solver.setup_dofs();
+  // }
 
-  fluid_solver.setup_dofs();
+  // fluid_solver.setup_dofs();
 
-  model.locate_wells(fluid_solver.get_dof_handler());
+  // model.locate_wells(fluid_solver.get_dof_handler());
 
-  FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
-      pressure_function(fluid_solver.get_dof_handler(),
-                        fluid_solver.pressure_relevant);
-  FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
-      saturation_function(fluid_solver.get_dof_handler(),
-                          fluid_solver.saturation_relevant);
+  // FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
+  //     pressure_function(fluid_solver.get_dof_handler(),
+  //                       fluid_solver.pressure_relevant);
+  // FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
+  //     saturation_function(fluid_solver.get_dof_handler(),
+  //                         fluid_solver.saturation_relevant);
 
-  { // fluid initialization step
-    fluid_solver.pressure_relevant = model.reference_pressure;
-    if (model.n_phases() == 2)
-      fluid_solver.saturation_relevant[0] = model.initial_saturation_water;
-  }
+  // { // fluid initialization step
+  //   fluid_solver.pressure_relevant = model.reference_pressure;
+  //   if (model.n_phases() == 2)
+  //     fluid_solver.saturation_relevant[0] = model.initial_saturation_water;
+  // }
 
-  if (model.solid_model != Model::SolidModelType::Compressibility)
-  { // geomechanics initialization step
-    // solid.solver.initialize(fluid_solver.pressure_relevant);
-    solid_solver.assemble_system(fluid_solver.pressure_relevant);
-    solid_solver.solve();
-    solid_solver.relevant_solution = solid_solver.solution;
-  }
+  // if (model.solid_model != Model::SolidModelType::Compressibility)
+  // { // geomechanics initialization step
+  //   // solid.solver.initialize(fluid_solver.pressure_relevant);
+  //   solid_solver.assemble_system(fluid_solver.pressure_relevant);
+  //   solid_solver.solve();
+  //   solid_solver.relevant_solution = solid_solver.solution;
+  // }
 
-  double time = 0;
-  int time_step_number = 0;
-  while (time < model.t_max)
-  {
-    double time_step = model.min_time_step;
-    time += time_step;
-    time_step_number++;
-    pcout << "Time " << time << "; time step " << time_step << std::endl;
+  // double time = 0;
+  // int time_step_number = 0;
+  // while (time < model.t_max)
+  // {
+  //   double time_step = model.min_time_step;
+  //   time += time_step;
+  //   time_step_number++;
+  //   pcout << "Time " << time << "; time step " << time_step << std::endl;
 
-    fluid_solver.pressure_old = fluid_solver.pressure_relevant;
-    model.update_well_controls(time);
-    // try
-    // {
-    if (model.solid_model == Model::SolidModelType::Compressibility)
-      solve_time_step_fluid(fluid_solver, time_step);
-    else if (model.solid_model == Model::SolidModelType::Elasticity)
-      solve_time_step_fluid_mechanics(fluid_solver, solid_solver, time_step);
-    // }
-    // catch (...)
-    // {
-    //   // truncate time step
-    //   AssertThrow(false, ExcNotImplemented());
-    // }
+  //   fluid_solver.pressure_old = fluid_solver.pressure_relevant;
+  //   model.update_well_controls(time);
+  //   // try
+  //   // {
+  //   if (model.solid_model == Model::SolidModelType::Compressibility)
+  //     solve_time_step_fluid(fluid_solver, time_step);
+  //   else if (model.solid_model == Model::SolidModelType::Elasticity)
+  //     solve_time_step_fluid_mechanics(fluid_solver, solid_solver, time_step);
+  //   // }
+  //   // catch (...)
+  //   // {
+  //   //   // truncate time step
+  //   //   AssertThrow(false, ExcNotImplemented());
+  //   // }
 
-    // field_report(time, time_step_number, fluid_solver);
+  //   // field_report(time, time_step_number, fluid_solver);
 
-  } // end time loop
+  // } // end time loop
 
-  // solid_solver.solution.print(std::cout, 4, true, false);
-  // fluid_solver.initialize(cell_values, neighbor_values, time_step);
-  // fluid_solver.assemble_pressure_system(time_step);
+  // // solid_solver.solution.print(std::cout, 4, true, false);
+  // // fluid_solver.initialize(cell_values, neighbor_values, time_step);
+  // // fluid_solver.assemble_pressure_system(time_step);
 
 
 } // eom

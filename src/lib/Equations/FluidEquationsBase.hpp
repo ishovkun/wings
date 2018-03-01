@@ -2,8 +2,13 @@
 
 #include <Math.hpp>
 
+/*
+ * Abstract class that defines the interaction with FluidEquation classes
+ * This family of classes is used to compute system matrix and ths_vector
+ * local entries and essentially contains all the physics of the problem.
+ */
 
-namespace CellValues
+namespace Equations
 {
 
 using namespace dealii;
@@ -19,8 +24,9 @@ struct SolutionValues
 {
   SolutionValues(const int n_phases = 3) {saturation.reinit(n_phases);}
   Vector<double> saturation;
-  double div_u, div_old_u;
+  // double div_u, div_old_u;
   double pressure;
+  Tensor<1, 3> grad_u, grad_old_u;
 };
 
 
@@ -35,13 +41,16 @@ struct FaceGeometry
 
 // Generic  class that defines the interaction with all fluid solvers in Wings
 template <int dim>
-class CellValuesBase
+class FluidEquationsBase
 {
  public:
-  // CellValuesBase();
   /* Update storage vectors and values for the current cell */
-  virtual void update(const CellIterator<dim> & cell,
-                      const SolutionValues    & solution_values) = 0;
+  virtual void update_cell_values(const CellIterator<dim> & cell,
+                                  const SolutionValues    & solution_values) = 0;
+  /* Update storage vectors and values for the current face */
+  virtual void update_face_values(const CellIterator<dim> & neighbor_cell,
+                                  const SolutionValues    & solution_values,
+                                  const FaceGeometry      & geometry) = 0;
   /* Update wellbore rates and j-indices.
    * The calculated rates are not true rates for
    * pressure-controled wells,
@@ -49,14 +58,11 @@ class CellValuesBase
    */
   virtual void update_wells(const CellIterator<dim> &cell) = 0;
   /* Update wellbore rates.
-   * This method actually gets real rates for both flow- and pressure-
+   * This method gets real rates for both flow- and pressure-
    * controlled wellbores.
    */
   virtual void update_wells(const CellIterator<dim> & cell,
                             const double              pressure) = 0;
-  /* Update storage vectors and values for the current face */
-  // virtual void update_face_values(const CellValuesBase<dim> & neighbor_data,
-  //                                 const FaceGeometry        & face_values) = 0;
   // methods for pressure solver
   /* Get a matrix entry corresponding to the cell.
    * should be called once after update_values()
@@ -66,26 +72,19 @@ class CellValuesBase
    * should be called once after update_values()
    */
   virtual double get_rhs_cell_entry(const double time_step,
-                                    const double pressure,
-                                    const double old_pressure,
-                                    const int /* component */ = 0) const = 0;
+                                    const double x,
+                                    const double old_x,
+                                    const int comp = 0) const = 0;
   /* Get a matrix entry corresponding to the cell.
    * should be called once after update_values()
    */
-  virtual double get_matrix_face_entry() const = 0;
+  virtual double get_matrix_face_entry(const int comp = 0) const = 0;
   /* Get a rhs entry corresponding to the face.
    * should be called once per face after update_face_values()
    */
-  virtual double get_rhs_face_entry(const double /* time_step */,
-                                    const int /* component */ = 0) const = 0;
+  virtual double get_rhs_face_entry(const double time_step,
+                                    const int comp = 0) const = 0;
 };
-
-
-
-// template <int dim>
-// CellValuesBase<dim>::CellValuesBase()
-// {}
-
 
 
 }  // end of namespace

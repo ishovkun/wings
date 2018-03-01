@@ -2,23 +2,23 @@
 MESSAGE("including library wings")
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/FEFunction)
-INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/CellValues)
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/Equations)
 
 ADD_LIBRARY(wings SHARED
-	AssembleFlowSystem.hpp
-  Simulator.hpp
-  Reader.hpp
   SyntaxParser.hpp
-  CellValues/CellValuesBase.hpp
-  CellValues/CellValuesSaturation.hpp
-  PressureSolver.hpp
+  Reader.hpp
+  Simulator.hpp
+  SolverBuilder.hpp
   SolverIMPES.hpp
+	AssembleFlowSystem.hpp
 	ElasticSolver.hpp
+  Equations/FluidEquationsBase.hpp
+  Equations/IMPESPressure.hpp
+  Equations/IMPESSaturation.hpp
   RelativePermeability.hpp
   ExtraFEData.hpp
   FEFunction/FEFunction.hpp
   FEFunction/FEFunctionPVT.hpp
-  SaturationSolver.hpp
   Math.hpp
   Model.hpp
   BitMap.hpp

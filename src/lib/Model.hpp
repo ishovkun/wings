@@ -21,13 +21,13 @@ namespace Model
 {
 using namespace dealii;
 
-enum FluidModelType {Liquid, GasOnly, DeadOil, WaterGas, Blackoil};
+enum FluidModelType {Liquid, Gas, DeadOil, WaterGas, BlackOil};
 
 enum SolidModelType {Compressibility, Elasticity};
 
 enum PVTType {Constant, Table, Correlation};
 
-enum Phase {Water, Oil, Gas};
+enum Phase {Water, Oleic, Gaseous};
 
 enum FluidCouplingStrategy {None, FixedStressSplit};
 
@@ -54,6 +54,13 @@ struct MeshConfig
 };
 
 
+struct PVTValues
+{
+  double volume_factor, viscosity, compressibility;
+};
+
+
+
 template <int dim>
 class Model
 {
@@ -65,8 +72,8 @@ class Model
         ConditionalOStream &pcout_);
   ~Model();
  private:
-  MPI_Comm                               &mpi_communicator;
-  ConditionalOStream                     &pcout;
+  MPI_Comm                               & mpi_communicator;
+  ConditionalOStream                     & pcout;
  public:
   // void read_input(const std::string&,
   //                 const int verbosity_=0);
@@ -110,6 +117,7 @@ class Model
   // querying data
   bool has_phase(const Phase &phase) const;
   unsigned int n_phases() const;
+  double density_standard_conditions(const int phase) const;
   double density_sc_water() const;
   double density_sc_oil() const;
   double get_biot_coefficient() const;
@@ -123,7 +131,7 @@ class Model
   void get_pvt_gas(const double        pressure,
                    std::vector<double> &dst) const;
   // this function calls any of the three above allowing for
-  // phase-agnostic CellValues
+  // phase-agnostic FluidEquations
   void get_pvt(const double        pressure,
                const int           phase,
                std::vector<double> &dst) const;
@@ -232,6 +240,31 @@ Model<dim>::~Model()
 
 template <int dim>
 inline
+double Model<dim>::density_standard_conditions(const int phase) const
+{
+  AssertThrow(phase < n_phases(), ExcDimensionMismatch(phase, n_phases()));
+  if (phase == 0)
+    return this->density_sc_w_constant;
+
+  // phase > 0
+  if (fluid_model == FluidModelType::DeadOil)
+    return this->density_sc_o_constant;
+  else if (fluid_model == FluidModelType::WaterGas)
+    return this->density_sc_g_constant;
+  else if (fluid_model == FluidModelType::BlackOil)
+    if (phase == 1)
+      return this->density_sc_o_constant;
+    else
+      return this->density_sc_g_constant;
+
+  return 0;
+
+}  // eom
+
+
+
+template <int dim>
+inline
 double Model<dim>::density_sc_water() const
 {
   return this->density_sc_w_constant;
@@ -310,7 +343,7 @@ const std::vector<const Interpolation::LookupTable*> Model<dim>::get_pvt_tables(
   std::vector<const Interpolation::LookupTable*> pvt_tables;
   if (has_phase(Phase::Water))
     pvt_tables.push_back(&pvt_table_water);
-  if (has_phase(Phase::Oil))
+  if (has_phase(Phase::Oleic))
     pvt_tables.push_back(&pvt_table_oil);
   // if (has_phase(const Model::Gas))
   //   pvt_tables.push_back(get_pvt_table_gas());
@@ -456,7 +489,7 @@ void Model<dim>::set_fluid_model(const FluidModelType & model_type)
   else if (fluid_model == DeadOil)
   {
     phases.push_back(Phase::Water);
-    phases.push_back(Phase::Oil);
+    phases.push_back(Phase::Oleic);
   }
   else
     AssertThrow(false, ExcNotImplemented());
@@ -513,26 +546,6 @@ void Model<dim>::get_relative_permeability(Vector<double>      &saturation,
     rel_perm.get_values(saturation, dst);
   else
     AssertThrow(false, ExcNotImplemented());
-}
-
-
-
-template <int dim>
-inline
-double Model<dim>::residual_saturation_water() const
-{
-  // std::cout << rel_perm.Sw_crit << std::endl;
-  return rel_perm.Sw_crit;
-}
-
-
-
-template <int dim>
-inline
-double Model<dim>::residual_saturation_oil() const
-{
-  // std::cout << rel_perm.So_rw;
-  return rel_perm.So_rw;
 }
 
 

@@ -7,8 +7,8 @@
 #include <deal.II/base/quadrature_lib.h>
 
 // wings modules
-// #include <CellValues/CellValuesBase.hpp>
-#include <CellValues/CellValuesPressure.hpp>
+#include <Equations/FluidEquationsBase.hpp>
+
 
 namespace FluidSolvers
 {
@@ -24,10 +24,7 @@ void assemble_flow_system(const DoFHandler<dim>               & fluid_dof_handle
                           const VectorType                    & solid_solution,
                           const VectorType                    & old_solid_solution,
                           const FEValuesExtractors::Vector    & displacement_extractor,
-                          // CellValues::CellValuesBase<dim>  & cell_values,
-                          // CellValues::CellValuesBase<dim>  & neighbor_values,
-                          CellValues::CellValuesPressure<dim> & cell_values,
-                          CellValues::CellValuesPressure<dim> & neighbor_values,
+                          Equations::FluidEquationsBase<dim>  & equation,
                           MatrixType                          & system_matrix,
                           VectorType                          & rhs_vector,
                           const double                        time_step,
@@ -71,12 +68,17 @@ void assemble_flow_system(const DoFHandler<dim>               & fluid_dof_handle
   std::vector<double>                 p_old_values(n_q_points);
   std::vector<double>                 div_u_values(n_q_points);
   std::vector<double>                 div_old_u_values(n_q_points);
+  std::vector< Tensor<2,dim> >        grad_u_values(n_q_points);
+  std::vector< Tensor<2,dim> >        grad_old_u_values(n_q_points);
+
   std::vector< std::vector<double> >  s_values(n_phases);
   for (auto & c: s_values)
     c.resize(face_quadrature_formula.size());
 
-  CellValues::SolutionValues solution_values;
-  CellValues::FaceGeometry   face_values;
+  // FluidEquations::SolutionValues solution_values;
+  // FluidEquations::FaceGeometry   face_values;
+  Equations::SolutionValues solution_values;
+  Equations::FaceGeometry   face_values;
 
   typename DoFHandler<dim>::active_cell_iterator
       cell = fluid_dof_handler.begin_active(),
@@ -106,22 +108,22 @@ void assemble_flow_system(const DoFHandler<dim>               & fluid_dof_handle
       {
         fe_values_solid.reinit(solid_cell);
         fe_values_solid[displacement_extractor].
-            get_function_divergences(solid_solution, div_u_values);
+            get_function_gradients(solid_solution, grad_u_values);
         fe_values_solid[displacement_extractor].
-            get_function_divergences(old_solid_solution, div_old_u_values);
-        solution_values.div_u = div_u_values[q_point];
-        solution_values.div_old_u = div_old_u_values[q_point];
+            get_function_gradients(old_solid_solution, grad_old_u_values);
+        solution_values.grad_u = grad_u_values[q_point];
+        solution_values.grad_old_u = grad_old_u_values[q_point];
       }
 
       const double pressure_value = p_values[q_point];
       const double pressure_value_old = p_old_values[q_point];
       solution_values.pressure = pressure_value;
 
-      cell_values.update(cell, solution_values);
-      cell_values.update_wells(cell);
+      equation.update_cell_values(cell, solution_values);
+      equation.update_wells(cell);
 
-      double matrix_ii = cell_values.get_matrix_cell_entry(time_step);
-      double rhs_i = cell_values.get_rhs_cell_entry(time_step,
+      double matrix_ii = equation.get_matrix_cell_entry(time_step);
+      double rhs_i = equation.get_rhs_cell_entry(time_step,
                                                     pressure_value,
                                                     pressure_value_old);
 
@@ -145,30 +147,29 @@ void assemble_flow_system(const DoFHandler<dim>               & fluid_dof_handle
               fe_values.get_function_values(saturations[c], s_values[c]);
               solution_values.saturation[c] = s_values[c][q_point];
             }
-            if (coupled_with_solid)
-            {
-              fe_values_solid.reinit(solid_cell->neighbor(f));
-              fe_values_solid[displacement_extractor].
-                  get_function_divergences(solid_solution, div_u_values);
-              fe_values_solid[displacement_extractor].
-                  get_function_divergences(old_solid_solution, div_old_u_values);
-              solution_values.div_u = div_u_values[q_point];
-              solution_values.div_old_u = div_old_u_values[q_point];
-            }
+            // if (coupled_with_solid)
+            // {
+            //   fe_values_solid.reinit(solid_cell->neighbor(f));
+            //   fe_values_solid[displacement_extractor].
+            //       get_function_divergences(solid_solution, div_u_values);
+            //   fe_values_solid[displacement_extractor].
+            //       get_function_divergences(old_solid_solution, div_old_u_values);
+            //   solution_values.div_u = div_u_values[q_point];
+            //   solution_values.div_old_u = div_old_u_values[q_point];
+            // }
             solution_values.pressure = p_values[q_point];
             face_values.normal = fe_face_values.normal_vector(q_point);
             face_values.area = cell->face(f)->measure();
 
-            // assemble local matrix and distribute
-            neighbor_values.update(neighbor, solution_values);
-            cell_values.update_face_values(neighbor_values, face_values);
+            equation.update_face_values(neighbor, solution_values,
+                                        face_values);
 
             // distribute
             neighbor->get_dof_indices(dof_indices_neighbor);
             const unsigned int j = dof_indices_neighbor[q_point];
-            const double face_entry = cell_values.get_matrix_face_entry();
+            const double face_entry = equation.get_matrix_face_entry();
             matrix_ii += face_entry;
-            rhs_i += cell_values.get_rhs_face_entry(time_step);
+            rhs_i += equation.get_rhs_face_entry(time_step);
             system_matrix.add(i, j, -face_entry);
           }
           else if ((cell->neighbor(f)->level() == cell->level()) &&
@@ -190,34 +191,32 @@ void assemble_flow_system(const DoFHandler<dim>               & fluid_dof_handle
                 fe_values.get_function_values(saturations[c], s_values[c]);
                 solution_values.saturation[c] = s_values[c][q_point];
               }
-              if (coupled_with_solid)
-              {
-                const auto & solid_neighbor =
-                    solid_cell->neighbor_child_on_subface(f, subface);
-                fe_values_solid.reinit(solid_neighbor);
-                fe_values_solid[displacement_extractor].
-                    get_function_divergences(solid_solution, div_u_values);
-                fe_values_solid[displacement_extractor].
-                    get_function_divergences(old_solid_solution, div_old_u_values);
-                solution_values.div_u = div_u_values[q_point];
-                solution_values.div_old_u = div_old_u_values[q_point];
-              }
+              // if (coupled_with_solid)
+              // {
+              //   const auto & solid_neighbor =
+              //       solid_cell->neighbor_child_on_subface(f, subface);
+              //   fe_values_solid.reinit(solid_neighbor);
+              //   fe_values_solid[displacement_extractor].
+              //       get_function_divergences(solid_solution, div_u_values);
+              //   fe_values_solid[displacement_extractor].
+              //       get_function_divergences(old_solid_solution, div_old_u_values);
+              //   solution_values.div_u = div_u_values[q_point];
+              //   solution_values.div_old_u = div_old_u_values[q_point];
+              // }
 
               solution_values.pressure = p_values[q_point];
               face_values.normal = fe_subface_values.normal_vector(q_point);
               face_values.area = fe_subface_values.JxW(q_point);
 
-              // update neighbor
-              neighbor_values.update(neighbor, solution_values);
-              // update face values
-              cell_values.update_face_values(neighbor_values, face_values);
+              equation.update_face_values(neighbor, solution_values,
+                                          face_values);
 
               // distribute
               neighbor->get_dof_indices(dof_indices_neighbor);
               const unsigned int j = dof_indices_neighbor[q_point];
-              const double face_entry = cell_values.get_matrix_face_entry();
+              const double face_entry = equation.get_matrix_face_entry();
               matrix_ii += face_entry;
-              rhs_i += cell_values.get_rhs_face_entry(time_step);
+              rhs_i += equation.get_rhs_face_entry(time_step);
               system_matrix.add(i, j, -face_entry);
             }
           } // end case neighbor is finer

@@ -23,7 +23,7 @@
 #include <Reader.hpp>
 #include <SolverIMPES.hpp>
 #include <Parsers.hpp>
-#include <CellValues/CellValuesPressure.hpp>
+#include <FluidEquations/FluidEquationsPressure.hpp>
 #include <FEFunction/FEFunction.hpp>
 
 
@@ -84,9 +84,9 @@ namespace WingTest
     //     saturation_solver(mpi_communicator,
     //                       pressure_solver.get_dof_handler(),
     //                       model, pcout);
-    CellValues::CellValuesPressure<dim>
+    FluidEquations::FluidEquationsPressure<dim>
         cell_values(model), neighbor_values(model);
-    CellValues::CellValuesSaturation<dim> cell_values_saturation(model);
+    FluidEquations::FluidEquationsSaturation<dim> cell_values_saturation(model);
     FluidSolvers::SolverIMPES<dim> fluid_solver(mpi_communicator,
                                                 triangulation,
                                                 model, pcout,

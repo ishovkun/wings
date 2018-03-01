@@ -217,9 +217,9 @@ void Simulator<dim>::run()
 
   model.locate_wells(pressure_solver.get_dof_handler());
 
-  CellValues::CellValuesBase<dim> cell_values_pressure(model),
+  FluidEquations::FluidEquationsBase<dim> cell_values_pressure(model),
                                   neighbor_values_pressure(model);
-  CellValues::CellValuesSaturation<dim> cell_values_saturation(model);
+  FluidEquations::FluidEquationsSaturation<dim> cell_values_saturation(model);
 
   FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
       pressure_function(pressure_solver.get_dof_handler(),
