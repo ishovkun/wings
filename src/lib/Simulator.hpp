@@ -41,16 +41,16 @@ class Simulator
  private:
   void refine_mesh();
   // export vtu data (for paraview)
-  void field_report(const double                           time_step,
-                    const unsigned int                     time_step_number,
-                    const FluidSolvers::SolverIMPES<dim> & fluid_solver);
+  void field_report(const double                               time_step,
+                    const unsigned int                         time_step_number,
+                    const FluidSolvers::FluidSolverBase<dim> & fluid_solver);
   // Solve time step for a blackoil system without geomechanics
-  void solve_time_step_fluid(FluidSolvers::SolverIMPES<dim> & fluid_solver,
-                             const double                     time_step);
+  void solve_time_step_fluid(FluidSolvers::FluidSolverBase<dim> & fluid_solver,
+                             const double                         time_step);
   // Solve time step for a blackoil system with geomechanics
-  void solve_time_step_fluid_mechanics(FluidSolvers::SolverIMPES<dim>   & fluid_solver,
-                                       SolidSolvers::ElasticSolver<dim> & solid_solver,
-                                       const double                       time_step);
+  void solve_time_step_fluid_mechanics(FluidSolvers::FluidSolverBase<dim> & fluid_solver,
+                                       SolidSolvers::ElasticSolver<dim>   & solid_solver,
+                                       const double                         time_step);
 
   MPI_Comm                                  mpi_communicator;
   parallel::distributed::Triangulation<dim> triangulation;
@@ -70,7 +70,6 @@ Simulator<dim>::Simulator(std::string input_file_name_)
     triangulation(mpi_communicator),
     pcout(std::cout, (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)),
     model(mpi_communicator, pcout),
-    // pressure_solver(mpi_communicator, triangulation, model, pcout),
     input_file(input_file_name_),
     output_helper(mpi_communicator, triangulation)
     // ,computing_timer(mpi_communicator, pcout,
@@ -172,17 +171,12 @@ void Simulator<dim>::read_mesh(unsigned int verbosity)
 template <int dim>
 void
 Simulator<dim>::
-field_report(const double time,
-             const unsigned int time_step_number,
-             const FluidSolvers::SolverIMPES<dim> &fluid_solver)
+field_report(const double                               time,
+             const unsigned int                         time_step_number,
+             const FluidSolvers::FluidSolverBase<dim> & fluid_solver)
 {
   DataOut<dim> data_out;
 
-  // data_out.attach_dof_handler(pressure_solver.get_dof_handler());
-  // data_out.add_data_vector(pressure_solver.relevant_solution, "pressure",
-  //                          DataOut<dim>::type_dof_data);
-  // data_out.add_data_vector(saturation_solver.relevant_solution[0], "Sw",
-  //                          DataOut<dim>::type_dof_data);
   fluid_solver.attach_data(data_out);
   data_out.build_patches();
 
@@ -193,8 +187,9 @@ field_report(const double time,
 
 template<int dim>
 void
-Simulator<dim>::solve_time_step_fluid(FluidSolvers::SolverIMPES<dim> & fluid_solver,
-                                      const double                     time_step)
+Simulator<dim>::
+solve_time_step_fluid(FluidSolvers::FluidSolverBase<dim> & fluid_solver,
+                      const double                         time_step)
 {
   // update wells
   FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
@@ -218,12 +213,13 @@ Simulator<dim>::solve_time_step_fluid(FluidSolvers::SolverIMPES<dim> & fluid_sol
 }  // end solve_time_step_fluid
 
 
+
 template<int dim>
 void
 Simulator<dim>::
-solve_time_step_fluid_mechanics(FluidSolvers::SolverIMPES<dim>   & fluid_solver,
-                                SolidSolvers::ElasticSolver<dim> & solid_solver,
-                                const double                       time_step)
+solve_time_step_fluid_mechanics(FluidSolvers::FluidSolverBase<dim>   & fluid_solver,
+                                SolidSolvers::ElasticSolver<dim>     & solid_solver,
+                                const double                           time_step)
 {
   FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
       pressure_function(fluid_solver.get_dof_handler(),
@@ -277,7 +273,6 @@ solve_time_step_fluid_mechanics(FluidSolvers::SolverIMPES<dim>   & fluid_solver,
 
   AssertThrow(false, ExcMessage("FSS didn't converge"));
 }  // end solve_
-
 
 
 template <int dim>

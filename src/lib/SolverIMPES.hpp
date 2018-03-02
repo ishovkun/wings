@@ -19,11 +19,12 @@
 #include <deal.II/lac/trilinos_precondition.h>
 
 // Custom modules
-#include <Model.hpp>
+#include <FluidSolverBase.hpp>
 #include <Equations/IMPESPressure.hpp>
 #include <Equations/IMPESSaturation.hpp>
-#include <ScaleOutputVector.hpp>
 #include <AssembleFlowSystem.hpp>
+#include <Model.hpp>
+#include <ScaleOutputVector.hpp>
 
 
 namespace FluidSolvers
@@ -31,8 +32,8 @@ namespace FluidSolvers
 using namespace dealii;
 
 
-template <int dim,int n_phases>
-class SolverIMPES
+template <int n_phases, int dim>
+class SolverIMPES : public FluidSolverBase<dim>
 {
  public:
   /* TODO: initialization description */
@@ -45,9 +46,11 @@ class SolverIMPES
   ~SolverIMPES();
   /* setup degrees of freedom for the current triangulation
    * and allocate memory for solution vectors */
-  void setup_dofs();
+  void setup_dofs() override;
   // Implicit pressure system: Fill matrix and rhs vector
   void assemble_pressure_system(const double time_step);
+  // same as assemble_pressure_system
+  void assemble_system(const double time_step) override;
   /*
    * solve saturation system explicitly.
    */
@@ -57,6 +60,11 @@ class SolverIMPES
    * returns the number of solver steps
    */
   unsigned int solve_pressure_system();
+  /*
+   * Solve pressure system, and then explicitly solve
+   * for saturations
+   */
+  void solve_time_step() override;
   // give solver access to solid dofs and solution vector
   void set_coupling(const DoFHandler<dim>               & solid_dof_handler,
                     const TrilinosWrappers::MPI::Vector & displacement_vector,
@@ -66,13 +74,13 @@ class SolverIMPES
    * Attach pressure and saturation vectors to the DataOut object.
    * This method is used for generating field reports
    */
-  void attach_data(DataOut<dim> & data_out) const;
+  void attach_data(DataOut<dim> & data_out) const override;
 
   // accessing private members
-  const TrilinosWrappers::SparseMatrix & get_system_matrix();
-  const TrilinosWrappers::MPI::Vector  & get_rhs_vector();
-  const DoFHandler<dim>                & get_dof_handler();
-  const FE_DGQ<dim>                    & get_fe();
+  const TrilinosWrappers::SparseMatrix & get_system_matrix() override;
+  const TrilinosWrappers::MPI::Vector  & get_rhs_vector() override;
+  const DoFHandler<dim>                & get_dof_handler() override;
+  const FE_DGQ<dim>                    & get_fe() override;
 
  private:
   MPI_Comm                                  & mpi_communicator;
@@ -108,8 +116,8 @@ class SolverIMPES
 };
 
 
-template <int dim,int n_phases>
-SolverIMPES<dim,n_phases>::
+template <int n_phases, int dim>
+SolverIMPES<n_phases,dim>::
 SolverIMPES(MPI_Comm                                  & mpi_communicator_,
             parallel::distributed::Triangulation<dim> & triangulation_,
             const Model::Model<dim>                   & model_,
@@ -132,15 +140,15 @@ SolverIMPES(MPI_Comm                                  & mpi_communicator_,
 {}  // eom
 
 
-template <int dim,int n_phases>
-SolverIMPES<dim,n_phases>::~SolverIMPES()
+template <int n_phases, int dim>
+SolverIMPES<n_phases,dim>::~SolverIMPES()
 {
   dof_handler.clear();
 }  // eom
 
 
-template <int dim,int n_phases>
-void SolverIMPES<dim,n_phases>::setup_dofs()
+template <int n_phases, int dim>
+void SolverIMPES<n_phases,dim>::setup_dofs()
 {
   dof_handler.distribute_dofs(fe);
   locally_owned_dofs.clear();
@@ -176,9 +184,9 @@ void SolverIMPES<dim,n_phases>::setup_dofs()
 
 
 
-template <int dim,int n_phases>
+template <int n_phases, int dim>
 void
-SolverIMPES<dim,n_phases>::
+SolverIMPES<n_phases,dim>::
 assemble_pressure_system(const double time_step)
 {
   assemble_flow_system
@@ -393,9 +401,9 @@ assemble_pressure_system(const double time_step)
 
 
 
-template <int dim,int n_phases>
+template <int n_phases, int dim>
 void
-SolverIMPES<dim,n_phases>::
+SolverIMPES<n_phases,dim>::
 solve_saturation_system(const double time_step)
 {
   assemble_flow_system
@@ -632,9 +640,9 @@ solve_saturation_system(const double time_step)
 } // eom
 
 
-template <int dim,int n_phases>
+template <int n_phases, int dim>
 unsigned int
-SolverIMPES<dim,n_phases>::solve_pressure_system()
+SolverIMPES<n_phases,dim>::solve_pressure_system()
 {
   double tol = 1e-10*rhs_vector.l2_norm();
   if (tol == 0.0)
@@ -663,9 +671,9 @@ SolverIMPES<dim,n_phases>::solve_pressure_system()
 
 
 
-template <int dim,int n_phases>
+template <int n_phases, int dim>
 void
-SolverIMPES<dim,n_phases>::
+SolverIMPES<n_phases,dim>::
 set_coupling(const DoFHandler<dim>               & solid_dof_handler,
              const TrilinosWrappers::MPI::Vector & displacement_vector,
              const TrilinosWrappers::MPI::Vector & old_displacement_vector,
@@ -680,45 +688,45 @@ set_coupling(const DoFHandler<dim>               & solid_dof_handler,
 
 
 
-template <int dim,int n_phases>
+template <int n_phases, int dim>
 const TrilinosWrappers::SparseMatrix&
-SolverIMPES<dim,n_phases>::get_system_matrix()
+SolverIMPES<n_phases,dim>::get_system_matrix()
 {
   return system_matrix;
 }  // eom
 
 
 
-template <int dim,int n_phases>
+template <int n_phases, int dim>
 const TrilinosWrappers::MPI::Vector&
-SolverIMPES<dim,n_phases>::get_rhs_vector()
+SolverIMPES<n_phases,dim>::get_rhs_vector()
 {
   return rhs_vector;
 }  // eom
 
 
 
-template <int dim,int n_phases>
+template <int n_phases, int dim>
 const DoFHandler<dim> &
-SolverIMPES<dim,n_phases>::get_dof_handler()
+SolverIMPES<n_phases,dim>::get_dof_handler()
 {
   return dof_handler;
 }  // eom
 
 
 
-template <int dim,int n_phases>
+template <int n_phases, int dim>
 const FE_DGQ<dim> &
-SolverIMPES<dim,n_phases>::get_fe()
+SolverIMPES<n_phases,dim>::get_fe()
 {
   return fe;
 }  // eom
 
 
 
-template <int dim,int n_phases>
+template <int n_phases, int dim>
 void
-SolverIMPES<dim,n_phases>::attach_data(DataOut<dim> & data_out) const
+SolverIMPES<n_phases,dim>::attach_data(DataOut<dim> & data_out) const
 {
   data_out.attach_dof_handler(dof_handler);
   // scale pressure by bar/psi/whatever
