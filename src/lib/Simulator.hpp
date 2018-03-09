@@ -21,6 +21,7 @@
 #include <ElasticSolver.hpp>
 #include <FEFunction/FEFunction.hpp>
 // #include <FEFunction/FEFunctionPVT.hpp>
+#include <SolverBuilder.hpp>
 
 namespace Wings
 {
@@ -288,7 +289,12 @@ void Simulator<dim>::run()
   else
     read_mesh(/* verbosity = */ 1);
 
-  // output_helper.prepare_output_directories();
+  output_helper.prepare_output_directories();
+
+  // SolverBuilder builder(model);
+  // auto & fluid_solver = builder.get_fluid_solver(mpi_communicator,
+  //                                                triangulation,
+  //                                                pcout);
 
   // define fluid object
   // FluidEquations::FluidEquationsPressure<dim> cell_values(model),

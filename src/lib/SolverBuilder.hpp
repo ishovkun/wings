@@ -1,4 +1,5 @@
 #pragma once
+#include <deal.II/distributed/tria.h>
 
 #include <Model.hpp>
 
@@ -11,19 +12,20 @@
 
 namespace Wings
 {
+using namespace dealii;
+
+static const int dim = 3;
 
 class SolverBuilder
 {
-  static const int dim = 3;
  public:
-  SolverBuiler(const Model::Model<dim> &model);
+  SolverBuilder(const Model::Model<dim> &model);
 
-  template<int n_phases>
-  std::unique_ptr<FluidSolvers::SolverIMPES<dim,n_phases>>
-  get_fluid_solver(MPI_Comm                                  & mpi_communicator_,
-                   parallel::distributed::Triangulation<dim> & triangulation_,
-                   const Model::Model<dim>                   & model_,
-                   ConditionalOStream                        & pcout_);
+  // FluidSolvers::FluidSolverBase<dim>
+  std::unique_ptr<FluidSolvers::FluidSolverBase<dim>>
+  get_fluid_solver(MPI_Comm                                  & mpi_communicator,
+                   parallel::distributed::Triangulation<dim> & triangulation,
+                   ConditionalOStream                        & pcout);
   std::unique_ptr<SolidSolvers::ElasticSolver<dim>> get_solid_solver();
 
  protected:
@@ -39,26 +41,26 @@ SolverBuilder::SolverBuilder(const Model::Model<dim> &model)
 
 
 
-template<int n_phases>
-std::unique_ptr<FluidSolvers::SolverIMPES<dim>>
+// FluidSolvers::FluidSolverBase<dim>
+std::unique_ptr<FluidSolvers::FluidSolverBase<dim>>
 SolverBuilder::
-get_fluid_solver(MPI_Comm                                  & mpi_communicator_,
-                 parallel::distributed::Triangulation<dim> & triangulation_,
-                 const Model::Model<dim>                   & model_,
-                 ConditionalOStream                        & pcout_)
+get_fluid_solver(MPI_Comm                                  & mpi_communicator,
+                 parallel::distributed::Triangulation<dim> & triangulation,
+                 ConditionalOStream                        & pcout)
 {
   switch(model.n_phases())
   {
     case 1:
       {
-        FluidEquations::FluidEquationsPressure<dim,1> implicit_pressure(model);
-        FluidEquations::FluidEquationsSaturation<dim,1> explicit_saturation(model);
-        return std::make_unique<FluidSolvers::SolverIMPES<dim,1>>
-            (new SolverIMPES<dim,1>(mpi_communicator,
-                                    triangulation,
-                                    model,
-                                    pcout,
-                                    implicit_pressure, explicit_saturation));
+        Equations::IMPESPressure<1,dim> implicit_pressure(model);
+        Equations::IMPESSaturation<1,dim> explicit_saturation(model);
+        // return std::make_unique<FluidSolvers::SolverIMPES<1,dim>>
+        //     (new FluidSolvers::SolverIMPES<1,dim>(mpi_communicator,
+        //                                           triangulation,
+        //                                           model,
+        //                                           pcout,
+        //                                           implicit_pressure,
+        //                                           explicit_saturation));
       }
 
     // case 2:

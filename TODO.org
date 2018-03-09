@@ -1,6 +1,7 @@
 
 * General
-** TODO Model should decide which phase is oil water or gas, not cellvalues
+** DONE Model should decide which phase is oil water or gas, not cellvalues
+   CLOSED: [2018-03-09 Fri 14:26]
 ** DONE Merge SaturationSolver and PressureSolver into FLuidSolverIMPES
    CLOSED: [2018-02-16 Fri 18:20]
 ** Simulator should take model as an argument
@@ -13,7 +14,9 @@
 ** DONE Allow creating cubic mesh with n_elements and dimensions
    CLOSED: [2018-02-16 Fri 18:20]
    also allow mesh file keyword
-** Put FluidEquations into ConstitutiveModel namespace and rename it into .., make ExtraValues callse FluidEquations
+** DONE Put FluidEquations into ConstitutiveModel namespace and rename it into .., make ExtraValues callse FluidEquations
+   CLOSED: [2018-03-09 Fri 14:26]
+** TODO Do some sort of location Probe class that would be responsible for getting data instead of model.
 * Physics
 ** Multiphase
 *** DONE Input

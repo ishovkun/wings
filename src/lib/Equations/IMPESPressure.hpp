@@ -50,7 +50,7 @@ class IMPESPressure : public FluidEquationsBase<dim>
   /* Get a matrix entry corresponding to the cell.
    * should be called once after update_values()
    */
-  virtual double get_matrix_face_entry() const override;
+  virtual double get_matrix_face_entry(const int = 0) const override;
   /* Get a rhs entry corresponding to the face.
    * should be called once per face after update_face_values()
    */
@@ -84,44 +84,47 @@ class IMPESPressure : public FluidEquationsBase<dim>
 
 // ----------------------Partial specialization-------------------------------
 // partial class specialization
-template <int dim>
-class IMPESPressure<1, dim>
-{
-  virtual double get_matrix_cell_entry(const double time_step) const override;
-  virtual double get_matrix_face_entry() const override;
-  virtual double get_rhs_cell_entry(const double time_step,
-                                    const double pressure,
-                                    const double old_pressure,
-                                    const int /* phase */ = 0) const override;
-  virtual double get_rhs_face_entry(const double /* time_step */,
-                                    const int /* phase */ = 0) const override;
-};
+// template <int dim>
+// class IMPESPressure<1, dim> //: public FluidEquationsBase<dim>
+// {
+//  public:
+//   virtual double get_matrix_cell_entry(const double time_step) const override;
+//   virtual double get_matrix_face_entry(const int = 0) const override;
+//   virtual double get_rhs_cell_entry(const double time_step,
+//                                     const double pressure,
+//                                     const double old_pressure,
+//                                     const int /* phase */ = 0) const override;
+//   virtual double get_rhs_face_entry(const double /* time_step */,
+//                                     const int /* phase */ = 0) const override;
+// };
 
-template <int dim>
-class IMPESPressure<2, dim>
-{
-  virtual double get_matrix_cell_entry(const double time_step) const override;
-  virtual double get_matrix_face_entry() const override;
-  virtual double get_rhs_cell_entry(const double time_step,
-                                    const double pressure,
-                                    const double old_pressure,
-                                    const int /* phase */ = 0) const override;
-  virtual double get_rhs_face_entry(const double /* time_step */,
-                                    const int /* phase */ = 0) const override;
-};
+// template <int dim>
+// class IMPESPressure<2, dim> //: public FluidEquationsBase<dim>
+// {
+//  public:
+//   virtual double get_matrix_cell_entry(const double time_step) const override;
+//   virtual double get_matrix_face_entry(const int = 0) const override;
+//   virtual double get_rhs_cell_entry(const double time_step,
+//                                     const double pressure,
+//                                     const double old_pressure,
+//                                     const int /* phase */ = 0) const override;
+//   virtual double get_rhs_face_entry(const double /* time_step */,
+//                                     const int /* phase */ = 0) const override;
+// };
 
-template <int dim>
-class IMPESPressure<3,dim>
-{
-  virtual double get_matrix_cell_entry(const double time_step) const override;
-  virtual double get_matrix_face_entry() const override;
-  virtual double get_rhs_cell_entry(const double time_step,
-                                    const double pressure,
-                                    const double old_pressure,
-                                    const int /* phase */ = 0) const override;
-  virtual double get_rhs_face_entry(const double /* time_step */,
-                                    const int /* phase */ = 0) const override;
-};
+// template <int dim>
+// class IMPESPressure<3,dim> //: public FluidEquationsBase<dim>
+// {
+//  public:
+//   virtual double get_matrix_cell_entry(const double time_step) const override;
+//   virtual double get_matrix_face_entry(const int = 0) const override;
+//   virtual double get_rhs_cell_entry(const double time_step,
+//                                     const double pressure,
+//                                     const double old_pressure,
+//                                     const int /* phase */ = 0) const override;
+//   virtual double get_rhs_face_entry(const double /* time_step */,
+//                                     const int /* phase */ = 0) const override;
+// };
 // ---------------------------------------------------------------------------
 
 
@@ -286,6 +289,74 @@ update_face_values(const CellIterator<dim> & neighbor_cell,
 
 } // eom
 
+
+// ==================== Partial specialization ===============================
+// --------------------------- 1 phase ---------------------------------------
+template <int dim>
+double
+IMPESPressure<1, dim>::
+get_matrix_cell_entry(const double time_step) const
+{
+  double entry = 0;
+
+  entry += this->pressure_terms[0]/time_step;
+  entry += this->well_Js[0];
+  return entry;
+
+  // // coupling with geomechanics
+  // if (model.coupling_strategy() == Model::FluidCouplingStrategy::FixedStressSplit)
+  // {
+  //   const double alpha = model.get_biot_coefficient();
+  //   const double E = model.get_young_modulus->value(this->cell_coord);
+  //   const double nu = model.get_poisson_ratio->value(this->cell_coord);
+  //   const double bulk_modulus = E/3.0/(1.0-2.0*nu);
+  //   entry += cell_volume/B_w * alpha*alpha/bulk_modulus/time_step;
+  // }
+}
+
+
+template <int dim>
+double
+IMPESPressure<1, dim>::
+get_rhs_cell_entry(const double time_step,
+                   const double pressure,
+                   const double,
+                   const int) const
+{
+  double entry = 0;
+
+  const double c1p = this->saturation_terms[0,0];
+
+  entry += c1p * pressure/time_step; // B matrix
+  entry += this->well_Qs[0];  // Q vector
+  // entry += -c1e*delta_div_u/time_step; // poroelastic
+
+  return entry;
+}  // eom
+
+
+
+template <int dim>
+inline
+double
+IMPESPressure<1,dim>::get_matrix_face_entry(const int) const
+{
+  return this->face_transmissibility[0];
+}
+
+
+
+template <int dim>
+inline
+double
+IMPESPressure<1, dim>::get_rhs_face_entry(const double,
+                                          const int) const
+{
+  return this->face_gravity_terms[0];
+} // eom
+
+// --------------------------- 2 phase ---------------------------------------
+
 // template <int n_phases, int dim = 3>
 // void
 // IMPESPressure<dim,n_phases>::
@@ -397,87 +468,60 @@ update_face_values(const CellIterator<dim> & neighbor_cell,
 // } // eom
 
 
-// partial specialization
+
+
+
 // template <int n_phases, int dim = 3>
+// template <int dim>
 // double
-// IMPESPressure<dim,n_phases>::
-// get_matrix_cell_entry(const double time_step) const {};
+// IMPESPressure<2,dim>::
+// get_matrix_cell_entry(const double time_step) const
+// {
+//   double entry = 0;
 
+//   if (this->model.fluid_model == Model::FluidModelType::DeadOil)
+//   {
+//     const double c1w = this->saturation_terms[0,0];
+//     const double c2o = this->saturation_terms[1,1];
+//     const double c1p = this->pressure_terms[0];
+//     const double c2p = this->pressure_terms[1];
+//     entry += (c2o/c1w * c1p + c2p)/time_step;
+//     entry += +c2o/c1w*this->well_Js[0] + this->well_Js[1];
+//   }
+//   else
+//   {
+//     AssertThrow(false, ExcNotImplemented());
+//   }
 
-template <int dim>
-double
-IMPESPressure<1, dim>::
-get_matrix_cell_entry(const double time_step) const
-{
-  double entry = 0;
-
-  entry += this->pressure_terms[0]/time_step;
-  entry += this->well_Js[0];
-  return entry;
-
-  // // coupling with geomechanics
-  // if (model.coupling_strategy() == Model::FluidCouplingStrategy::FixedStressSplit)
-  // {
-  //   const double alpha = model.get_biot_coefficient();
-  //   const double E = model.get_young_modulus->value(this->cell_coord);
-  //   const double nu = model.get_poisson_ratio->value(this->cell_coord);
-  //   const double bulk_modulus = E/3.0/(1.0-2.0*nu);
-  //   entry += cell_volume/B_w * alpha*alpha/bulk_modulus/time_step;
-  // }
-}
-
-
-// template <int n_phases, int dim = 3>
-template <int dim>
-double
-IMPESPressure<2,dim>::
-get_matrix_cell_entry(const double time_step) const
-{
-  double entry = 0;
-
-  if (this->model.fluid_model == Model::FluidModelType::DeadOil)
-  {
-    const double c1w = this->saturation_terms[0,0];
-    const double c2o = this->saturation_terms[1,1];
-    const double c1p = this->pressure_terms[0];
-    const double c2p = this->pressure_terms[1];
-    entry += (c2o/c1w * c1p + c2p)/time_step;
-    entry += +c2o/c1w*this->well_Js[0] + this->well_Js[1];
-  }
-  else
-  {
-    AssertThrow(false, ExcNotImplemented());
-  }
-
-  return entry;
-} // eom
+//   return entry;
+// } // eom
 
 
 
-template <int dim>
-double
-IMPESPressure<3,dim>::
-get_matrix_cell_entry(const double time_step) const
-{
-  AssertThrow(false, ExcNotImplemented());
+// template <int dim>
+// double
+// IMPESPressure<3,dim>::
+// get_matrix_cell_entry(const double time_step) const
+// {
+//   AssertThrow(false, ExcNotImplemented());
 
-  const double entry = 0;
-  const double c1w = this->saturation_terms[0,0];
-  const double c2o = this->saturation_terms[1,1];
-  const double c3w = this->saturation_terms[2,0];
-  const double c3o = this->saturation_terms[2,1];
-  const double c3g = this->saturation_terms[2,2];
-  const double c1p = this->pressure_terms[0];
-  const double c2p = this->pressure_terms[1];
-  const double c3p = this->pressure_terms[2];
+//   const double entry = 0;
+//   const double c1w = this->saturation_terms[0,0];
+//   const double c2o = this->saturation_terms[1,1];
+//   const double c3w = this->saturation_terms[2,0];
+//   const double c3o = this->saturation_terms[2,1];
+//   const double c3g = this->saturation_terms[2,2];
+//   const double c1p = this->pressure_terms[0];
+//   const double c2p = this->pressure_terms[1];
+//   const double c3p = this->pressure_terms[2];
 
-  const double A = c2o/c1w * (c3g-c3w)/(c3g-c3o);
-  const double B = c2o / (c3g - c3o);
+//   const double A = c2o/c1w * (c3g-c3w)/(c3g-c3o);
+//   const double B = c2o / (c3g - c3o);
 
-  entry += (A*c1p + c2p + B*c3p)/time_step;
+//   entry += (A*c1p + c2p + B*c3p)/time_step;
 
-  return entry;
-}
+//   return entry;
+// }
 
 
 // template <int n_phases, int dim = 3>
@@ -527,85 +571,66 @@ get_matrix_cell_entry(const double time_step) const
 // } // eom
 
 
-template <int dim>
-double
-IMPESPressure<1, dim>::
-get_rhs_cell_entry(const double time_step,
-                   const double pressure,
-                   const double,
-                   const int) const
-{
-  double entry = 0;
-
-  const double c1p = this->saturation_terms[0,0];
-
-  entry += c1p * pressure/time_step; // B matrix
-  entry += this->well_Qs[0];  // Q vector
-  // entry += -c1e*delta_div_u/time_step; // poroelastic
-
-  return entry;
-}  // eom
 
 
+// template <int dim>
+// double
+// IMPESPressure<2, dim>::
+// get_rhs_cell_entry(const double time_step,
+//                    const double pressure,
+//                    const double,
+//                    const int) const
+// {
+//   double entry = 0;
 
-template <int dim>
-double
-IMPESPressure<2, dim>::
-get_rhs_cell_entry(const double time_step,
-                   const double pressure,
-                   const double,
-                   const int) const
-{
-  double entry = 0;
+//   const double c1w = this->saturation_terms[0,0];
+//   const double c2o = this->saturation_terms[1,1];
+//   const double c1p = this->pressure_terms[0];
+//   const double c2p = this->pressure_terms[1];
 
-  const double c1w = this->saturation_terms[0,0];
-  const double c2o = this->saturation_terms[1,1];
-  const double c1p = this->pressure_terms[0];
-  const double c2p = this->pressure_terms[1];
+//   if (this->model.fluid_model == Model::FluidModelType::DeadOil)
+//   {
+//     entry += (c2o/c1w * c1p + c2p)*pressure/time_step;  // B matrix
+//     entry += +c2o/c1w * this->well_Qs[0] + this->well_Qs[1]; // Q vector
+//     // entry += - (c2o/c1w*c1e + c2e)*delta_div_u/time_step; // poroelastic
+//     // entry += - (c2o/c1w*c1e + c2e)*delta_div_u/time_step; // poroelastic
+//   }
+//   else if (this->model.fluid_model == Model::FluidModelType::WaterGas)
+//   {
+//     AssertThrow(false, ExcNotImplemented());
+//   }
 
-  if (this->model.fluid_model == Model::FluidModelType::DeadOil)
-  {
-    entry += (c2o/c1w * c1p + c2p)*pressure/time_step;  // B matrix
-    entry += +c2o/c1w * this->well_Qs[0] + this->well_Qs[1]; // Q vector
-    // entry += - (c2o/c1w*c1e + c2e)*delta_div_u/time_step; // poroelastic
-    // entry += - (c2o/c1w*c1e + c2e)*delta_div_u/time_step; // poroelastic
-  }
-  else if (this->model.fluid_model == Model::FluidModelType::WaterGas)
-  {
-    AssertThrow(false, ExcNotImplemented());
-  }
-
-  return entry;
-}  // eom
+//   return entry;
+// }  // eom
 
 
 
-template <int dim>
-double
-IMPESPressure<3, dim>::
-get_rhs_cell_entry(const double time_step,
-                   const double pressure,
-                   const double,
-                   const int) const
-{
-  AssertThrow(false, ExcNotImplemented());
+// template <int dim>
+// double
+// IMPESPressure<3, dim>::
+// get_rhs_cell_entry(const double time_step,
+//                    const double pressure,
+//                    const double,
+//                    const int) const
+// {
+//   AssertThrow(false, ExcNotImplemented());
 
-  double entry = 0;
+//   double entry = 0;
 
-  const double c1w = this->saturation_terms[0,0];
-  const double c2o = this->saturation_terms[1,1];
-  const double c3w = this->saturation_terms[2,0];
-  const double c3o = this->saturation_terms[2,1];
-  const double c3g = this->saturation_terms[2,2];
-  const double c1p = this->pressure_terms[0];
-  const double c2p = this->pressure_terms[1];
-  const double c3p = this->pressure_terms[2];
+//   const double c1w = this->saturation_terms[0,0];
+//   const double c2o = this->saturation_terms[1,1];
+//   const double c3w = this->saturation_terms[2,0];
+//   const double c3o = this->saturation_terms[2,1];
+//   const double c3g = this->saturation_terms[2,2];
+//   const double c1p = this->pressure_terms[0];
+//   const double c2p = this->pressure_terms[1];
+//   const double c3p = this->pressure_terms[2];
 
-  const double A = c2o/c1w * (c3g-c3w)/(c3g-c3o);
-  const double B = c2o / (c3g - c3o);
-  entry += (A*c1p + c2p + B*c3p)*pressure/time_step;  // B matrix
-  return entry;
-}  // eom
+//   const double A = c2o/c1w * (c3g-c3w)/(c3g-c3o);
+//   const double B = c2o / (c3g - c3o);
+//   entry += (A*c1p + c2p + B*c3p)*pressure/time_step;  // B matrix
+//   return entry;
+// }  // eom
 
 
 // template <int n_phases, int dim = 3>
@@ -658,92 +683,74 @@ get_rhs_cell_entry(const double time_step,
 
 
 
-template <int dim>
-inline
-double
-IMPESPressure<1,dim>::get_matrix_face_entry() const
-{
-  return this->face_transmissibility[0];
-}
+// template <int dim>
+// inline
+// double
+// IMPESPressure<2,dim>::get_matrix_face_entry(const int) const
+// {
+//   double entry = 0;
+
+//   if (this->model.fluid_model == Model::FluidModelType::DeadOil)
+//   {
+//     const double c2o = this->saturation_terms[1,1];
+//     const double c1w = this->saturation_terms[0,0];
+//     const double c1p = this->pressure_terms[0];
+//     entry += +c2o/c1w * this->face_transmissibility[0] + this->face_transmissibility[1];
+//   }
+//   else
+//   {
+//     AssertThrow(false, ExcNotImplemented());
+//   }
+
+//   return entry;
+// } // eom
+
+
+// template <int dim>
+// inline
+// double
+// IMPESPressure<3,dim>::get_matrix_face_entry(const int) const
+// {
+//   AssertThrow(false, ExcNotImplemented());
+//   return 0;
+// } // eom
 
 
 
-template <int dim>
-inline
-double
-IMPESPressure<2,dim>::get_matrix_face_entry() const
-{
-  double entry = 0;
+// template <int dim>
+// inline
+// double
+// IMPESPressure<2, dim>::get_rhs_face_entry(const double,
+//                                          const int) const
+// {
+//   double entry = 0;
 
-  if (this->model.fluid_model == Model::FluidModelType::DeadOil)
-  {
-    const double c2o = this->saturation_terms[1,1];
-    const double c1w = this->saturation_terms[0,0];
-    const double c1p = this->pressure_terms[0];
-    entry += +c2o/c1w * this->face_transmissibility[0] + this->face_transmissibility[1];
-  }
-  else
-  {
-    AssertThrow(false, ExcNotImplemented());
-  }
+//   if (this->model.fluid_model == Model::FluidModelType::DeadOil)
+//   {
+//     const double c2o = this->saturation_terms[1,1];
+//     const double c1w = this->saturation_terms[0,0];
+//     entry += +c2o/c1w * this->face_gravity_terms[0]
+//                         +
+//                         this->face_gravity_terms[1];
+//   }
+//   else
+//   {
+//     AssertThrow(false, ExcNotImplemented());
+//   }
 
-  return entry;
-} // eom
-
-
-template <int dim>
-inline
-double
-IMPESPressure<3,dim>::get_matrix_face_entry() const
-{
-  AssertThrow(false, ExcNotImplemented());
-  return 0;
-} // eom
-
-
-template <int dim>
-inline
-double
-IMPESPressure<1, dim>::get_rhs_face_entry(const double,
-                                         const int) const
-{
-  return this->face_gravity_terms[0];
-} // eom
-
-template <int dim>
-inline
-double
-IMPESPressure<2, dim>::get_rhs_face_entry(const double,
-                                         const int) const
-{
-  double entry = 0;
-
-  if (this->model.fluid_model == Model::FluidModelType::DeadOil)
-  {
-    const double c2o = this->saturation_terms[1,1];
-    const double c1w = this->saturation_terms[0,0];
-    entry += +c2o/c1w * this->face_gravity_terms[0]
-                        +
-                        this->face_gravity_terms[1];
-  }
-  else
-  {
-    AssertThrow(false, ExcNotImplemented());
-  }
-
-  return entry;
-} // eom
+//   return entry;
+// } // eom
 
 
 
-template <int dim>
-inline
-double
-IMPESPressure<3, dim>::get_rhs_face_entry(const double,
-                                          const int) const
-{
-  AssertThrow(false, ExcNotImplemented());
-  return 0;
-} // eom
+// template <int dim>
+// inline
+// double
+// IMPESPressure<3, dim>::get_rhs_face_entry(const double,
+//                                           const int) const
+// {
+//   AssertThrow(false, ExcNotImplemented());
+//   return 0;
+// } // eom
 
 } // end namespace
