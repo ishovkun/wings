@@ -39,6 +39,8 @@ class Wellbore : public Function<dim>
   // set data methods
   // set control method (pressure, flow), control value, etc.
   void set_control(const Schedule::WellControl& control_);
+  // get well know where to get p and s from to compute productivity
+  void set_pressure_saturation_function(const Function<dim> &f);
   // access methods
   double                                  get_radius() const;
   // get current controlling parameters
@@ -82,8 +84,7 @@ class Wellbore : public Function<dim>
    * Additionally, computed the segment-wise sum of productivities
    * for each phase (for further distribution between segments)
    */
-  void update_productivity(const Function<dim> &get_pressure,
-                           const Function<dim> &get_saturation);
+  void update_productivity();
   /*
    * This method is a modification of the deal.ii method to check
    * whether a point is inside a cell. It allows for some hard-coded
@@ -153,6 +154,7 @@ class Wellbore : public Function<dim>
   std::vector< Tensor<1,dim> >       segment_direction;
   std::vector< std::vector<double> > productivities;
   Vector<double>                     total_productivity;
+  const Function<dim> * p_pres_sat_func;
 };  // eom
 
 
@@ -675,14 +677,12 @@ Wellbore<dim>:: get_productivities()
 
 template <int dim>
 void Wellbore<dim>::
-update_productivity(const Function<dim> &get_pressure,
-                    const Function<dim> &get_saturation)
+update_productivity()
 {
   /*
     First get cell dimensions dx dy dz
     First compute the sum of permeabilities for the flux normalization
     Then compute productivities.
-    How do I normalize permeability when it's a tensor?
   */
   Vector<double>      perm(dim);
   Vector<double>      saturation(n_phases);
@@ -709,16 +709,24 @@ update_productivity(const Function<dim> &get_pressure,
 
     const double j_ind = abs_productivity.norm();
 
+    // retrieve pressure and saturations
+    std::vector<double> v_pressure_saturation(n_phases+1);
+    p_pres_sat_func.vector_value(cells[i]->center(), v_pressure_saturation);
+    // first component is pressure others - saturation
+    const double pressure = v_pressure_saturation[0];
+
     if (n_phases == 1)
       rel_perm[0] = 1;
     else
     {
       // phase productivities
-      get_saturation.vector_value(cells[i]->center(), saturation);
+      for (int p=0; p<n_phases; ++p)
+        saturation[p]=v_pressure_saturation[p+1];
+      // get_saturation.vector_value(cells[i]->center(), saturation);
       relative_permeability.get_values(saturation, rel_perm);
     }
 
-    const double pressure = get_pressure.value(cells[i]->center());
+    // const double pressure = get_pressure.value(cells[i]->center());
     for (int p=0; p<n_phases; ++p)
     {
       pvt_tables[p]->get_values(pressure, pvt_values);
@@ -856,5 +864,15 @@ Wellbore<dim>::get_flow_rate(const CellIterator<dim> & cell,
   else
     return get_J_and_Q(cell, phase).second;
 }  // end get_flow_rate
+
+
+
+template<int dim>
+void
+Wellbore<dim>::set_pressure_saturation_function(const Function<dim> &f)
+{
+  p_pres_sat_func = & f;
+}  // end set_pressure_saturation_function
+
 
 }  // end of namespace

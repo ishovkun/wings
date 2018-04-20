@@ -25,6 +25,7 @@
 #include <AssembleFlowSystem.hpp>
 #include <Model.hpp>
 #include <ScaleOutputVector.hpp>
+#include <FEFunction/FEFunctionPS.hpp>
 
 
 namespace FluidSolvers
@@ -32,8 +33,8 @@ namespace FluidSolvers
 using namespace dealii;
 
 
-template <int n_phases, int dim>
-class SolverIMPES : public FluidSolverBase<dim>
+template <int n_phases>
+class SolverIMPES : public FluidSolverBase
 {
  public:
   /* TODO: initialization description */
@@ -41,12 +42,14 @@ class SolverIMPES : public FluidSolverBase<dim>
               parallel::distributed::Triangulation<dim> & triangulation_,
               const Model::Model<dim>                   & model_,
               ConditionalOStream                        & pcout_,
-              Equations::IMPESPressure<n_phases,dim>    & cell_values,
-              Equations::IMPESSaturation<n_phases,dim>  & cell_values_saturation);
+              Equations::IMPESPressure<n_phases>        & cell_values,
+              Equations::IMPESSaturation<n_phases>      & cell_values_saturation);
   ~SolverIMPES();
   /* setup degrees of freedom for the current triangulation
    * and allocate memory for solution vectors */
   void setup_dofs() override;
+  // save solution for old iteration to compute difference later
+  virtual void save_solution() override;
   // Implicit pressure system: Fill matrix and rhs vector
   void assemble_pressure_system(const double time_step);
   // same as assemble_pressure_system
@@ -64,7 +67,7 @@ class SolverIMPES : public FluidSolverBase<dim>
    * Solve pressure system, and then explicitly solve
    * for saturations
    */
-  void solve_time_step() override;
+  unsigned int solve_time_step(const double time_step) override;
   // give solver access to solid dofs and solution vector
   void set_coupling(const DoFHandler<dim>               & solid_dof_handler,
                     const TrilinosWrappers::MPI::Vector & displacement_vector,
@@ -75,6 +78,9 @@ class SolverIMPES : public FluidSolverBase<dim>
    * This method is used for generating field reports
    */
   void attach_data(DataOut<dim> & data_out) const override;
+
+  FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
+  get_pressure_saturation_function();
 
   // accessing private members
   const TrilinosWrappers::SparseMatrix & get_system_matrix() override;
@@ -96,10 +102,10 @@ class SolverIMPES : public FluidSolverBase<dim>
 
  public:
   TrilinosWrappers::MPI::Vector              solution,
-                                             pressure_relevant,
+                                             pressure,
                                              pressure_old;
   // std::vector<TrilinosWrappers::MPI::Vector> saturation_solution;
-  std::vector<TrilinosWrappers::MPI::Vector> saturation_relevant,
+  std::vector<TrilinosWrappers::MPI::Vector> saturation,
                                              saturation_old;
   // partitioning
   IndexSet                      locally_owned_dofs, locally_relevant_dofs;
@@ -111,19 +117,19 @@ class SolverIMPES : public FluidSolverBase<dim>
   const FEValuesExtractors::Vector          * p_displacement_extractor;
   bool coupled_with_solid;
 
-  Equations::IMPESPressure<n_phases,dim>   cell_values;
-  Equations::IMPESSaturation<n_phases,dim> cell_values_saturation;
+  Equations::IMPESPressure<n_phases>   cell_values;
+  Equations::IMPESSaturation<n_phases> cell_values_saturation;
 };
 
 
-template <int n_phases, int dim>
-SolverIMPES<n_phases,dim>::
+template <int n_phases>
+SolverIMPES<n_phases>::
 SolverIMPES(MPI_Comm                                  & mpi_communicator_,
             parallel::distributed::Triangulation<dim> & triangulation_,
             const Model::Model<dim>                   & model_,
             ConditionalOStream                        & pcout_,
-            Equations::IMPESPressure<n_phases,dim>    & cell_values,
-            Equations::IMPESSaturation<n_phases,dim>  & cell_values_saturation)
+            Equations::IMPESPressure<n_phases>        & cell_values,
+            Equations::IMPESSaturation<n_phases>      & cell_values_saturation)
     :
     mpi_communicator(mpi_communicator_),
     triangulation(triangulation_),
@@ -132,7 +138,7 @@ SolverIMPES(MPI_Comm                                  & mpi_communicator_,
     model(model_),
     pcout(pcout_),
     // saturation_solution(model.n_phases()),
-    saturation_relevant(model.n_phases()),
+    saturation(model.n_phases()),
     saturation_old(model.n_phases() - 1),  // old solution n-1 phases
     coupled_with_solid(false),
     cell_values(cell_values),
@@ -140,22 +146,21 @@ SolverIMPES(MPI_Comm                                  & mpi_communicator_,
 {}  // eom
 
 
-template <int n_phases, int dim>
-SolverIMPES<n_phases,dim>::~SolverIMPES()
+template <int n_phases>
+SolverIMPES<n_phases>::~SolverIMPES()
 {
   dof_handler.clear();
 }  // eom
 
 
-template <int n_phases, int dim>
-void SolverIMPES<n_phases,dim>::setup_dofs()
+template <int n_phases>
+void SolverIMPES<n_phases>::setup_dofs()
 {
   dof_handler.distribute_dofs(fe);
   locally_owned_dofs.clear();
   locally_relevant_dofs.clear();
   locally_owned_dofs = dof_handler.locally_owned_dofs();
-  DoFTools::extract_locally_relevant_dofs(dof_handler,
-                                          locally_relevant_dofs);
+  DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant_dofs);
 
   { // system matrix
     system_matrix.clear();
@@ -168,13 +173,13 @@ void SolverIMPES<n_phases,dim>::setup_dofs()
   { // vectors
     solution.reinit(locally_owned_dofs, mpi_communicator);
     pressure_old.reinit(locally_relevant_dofs, mpi_communicator);
-    pressure_relevant.reinit(locally_relevant_dofs, mpi_communicator);
+    pressure.reinit(locally_relevant_dofs, mpi_communicator);
     rhs_vector.reinit(locally_owned_dofs, locally_relevant_dofs,
                       mpi_communicator, /* omit-zeros= */ true);
     for (unsigned int p=0; p<model.n_phases(); ++p)
     {
       // saturation_solution[p].reinit(locally_owned_dofs, mpi_communicator);
-      saturation_relevant[p].reinit(locally_relevant_dofs, mpi_communicator);
+      saturation[p].reinit(locally_relevant_dofs, mpi_communicator);
       // old solution stores only n-1 phases
       if (p < model.n_phases() - 1)
         saturation_old[p].reinit(locally_relevant_dofs, mpi_communicator);
@@ -184,15 +189,15 @@ void SolverIMPES<n_phases,dim>::setup_dofs()
 
 
 
-template <int n_phases, int dim>
+template <int n_phases>
 void
-SolverIMPES<n_phases,dim>::
+SolverIMPES<n_phases>::
 assemble_pressure_system(const double time_step)
 {
   assemble_flow_system
       <dim, TrilinosWrappers::MPI::Vector, TrilinosWrappers::SparseMatrix>
       (dof_handler, *p_solid_dof_handler,
-       pressure_relevant, pressure_old, saturation_relevant,
+       pressure, pressure_old, saturation,
        *p_displacement, *p_old_displacement, *p_displacement_extractor,
        cell_values,
        system_matrix, rhs_vector,
@@ -401,15 +406,15 @@ assemble_pressure_system(const double time_step)
 
 
 
-template <int n_phases, int dim>
+template <int n_phases>
 void
-SolverIMPES<n_phases,dim>::
+SolverIMPES<n_phases>::
 solve_saturation_system(const double time_step)
 {
   assemble_flow_system
       <dim, TrilinosWrappers::MPI::Vector, TrilinosWrappers::SparseMatrix>
       (dof_handler, *p_solid_dof_handler,
-       pressure_relevant, pressure_old, saturation_relevant,
+       pressure, pressure_old, saturation,
        *p_displacement, *p_old_displacement, *p_displacement_extractor,
        cell_values_saturation,
        /*not used*/ system_matrix, /* rhs_vector = */ rhs_vector,
@@ -422,7 +427,7 @@ solve_saturation_system(const double time_step)
 
   for (const auto & dof : locally_owned_dofs)
   {
-    const double Sw_old = saturation_relevant[0][dof];
+    const double Sw_old = saturation[0][dof];
     double increment = rhs_vector[dof];
 
     // assert that we are in bounds
@@ -435,214 +440,13 @@ solve_saturation_system(const double time_step)
   } // end dof loop
 
   solution.compress(VectorOperation::insert);
-  // Only one integration point in FVM
-  // QGauss<dim>       quadrature_formula(1);
-  // QGauss<dim-1>     face_quadrature_formula(1);
-
-  // const auto & fe = dof_handler.get_fe();
-  // FEValues<dim> fe_values(fe, quadrature_formula, update_values);
-  // FEValues<dim> fe_values_neighbor(fe, quadrature_formula, update_values);
-
-  // // the following two objects only get geometry data
-  // FEFaceValues<dim> fe_face_values(fe, face_quadrature_formula,
-  //                                  update_normal_vectors);
-  // // We need JxW flag for subfaces since there is no
-  // // method to determine sub face area in triangulation class
-  // FESubfaceValues<dim> fe_subface_values(fe, face_quadrature_formula,
-  //                                        update_normal_vectors |
-  //                                        update_JxW_values);
-
-  // FEValues<dim> * p_fe_values_solid = NULL;
-  // if (coupled_with_solid)
-  //   p_fe_values_solid = new FEValues<dim>(p_solid_dof_handler->get_fe(),
-  //                                         quadrature_formula, update_gradients);
-  // auto & fe_values_solid = * p_fe_values_solid;
-
-  // const unsigned int dofs_per_cell = fe.dofs_per_cell;
-  // const unsigned int n_q_points = quadrature_formula.size();
-
-  // std::vector<types::global_dof_index>
-  //     dof_indices(dofs_per_cell),
-  //     dof_indices_neighbor(dofs_per_cell);
-
-  // // objects to store local data
-  // Tensor<1, dim>       normal;
-  // std::vector<double>  p_values(quadrature_formula.size()),
-  //                      p_old_values(quadrature_formula.size());
-  // std::vector<double>  div_u_values(n_q_points);
-  // std::vector<double>  div_old_u_values(n_q_points);
-
-  // std::vector< std::vector<double> >  s_values(model.n_phases()-1);
-  // for (auto & c: s_values)
-  //   c.resize(face_quadrature_formula.size());
-
-  // FluidEquations::ExtraValues extra_values;
-
-  // const double So_rw = model.residual_saturation_oil();  //
-  // const double Sw_crit = model.residual_saturation_water();
-  // const unsigned int q_point = 0;
-
-  // typename DoFHandler<dim>::active_cell_iterator
-  //     cell = dof_handler.begin_active(),
-  //     // trick to place solid_cell in cell loop condition
-  //     solid_cell = dof_handler.begin_active(),
-  //     endc = dof_handler.end();
-
-  // if (coupled_with_solid)
-  //   solid_cell = p_solid_dof_handler->begin_active();
-
-  // for (; cell!=endc; ++cell, ++solid_cell)
-  //   if (cell->is_locally_owned())
-  //   {
-  //     fe_values.reinit(cell);
-  //     fe_values.get_function_values(pressure_old, p_old_values);
-  //     fe_values.get_function_values(pressure_relevant, p_values);
-  //     for (unsigned int c=0; c<model.n_phases() - 1; ++c)
-  //     {
-  //       fe_values.get_function_values(saturation_relevant[c], s_values[c]);
-  //       extra_values.saturation[c] = s_values[c][q_point];
-  //     }
-  //     if (coupled_with_solid)
-  //     {
-  //       fe_values_solid.reinit(solid_cell);
-  //       fe_values_solid[*p_displacement_extractor].
-  //           get_function_divergences(*p_displacement, div_u_values);
-  //       fe_values_solid[*p_displacement_extractor].
-  //           get_function_divergences(*p_old_displacement, div_old_u_values);
-  //       extra_values.div_u = div_u_values[q_point];
-  //       extra_values.div_old_u = div_old_u_values[q_point];
-  //     }
-
-  //     const double p_old = p_old_values[q_point];
-  //     const double p = p_values[q_point];
-  //     const double Sw_old = extra_values.saturation[0];
-
-  //     // cell_values.update(cell, p, extra_values);
-  //     // cell_values.update_wells(cell, p);
-  //     cell_values_saturation.update(cell, p, extra_values);
-  //     cell_values_saturation.update_wells(cell, p);
-
-  //     double solution_increment =
-  //         cell_values_saturation.get_rhs_cell_entry(time_step, p, p_old, 0);
-
-  //     cell->get_dof_indices(dof_indices);
-  //     const unsigned int i = dof_indices[q_point];
-
-  //     for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
-  //     {
-  //       if (cell->at_boundary(f) == false)
-  //       {
-  //         if((cell->neighbor(f)->level() == cell->level() &&
-  //             cell->neighbor(f)->has_children() == false) ||
-  //            cell->neighbor_is_coarser(f))
-  //         {
-  //           const auto & neighbor = cell->neighbor(f);
-  //           fe_values.reinit(neighbor);
-  //           fe_face_values.reinit(cell, f);
-
-  //           fe_values.get_function_values(pressure_relevant, p_values);
-  //           for (unsigned int c=0; c<model.n_phases() - 1; ++c)
-  //           {
-  //             fe_values.get_function_values(saturation_relevant[c], s_values[c]);
-  //             extra_values.saturation[c] = s_values[c][q_point];
-  //           }
-  //           if (coupled_with_solid)
-  //           {
-  //             fe_values_solid.reinit(solid_cell->neighbor(f));
-  //             fe_values_solid[*p_displacement_extractor].
-  //                 get_function_divergences(*p_displacement, div_u_values);
-  //             fe_values_solid[*p_displacement_extractor].
-  //                 get_function_divergences(*p_old_displacement, div_old_u_values);
-  //             extra_values.div_u = div_u_values[q_point];
-  //             extra_values.div_old_u = div_old_u_values[q_point];
-  //           }
-
-  //           const double p_neighbor = p_values[q_point];
-
-  //           normal = fe_face_values.normal_vector(q_point);
-  //           const double dS = cell->face(f)->measure();  // face area
-
-  //           // assemble local matrix and distribute
-  //           cell_values_neighbor.update(neighbor, p_neighbor, extra_values);
-  //           cell_values_saturation.update_face_values(cell_values_neighbor,
-  //                                                     normal, dS);
-
-  //           solution_increment +=
-  //               cell_values_saturation.get_rhs_face_entry(time_step, 0);
-
-  //         }
-  //         // case neighbor finer
-  //         else if ((cell->neighbor(f)->level() == cell->level()) &&
-  //                  (cell->neighbor(f)->has_children() == true))
-  //         {
-  //           for (unsigned int subface=0;
-  //                subface<cell->face(f)->n_children(); ++subface)
-  //           {
-  //             // compute parameters
-  //             const auto & neighbor
-  //                 = cell->neighbor_child_on_subface(f, subface);
-
-  //             fe_values.reinit(neighbor);
-  //             fe_subface_values.reinit(cell, f, subface);
-
-  //             fe_values.get_function_values(pressure_relevant, p_values);
-  //             const double p_neighbor = p_values[q_point];
-  //             for (unsigned int c=0; c<model.n_phases() - 1; ++c)
-  //             {
-  //               fe_values.get_function_values(saturation_relevant[c], s_values[c]);
-  //               extra_values.saturation[c] = s_values[c][q_point];
-  //             }
-  //             if (coupled_with_solid)
-  //             {
-  //               const auto & solid_neighbor =
-  //                   solid_cell->neighbor_child_on_subface(f, subface);
-  //               fe_values_solid.reinit(solid_neighbor);
-  //               fe_values_solid[*p_displacement_extractor].
-  //                   get_function_divergences(*p_displacement, div_u_values);
-  //               fe_values_solid[*p_displacement_extractor].
-  //                   get_function_divergences(*p_old_displacement, div_old_u_values);
-  //               extra_values.div_u = div_u_values[q_point];
-  //               extra_values.div_old_u = div_old_u_values[q_point];
-  //             }
-
-  //             normal = fe_subface_values.normal_vector(q_point); // 0 is gauss point
-  //             const double dS = fe_subface_values.JxW(q_point);
-
-  //             // update neighbor
-  //             cell_values_neighbor.update(neighbor, p_neighbor, extra_values);
-
-  //             // update face values
-  //             cell_values_saturation.update_face_values(cell_values_neighbor, normal, dS);
-
-  //             // distribute
-  //             solution_increment +=
-  //                 cell_values_saturation.get_rhs_face_entry(time_step, 0);
-  //           }
-  //         } // end case neighbor is finer
-
-  //       } // end if face not at boundary
-  //     }  // end face loop
-
-  //     // assert that we are in bounds
-  //     if (Sw_old + solution_increment > (1.0 - So_rw))
-  //       solution_increment = (1.0 - So_rw) - Sw_old;
-  //     else if (Sw_old + solution_increment < Sw_crit)
-  //       solution_increment = Sw_crit - Sw_old;
-
-  //     solution[i] = Sw_old + solution_increment;
-  //     // solution[0][i] = Sw_old + solution_increment;
-  //     // solution[1][i] = 1.0 - (Sw_old + solution_increment);
-  //   } // end cells loop
-
-  // // solution[0].compress(VectorOperation::insert);
-  // // solution[1].compress(VectorOperation::insert);
-  // solution.compress(VectorOperation::insert);
+  saturation[0] = solution;
 } // eom
 
 
-template <int n_phases, int dim>
+template <int n_phases>
 unsigned int
-SolverIMPES<n_phases,dim>::solve_pressure_system()
+SolverIMPES<n_phases>::solve_pressure_system()
 {
   double tol = 1e-10*rhs_vector.l2_norm();
   if (tol == 0.0)
@@ -666,14 +470,31 @@ SolverIMPES<n_phases,dim>::solve_pressure_system()
     solver.solve(system_matrix, solution, rhs_vector);
   }
 
+  pressure = solution;
+
   return solver_control.last_step();
 } // eom
 
 
 
-template <int n_phases, int dim>
+template <int n_phases>
+unsigned int
+SolverIMPES<n_phases>::solve_time_step(const double time_step)
+{
+  assemble_pressure_system(time_step);
+  unsigned int n_steps = solve_pressure_system();
+
+  if (n_phases > 1)
+    solve_saturation_system();
+
+  return n_steps;
+}
+
+
+
+template <int n_phases>
 void
-SolverIMPES<n_phases,dim>::
+SolverIMPES<n_phases>::
 set_coupling(const DoFHandler<dim>               & solid_dof_handler,
              const TrilinosWrappers::MPI::Vector & displacement_vector,
              const TrilinosWrappers::MPI::Vector & old_displacement_vector,
@@ -688,45 +509,45 @@ set_coupling(const DoFHandler<dim>               & solid_dof_handler,
 
 
 
-template <int n_phases, int dim>
+template <int n_phases>
 const TrilinosWrappers::SparseMatrix&
-SolverIMPES<n_phases,dim>::get_system_matrix()
+SolverIMPES<n_phases>::get_system_matrix()
 {
   return system_matrix;
 }  // eom
 
 
 
-template <int n_phases, int dim>
+template <int n_phases>
 const TrilinosWrappers::MPI::Vector&
-SolverIMPES<n_phases,dim>::get_rhs_vector()
+SolverIMPES<n_phases>::get_rhs_vector()
 {
   return rhs_vector;
 }  // eom
 
 
 
-template <int n_phases, int dim>
+template <int n_phases>
 const DoFHandler<dim> &
-SolverIMPES<n_phases,dim>::get_dof_handler()
+SolverIMPES<n_phases>::get_dof_handler()
 {
   return dof_handler;
 }  // eom
 
 
 
-template <int n_phases, int dim>
+template <int n_phases>
 const FE_DGQ<dim> &
-SolverIMPES<n_phases,dim>::get_fe()
+SolverIMPES<n_phases>::get_fe()
 {
   return fe;
 }  // eom
 
 
 
-template <int n_phases, int dim>
+template <int n_phases>
 void
-SolverIMPES<n_phases,dim>::attach_data(DataOut<dim> & data_out) const
+SolverIMPES<n_phases>::attach_data(DataOut<dim> & data_out) const
 {
   data_out.attach_dof_handler(dof_handler);
   // scale pressure by bar/psi/whatever
@@ -734,11 +555,21 @@ SolverIMPES<n_phases,dim>::attach_data(DataOut<dim> & data_out) const
                                                  model.units.pressure());
   // data_out.add_data_vector(pressure_relevant, Keywords::pressure_vector,
   //                          DataOut<dim>::type_dof_data);
-  data_out.add_data_vector(pressure_relevant, pressure_scaler);
-  data_out.add_data_vector(saturation_relevant, Keywords::saturation_water_vector,
+  data_out.add_data_vector(pressure, pressure_scaler);
+  data_out.add_data_vector(saturation, Keywords::saturation_water_vector,
                            DataOut<dim>::type_dof_data);
 }  // end attach_data
 
+
+
+template<int n_phases>
+FEFunction::FEFunction<dim, TrilinosWrappers::MPI::Vector>
+SolverIMPES<n_phases>::get_pressure_saturation_function()
+{
+  return FEFunction::FEFunctionPS<dim,TrilinosWrappers::MPI::Vector>(dof_handler,
+                                                                     pressure,
+                                                                     saturation);
+}  // end get_pressure_saturation_function
 
 
 }  // end of namespace

@@ -4,7 +4,6 @@
 #include <fstream>
 
 #include <deal.II/base/tensor.h>
-#include <deal.II/base/function.h>
 
 #include <Parsers.hpp>
 
@@ -19,7 +18,8 @@ class BitMapFile
  public:
   BitMapFile(const std::string &name);
   double get_value(const double x) const;
-  double get_value(const double x, const double y) const;
+  double get_value(const double x,
+                   const double y) const;
   double get_value(const double x,
                    const double y,
                    const double z) const;
@@ -245,106 +245,6 @@ void BitMapFile::scale_coordinates(const double scale)
 {
   for (auto & dimension : dimensions)
     dimension = dimension * scale;
-}  // eom
-
-
-
-template <int dim>
-class BitMapFunction : public Function<dim>
-{
- public:
-  BitMapFunction(const std::string &filename);
-  BitMapFunction(const std::string   &filename,
-                 const Tensor<1,dim> &anisotropy_);
-
-  double value(const Point<dim> &p,
-               const unsigned int /*component*/ c) const;
-  void vector_value(const Point<dim> &p,
-                    Tensor<1,dim>    &v) const;
-  void vector_value(const Point<dim> &p,
-                    Vector<double>   &v) const;
-  void scale_coordinates(const double scale);
- private:
-  // BitMapFile<dim> f;
-  BitMapFile f;
-  Tensor<1,dim> anisotropy;
-};
-
-
-
-template<int dim>
-BitMapFunction<dim>::BitMapFunction(const std::string &filename)
-    :
-    Function<dim>(1),
-    f(filename)
-{
-  for (unsigned int d=0; d<dim; d++)
-    anisotropy[d] = 1;
-}  // eom
-
-
-
-template<int dim>
-BitMapFunction<dim>::BitMapFunction(const std::string   &filename,
-                                    const Tensor<1,dim> &anisotropy_)
-    :
-    Function<dim>(1),
-    f(filename),
-    anisotropy(anisotropy_)
-{}  // eom
-
-
-
-template<int dim>
-void
-BitMapFunction<dim>::vector_value(const Point<dim> &p,
-                                  Vector<double>   &v) const
-{
-  AssertThrow(v.size() == dim,
-              ExcMessage("Dimension mismatch"));
-  for (int c=0; c<dim; c++)
-    v[c] = value(p, c);
-}  // eom
-
-
-
-template<int dim>
-void
-BitMapFunction<dim>::vector_value(const Point<dim> &p,
-                                  Tensor<1,dim>    &v) const
-{
-  for (int c=0; c<dim; c++)
-    v[c] = value(p, c);
-}  // eom
-
-
-template<>
-double
-BitMapFunction<2>::value(const Point<2> &p,
-                         const unsigned int /*component*/ c) const
-{
-  // Assert(c<2, ExcNotImplemented());
-  return f.get_value(p(0),p(1))*anisotropy[c];
-}  // eom
-
-
-
-template<>
-double
-BitMapFunction<3>::value(const Point<3> &p,
-                         const unsigned int /*component*/ c) const
-{
-  // Assert(c<2, ExcNotImplemented());
-  return f.get_value(p(0),p(1), p(2))*anisotropy[c];
-}  // eom
-
-
-
-template<>
-void
-BitMapFunction<3>::scale_coordinates(const double scale)
-{
-  f.scale_coordinates(scale);
 }  // eom
 
 

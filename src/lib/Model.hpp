@@ -10,7 +10,7 @@
 // Custom modules
 #include <Wellbore.hpp>
 #include <Parsers.hpp>
-#include <BitMap.hpp>
+// #include <BitMap.hpp>
 #include <Units.h>
 #include <Tensors.hpp>
 #include <LookupTable.hpp>
@@ -82,8 +82,8 @@ class Model
   // Functions of a coordinate
   Function<dim> * get_young_modulus,
                 * get_poisson_ratio,
-                * get_permeability,
                 * get_porosity;
+  TensorFunction<2,dim,double> * get_permeability;
 
   // adding data
   void set_fluid_model(const FluidModelType &type);
@@ -135,10 +135,13 @@ class Model
   void get_pvt(const double        pressure,
                const int           phase,
                std::vector<double> &dst) const;
+  void get_pvt(const double   pressure,
+               const int      phase,
+               PVTValues    & pvt_values) const;
   double get_time_step(const double time) const;
   std::vector<int> get_well_ids() const;
-  void get_relative_permeability(Vector<double>      &saturation,
-                                 std::vector<double> &dst) const;
+  void get_relative_permeability(const Vector<double> &saturation,
+                                 std::vector<double>  &dst) const;
   int get_well_id(const std::string& well_name) const;
   std::pair<double,double> get_saturation_limits(const unsigned int phase) const;
 
@@ -197,6 +200,7 @@ class Model
   std::string                input_file_name;
   double                     density_sc_w_constant,
                              density_sc_o_constant,
+                             density_sc_g_constant,
                              porosity,
                              biot_coefficient,
                              rock_compressibility_constant;
@@ -357,9 +361,9 @@ void Model<dim>::add_well(const std::string name,
                           const double radius,
                           const std::vector< Point<dim> > &locations)
 {
-  Wellbore<dim> w(locations, radius, mpi_communicator,
-                  *get_permeability, rel_perm, get_pvt_tables());
-  this->wells.push_back(w);
+  // Wellbore<dim> w(locations, radius, mpi_communicator,
+  //                 *get_permeability, rel_perm, get_pvt_tables());
+  // this->wells.push_back(w);
 
   // check if well_id is in unique_well_ids and add if not
   if (well_ids.empty())
@@ -428,9 +432,9 @@ void Model<dim>::set_pvt_oil(Interpolation::LookupTable &table)
 
 
 template <int dim>
-void Model<dim>::get_pvt(const double        pressure,
-                         const int           phase,
-                         std::vector<double> &dst) const
+void Model<dim>::get_pvt(const double          pressure,
+                         const int             phase,
+                         std::vector<double> & dst) const
 {
   AssertThrow(phase < n_phases(), ExcMessage("Wrong phase"));
 
@@ -447,6 +451,18 @@ void Model<dim>::get_pvt(const double        pressure,
     AssertThrow(false, ExcNotImplemented());
 }
 
+
+template <int dim>
+void Model<dim>::get_pvt(const double   pressure,
+                         const int      phase,
+                         PVTValues    & pvt_values) const
+{
+  std::vector<double> pvt_array(n_pvt_water_columns);
+  get_pvt(pressure, phase, pvt_array);
+  pvt_values.volume_factor = pvt_array[0];
+  pvt_values.compressibility = pvt_array[1];
+  pvt_values.viscosity = pvt_array[2];
+}
 
 
 template <int dim>
@@ -534,8 +550,8 @@ void Model<dim>::set_rel_perm(const double Sw_crit,
 
 template <int dim>
 inline
-void Model<dim>::get_relative_permeability(Vector<double>      &saturation,
-                                           std::vector<double> &dst) const
+void Model<dim>::get_relative_permeability(const Vector<double> &saturation,
+                                           std::vector<double>  &dst) const
 {
   AssertThrow(dst.size() == n_phases(),
               ExcDimensionMismatch(dst.size(), n_phases()));

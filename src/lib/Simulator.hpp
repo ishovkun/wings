@@ -42,16 +42,16 @@ class Simulator
  private:
   void refine_mesh();
   // export vtu data (for paraview)
-  void field_report(const double                               time_step,
-                    const unsigned int                         time_step_number,
-                    const FluidSolvers::FluidSolverBase<dim> & fluid_solver);
+  void field_report(const double                          time_step,
+                    const unsigned int                    time_step_number,
+                    const FluidSolvers::FluidSolverBase & fluid_solver);
   // Solve time step for a blackoil system without geomechanics
-  void solve_time_step_fluid(FluidSolvers::FluidSolverBase<dim> & fluid_solver,
-                             const double                         time_step);
+  void solve_time_step_fluid(FluidSolvers::FluidSolverBase & fluid_solver,
+                             const double                    time_step);
   // Solve time step for a blackoil system with geomechanics
-  void solve_time_step_fluid_mechanics(FluidSolvers::FluidSolverBase<dim> & fluid_solver,
-                                       SolidSolvers::ElasticSolver<dim>   & solid_solver,
-                                       const double                         time_step);
+  void solve_time_step_fluid_mechanics(FluidSolvers::FluidSolverBase     & fluid_solver,
+                                       SolidSolvers::ElasticSolver<dim>  & solid_solver,
+                                       const double                        time_step);
 
   MPI_Comm                                  mpi_communicator;
   parallel::distributed::Triangulation<dim> triangulation;
@@ -169,12 +169,13 @@ void Simulator<dim>::read_mesh(unsigned int verbosity)
 }  // eom
 
 
+
 template <int dim>
 void
 Simulator<dim>::
-field_report(const double                               time,
-             const unsigned int                         time_step_number,
-             const FluidSolvers::FluidSolverBase<dim> & fluid_solver)
+field_report(const double                          time,
+             const unsigned int                    time_step_number,
+             const FluidSolvers::FluidSolverBase & fluid_solver)
 {
   DataOut<dim> data_out;
 
@@ -186,31 +187,27 @@ field_report(const double                               time,
 }  // eom
 
 
+
 template<int dim>
 void
 Simulator<dim>::
-solve_time_step_fluid(FluidSolvers::FluidSolverBase<dim> & fluid_solver,
-                      const double                         time_step)
+solve_time_step_fluid(FluidSolvers::FluidSolverBase & fluid_solver,
+                      const double                    time_step)
 {
   // update wells
-  FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
-      pressure_function(fluid_solver.get_dof_handler(),
-                        fluid_solver.pressure_relevant);
-  FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
-      saturation_function(fluid_solver.get_dof_handler(),
-                          fluid_solver.saturation_relevant);
+  // FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
+  //     pressure_function(fluid_solver.get_dof_handler(),
+  //                       fluid_solver.pressure_relevant);
+  // FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
+  //     saturation_function(fluid_solver.get_dof_handler(),
+  //                         fluid_solver.saturation_relevant);
+  // const auto & pressure_saturation_function =
+  //     fluid_solver.get_ps_function();
 
-  model.update_well_productivities(pressure_function, saturation_function);
+  // model.update_well_productivities(pressure_function, saturation_function);
 
-  // solve for fluid flow
-  fluid_solver.assemble_pressure_system(time_step);
-  fluid_solver.solve_pressure_system();
-  fluid_solver.pressure_relevant = fluid_solver.solution;
-  if (model.n_phases() > 1)
-  {
-    fluid_solver.solve_saturation_system(time_step);
-    fluid_solver.saturation_relevant[0] = fluid_solver.solution;
-  }
+  // // solve for fluid flow
+  // fluid_solver.solve_time_step(time_step);
 }  // end solve_time_step_fluid
 
 
@@ -218,61 +215,64 @@ solve_time_step_fluid(FluidSolvers::FluidSolverBase<dim> & fluid_solver,
 template<int dim>
 void
 Simulator<dim>::
-solve_time_step_fluid_mechanics(FluidSolvers::FluidSolverBase<dim>   & fluid_solver,
-                                SolidSolvers::ElasticSolver<dim>     & solid_solver,
-                                const double                           time_step)
+solve_time_step_fluid_mechanics(FluidSolvers::FluidSolverBase    & fluid_solver,
+                                SolidSolvers::ElasticSolver<dim> & solid_solver,
+                                const double                       time_step)
 {
-  FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
-      pressure_function(fluid_solver.get_dof_handler(),
-                        fluid_solver.pressure_relevant);
-  FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
-      saturation_function(fluid_solver.get_dof_handler(),
-                          fluid_solver.saturation_relevant);
-  TrilinosWrappers::MPI::Vector pressure_old_iter(fluid_solver.pressure_relevant);
+  // FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
+  //     pressure_function(fluid_solver.get_dof_handler(),
+  //                       fluid_solver.pressure_relevant);
+  // FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
+  //     saturation_function(fluid_solver.get_dof_handler(),
+  //                         fluid_solver.saturation_relevant);
+  // TrilinosWrappers::MPI::Vector pressure_old_iter(fluid_solver.pressure_relevant);
 
-  int fss_step = 0;
-  while(fss_step < model.max_coupling_steps)
-  {
-    fss_step++;
-    pcout << "fss step " << fss_step << " of " << model.max_coupling_steps
-          << std::flush;
+  // int fss_step = 0;
+  // while(fss_step < model.max_coupling_steps)
+  // {
+  //   fss_step++;
+  //   pcout << "fss step " << fss_step << " of " << model.max_coupling_steps
+  //         << std::flush;
 
-    // model.update_well_productivities(pressure_function, saturation_function);
-    pressure_old_iter = fluid_solver.pressure_relevant;
+  //   model.update_well_productivities(pressure_function, saturation_function);
 
-    {// solve for fluid flow
-      fluid_solver.assemble_pressure_system(time_step);
-      fluid_solver.solve_pressure_system();
-      fluid_solver.pressure_relevant = fluid_solver.solution;
-      if (model.n_phases() > 1)
-      {
-        fluid_solver.solve_saturation_system(time_step);
-        fluid_solver.saturation_relevant[0] = fluid_solver.solution;
-      }
-    } // end solve fluid flow
-    { // solve elasticity
-      solid_solver.assemble_system(fluid_solver.pressure_relevant);
-      solid_solver.solve();
-      solid_solver.relevant_solution = solid_solver.solution;
-    }
+  //   // store old iter solution
+  //   fluid_solver.save_solution();
 
-    // estimate error
-    double error = 0;
-    for (const auto & dof : fluid_solver.locally_relevant_dofs)
-    {
-      const double diff =
-          fluid_solver.pressure_relevant[dof] - pressure_old_iter[dof];
-      error += diff*diff;
-    }
-    error = Utilities::MPI::sum(error, mpi_communicator);
-    error /= abs(fluid_solver.pressure_relevant.mean_value());
-    pcout << "\t" << error << std::endl;
+  //   {// solve for fluid flow
+  //     fluid_solver.assemble_pressure_system(time_step);
+  //     fluid_solver.solve_pressure_system();
+  //     fluid_solver.pressure_relevant = fluid_solver.solution;
+  //     if (model.n_phases() > 1)
+  //     {
+  //       fluid_solver.solve_saturation_system(time_step);
+  //       fluid_solver.saturation_relevant[0] = fluid_solver.solution;
+  //     }
+  //   } // end solve fluid flow
+  //   { // solve elasticity
+  //     solid_solver.assemble_system(fluid_solver.pressure_relevant);
+  //     solid_solver.solve();
+  //     solid_solver.relevant_solution = solid_solver.solution;
+  //   }
 
-    if (error < model.coupling_tolerance)
-      return;
-  } // end fss loop
+  //   // estimate error
+  //   double error = 0;
+  //   for (const auto & dof : fluid_solver.locally_relevant_dofs)
+  //   {
+  //     const double diff =
+  //         fluid_solver.pressure_relevant[dof] - pressure_old_iter[dof];
+  //     error += diff*diff;
+  //   }
 
-  AssertThrow(false, ExcMessage("FSS didn't converge"));
+  //   error = Utilities::MPI::sum(error, mpi_communicator);
+  //   error /= abs(fluid_solver.pressure_relevant.mean_value());
+  //   pcout << "\t" << error << std::endl;
+
+  //   if (error < model.coupling_tolerance)
+  //     return;
+  // } // end fss loop
+
+  // AssertThrow(false, ExcMessage("FSS didn't converge"));
 }  // end solve_
 
 
@@ -291,7 +291,7 @@ void Simulator<dim>::run()
 
   output_helper.prepare_output_directories();
 
-  // SolverBuilder builder(model);
+  SolverBuilder builder(model);
   // auto & fluid_solver = builder.get_fluid_solver(mpi_communicator,
   //                                                triangulation,
   //                                                pcout);

@@ -18,29 +18,29 @@ template <int dim, typename VectorType>
 class FEFunction : public Function<dim>
 {
  public:
-  FEFunction(const DoFHandler<dim>         &dof_handler,
-             const std::vector<VectorType> &vectors);
-  FEFunction(const DoFHandler<dim>         &dof_handler_,
-             const VectorType              &vector);
-  void vector_value(const Point<dim>    &p,
-                    Vector<double> &dst) const;
-  double value(const Point<dim> &p,
-               const unsigned int component=0) const;
+  FEFunction(const DoFHandler<dim>         & dof_handler,
+             const std::vector<VectorType> & vectors);
+  FEFunction(const DoFHandler<dim>         & dof_handler_,
+             const VectorType              & vector);
+  virtual void vector_value(const Point<dim> & p,
+                            Vector<double>   & dst) const;
+  virtual double value(const Point<dim> & p,
+                       const unsigned int component=0) const;
 
- private:
-  const DoFHandler<dim>          &dof_handler;
-  const std::vector<VectorType>  &vectors;
-  const VectorType               dummy; // to supress compilation warning
-  const std::vector<VectorType>  dummy_std;
-  const VectorType               &single_vector;
+ protected:
+  const DoFHandler<dim>          & dof_handler;
+  const std::vector<VectorType>  & vectors;
+  const VectorType                 dummy; // to supress compilation warning
+  const std::vector<VectorType>    dummy_std;
+  const VectorType               & single_vector;
 };
 
 
 
 template <int dim, typename VectorType>
 FEFunction<dim, VectorType>::
-FEFunction(const DoFHandler<dim>         &dof_handler,
-           const std::vector<VectorType> &vectors_)
+FEFunction(const DoFHandler<dim>         & dof_handler,
+           const std::vector<VectorType> & vectors_)
     :
     dof_handler(dof_handler),
     vectors(vectors_),
@@ -51,8 +51,8 @@ FEFunction(const DoFHandler<dim>         &dof_handler,
 
 template <int dim, typename VectorType>
 FEFunction<dim, VectorType>::
-FEFunction(const DoFHandler<dim>         &dof_handler,
-           const VectorType              &vector)
+FEFunction(const DoFHandler<dim>         & dof_handler,
+           const VectorType              & vector)
     :
     dof_handler(dof_handler),
     vectors(dummy_std),
@@ -63,13 +63,13 @@ FEFunction(const DoFHandler<dim>         &dof_handler,
 
 template <int dim, typename VectorType>
 double
-FEFunction<dim,VectorType>::value(const Point<dim> &p,
+FEFunction<dim,VectorType>::value(const Point<dim> & p,
                                   const unsigned int component) const
 {
   /* Don't call this function before setup_dofs */
   AssertThrow(dof_handler.has_active_dofs(), ExcMessage("DofHandler is empty"));
-  AssertThrow(vectors.size() == 0, ExcMessage("Either vectors or single_vector should be empty"));
-  AssertThrow(component == 0, ExcNotImplemented());
+  // AssertThrow(vectors.size() == 0, ExcMessage("Either vectors or single_vector should be empty"));
+  // AssertThrow(component == 0, ExcNotImplemented());
 
   const auto & fe = dof_handler.get_fe();
 
@@ -88,7 +88,10 @@ FEFunction<dim,VectorType>::value(const Point<dim> &p,
       if (cell->point_inside(p))
       {
         fe_values.reinit(cell);
-        fe_values.get_function_values(single_vector, v_values);
+        if (vectors.size() == 0)
+          fe_values.get_function_values(single_vector, v_values);
+        else
+          fe_values.get_function_values(vectors[component], v_values);
         result = v_values[0];
         break;
       }  // end cell loop
@@ -100,11 +103,14 @@ FEFunction<dim,VectorType>::value(const Point<dim> &p,
 
 template <int dim, typename VectorType>
 void
-FEFunction<dim,VectorType>::vector_value(const Point<dim> &p,
-                                         Vector<double>   &dst) const
+FEFunction<dim,VectorType>::vector_value(const Point<dim> & p,
+                                         Vector<double>   & dst) const
 {
   /* Don't call this function before setup_dofs */
   AssertThrow(dof_handler.has_active_dofs(), ExcMessage("DofHandler is empty"));
+
+  AssertThrow(dst.size() == vectors.size()+1,
+              ExcDimensionMismatch(dst.size(), vectors.size()+1));
 
   const auto & fe = dof_handler.get_fe();
 
@@ -126,10 +132,13 @@ FEFunction<dim,VectorType>::vector_value(const Point<dim> &p,
       if (cell->point_inside(p))
       {
         fe_values.reinit(cell);
+        fe_values.get_function_values(this->single_vector, v_values);
+        dst[0] = v_values[0];
+
         for (unsigned int c=0; c<vectors.size(); ++c)
         {
           fe_values.get_function_values(vectors[c], v_values);
-          dst[c] = v_values[0];
+          dst[c+1] = v_values[0];
         }
         break;
       }  // end cell loop

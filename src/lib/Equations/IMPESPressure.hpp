@@ -10,9 +10,11 @@ namespace Equations
 {
 using namespace dealii;
 
+// static const int dim = 3;
 
-template <int n_phases, int dim = 3>
-class IMPESPressure : public FluidEquationsBase<dim>
+// class IMPESPressure : public FluidEquationsBase<dim>
+template <int n_phases>
+class IMPESPressure : public FluidEquationsBase
 {
  public:
   IMPESPressure(const Model::Model<dim> &model_);
@@ -60,15 +62,17 @@ class IMPESPressure : public FluidEquationsBase<dim>
  public:
   const Model::Model<dim>     & model;        // reference to the model object
   Point<dim>                    location;     // cell center coordinates
-  Vector<double>                perm;         // absolute permeability
-  std::vector<double>           rel_perm;     // relative permeabilities
-  Tensor<1,n_phases>            saturations;   // phase saturations
-  std::vector<Model::PVTValues> pvt_values;   // phase volume factors
-  Model::PVTValues              pvt_neighbor; // phase volume factors
-  Tensor<1,n_phases>            face_transmissibility;       // phase face transmissibilities
-  Tensor<1,n_phases>            face_gravity_terms;       // phase face gravity terms
-  Tensor<1,n_phases>            well_Js;      // productivity indices for phases and segments
-  Tensor<1,n_phases>            well_Qs;      // well rates for all segments and phases
+  // Tensor<1,n_phases>            rel_perm;           // productivity indices for phases and segments
+  std::vector<double>           rel_perm;              // relative permeabilities
+  // Tensor<1,n_phases>            saturations;           // phase saturations
+  Vector<double>                saturations;           // phase saturations
+  std::vector<Model::PVTValues> pvt_values;            // phase volume factors
+  Model::PVTValues              pvt_neighbor;          // phase volume factors
+  Tensor<1,n_phases>            face_transmissibility; // phase face transmissibilities
+  Tensor<1,n_phases>            face_gravity_terms;    // phase face gravity terms
+  Tensor<1,n_phases>            well_Js;               // productivity indices for phases and segments
+  Tensor<1,n_phases>            well_Qs;               // well rates for all segments and phases
+  Point<dim>                    cell_coord;
   // coeffs
   double pressure;         // stores current cell pressure
   double porosity, cell_volume; // porosity and cell volume
@@ -128,33 +132,33 @@ class IMPESPressure : public FluidEquationsBase<dim>
 // ---------------------------------------------------------------------------
 
 
-template <int n_phases, int dim>
-IMPESPressure<n_phases, dim>::
+template <int n_phases>
+IMPESPressure<n_phases>::
 IMPESPressure(const Model::Model<dim> &model)
     :
-    FluidEquationsBase<dim>::FluidEquationsBase(),
+    // FluidEquationsBase<dim>::FluidEquationsBase(),
+    FluidEquationsBase::FluidEquationsBase(),
     model(model),
-    perm(dim),
     rel_perm(n_phases),
-    pvt_values(n_phases),
-    face_transmissibility(n_phases),
-    face_gravity_terms(n_phases),
-    well_Js(n_phases),
-    well_Qs(n_phases)
+    pvt_values(n_phases)
+    // face_transmissibility(n_phases),
+    // face_gravity_terms(n_phases),
+    // well_Js(n_phases),
+    // well_Qs(n_phases)
 {}
 
 
 
-template <int n_phases, int dim>
+template <int n_phases>
 void
-IMPESPressure<n_phases, dim>::
+IMPESPressure<n_phases>::
 update_cell_values(const CellIterator<dim> & cell,
                    const SolutionValues    & solution)
 {
   location = cell->center();
   cell_volume = cell->measure();
-  porosity = model.get_porosity->values(location);
-  model.get_permeability->vector_value(cell->center(), perm);
+  porosity = model.get_porosity->value(location);
+  const Tensor<2,dim> perm = model.get_permeability->value(cell->center());
 
   this->pressure = solution.pressure;
   saturations = solution.saturation;
@@ -167,7 +171,7 @@ update_cell_values(const CellIterator<dim> & cell,
   {
     model.get_pvt(pressure, phase, pvt_values[phase]);
 
-    saturation_terms[phase, phase] =
+    saturation_terms[phase][phase] =
         porosity / pvt_values[phase].volume_factor * cell_volume;
     pressure_terms[phase] =
         saturations[phase]/pvt_values[phase].volume_factor *
@@ -185,9 +189,9 @@ update_cell_values(const CellIterator<dim> & cell,
 
 
 
-template <int n_phases, int dim>
+template <int n_phases>
 void
-IMPESPressure<n_phases,dim>::
+IMPESPressure<n_phases>::
 update_wells(const CellIterator<dim> &cell)
 {
   well_Js = 0;
@@ -205,9 +209,9 @@ update_wells(const CellIterator<dim> &cell)
 
 
 
-template <int n_phases, int dim>
+template <int n_phases>
 void
-IMPESPressure<n_phases,dim>::
+IMPESPressure<n_phases>::
 update_wells(const CellIterator<dim> &cell,
              const double             pressure)
 {
@@ -220,9 +224,9 @@ update_wells(const CellIterator<dim> &cell,
 
 
 
-template <int n_phases, int dim>
+template <int n_phases>
 void
-IMPESPressure<n_phases,dim>::
+IMPESPressure<n_phases>::
 update_face_values(const CellIterator<dim> & neighbor_cell,
                    const SolutionValues    & neighbor_solution,
                    const FaceGeometry      & face_geometry)
@@ -231,8 +235,8 @@ update_face_values(const CellIterator<dim> & neighbor_cell,
   const double distance = dx.norm();
 
   // obtain face absolute transmissibility
-  Vector<double> perm_neighbor(dim);
-  model.get_permeability->vector_value(neighbor_cell->center(), perm_neighbor);
+  Tensor<2,dim> perm_negihbor =
+      model.get_permeability->value(neighbor_cell->center());
   // Math::harmonic_mean(this->k, neighbor_data.k, k_face);
   // dirty hack to make harmonic mean work with irregular grid
   const double dx1 = cell_volume/face_geometry.area;
@@ -247,7 +251,9 @@ update_face_values(const CellIterator<dim> & neighbor_cell,
 
   // face phase transmissibilities
   std::vector<double> rel_perm_neighbor(n_phases);
-  model.get_relative_permeability(neighbor_solution, rel_perm_neighbor);
+  model.get_relative_permeability(neighbor_solution.saturation, rel_perm_neighbor);
+  // model.get_relative_permeability(saturations, rel_perm);
+
   const double gravity = model.gravity();
   const double depth = location[2];
   const double neighbor_depth = neighbor_cell->center()[2];
@@ -292,9 +298,9 @@ update_face_values(const CellIterator<dim> & neighbor_cell,
 
 // ==================== Partial specialization ===============================
 // --------------------------- 1 phase ---------------------------------------
-template <int dim>
+template <>
 double
-IMPESPressure<1, dim>::
+IMPESPressure<1>::
 get_matrix_cell_entry(const double time_step) const
 {
   double entry = 0;
@@ -315,9 +321,10 @@ get_matrix_cell_entry(const double time_step) const
 }
 
 
-template <int dim>
+// template <int dim>
+template <>
 double
-IMPESPressure<1, dim>::
+IMPESPressure<1>::
 get_rhs_cell_entry(const double time_step,
                    const double pressure,
                    const double,
@@ -325,7 +332,7 @@ get_rhs_cell_entry(const double time_step,
 {
   double entry = 0;
 
-  const double c1p = this->saturation_terms[0,0];
+  const double c1p = this->saturation_terms[0][0];
 
   entry += c1p * pressure/time_step; // B matrix
   entry += this->well_Qs[0];  // Q vector
@@ -336,28 +343,30 @@ get_rhs_cell_entry(const double time_step,
 
 
 
-template <int dim>
+// template <int dim>
+template <>
 inline
 double
-IMPESPressure<1,dim>::get_matrix_face_entry(const int) const
+IMPESPressure<1>::get_matrix_face_entry(const int) const
 {
   return this->face_transmissibility[0];
 }
 
 
 
-template <int dim>
+// template <int dim>
+template <>
 inline
 double
-IMPESPressure<1, dim>::get_rhs_face_entry(const double,
-                                          const int) const
+IMPESPressure<1>::get_rhs_face_entry(const double,
+                                     const int) const
 {
   return this->face_gravity_terms[0];
 } // eom
 
 // --------------------------- 2 phase ---------------------------------------
 
-// template <int n_phases, int dim = 3>
+// template <int n_phases>
 // void
 // IMPESPressure<dim,n_phases>::
 // update_face_values(const CellIterator<dim> & neighbor_cell,
@@ -471,7 +480,7 @@ IMPESPressure<1, dim>::get_rhs_face_entry(const double,
 
 
 
-// template <int n_phases, int dim = 3>
+// template <int n_phases>
 // template <int dim>
 // double
 // IMPESPressure<2,dim>::
@@ -481,8 +490,8 @@ IMPESPressure<1, dim>::get_rhs_face_entry(const double,
 
 //   if (this->model.fluid_model == Model::FluidModelType::DeadOil)
 //   {
-//     const double c1w = this->saturation_terms[0,0];
-//     const double c2o = this->saturation_terms[1,1];
+//     const double c1w = this->saturation_terms[0][0];
+//     const double c2o = this->saturation_terms[1][1];
 //     const double c1p = this->pressure_terms[0];
 //     const double c2p = this->pressure_terms[1];
 //     entry += (c2o/c1w * c1p + c2p)/time_step;
@@ -506,11 +515,11 @@ IMPESPressure<1, dim>::get_rhs_face_entry(const double,
 //   AssertThrow(false, ExcNotImplemented());
 
 //   const double entry = 0;
-//   const double c1w = this->saturation_terms[0,0];
-//   const double c2o = this->saturation_terms[1,1];
-//   const double c3w = this->saturation_terms[2,0];
+//   const double c1w = this->saturation_terms[0][0];
+//   const double c2o = this->saturation_terms[1][1];
+//   const double c3w = this->saturation_terms[2][0];
 //   const double c3o = this->saturation_terms[2,1];
-//   const double c3g = this->saturation_terms[2,2];
+//   const double c3g = this->saturation_terms[2][2];
 //   const double c1p = this->pressure_terms[0];
 //   const double c2p = this->pressure_terms[1];
 //   const double c3p = this->pressure_terms[2];
@@ -524,7 +533,7 @@ IMPESPressure<1, dim>::get_rhs_face_entry(const double,
 // }
 
 
-// template <int n_phases, int dim = 3>
+// template <int n_phases>
 // double
 // IMPESPressure<dim,n_phases>::
 // get_matrix_cell_entry(const double time_step) const
@@ -583,8 +592,8 @@ IMPESPressure<1, dim>::get_rhs_face_entry(const double,
 // {
 //   double entry = 0;
 
-//   const double c1w = this->saturation_terms[0,0];
-//   const double c2o = this->saturation_terms[1,1];
+//   const double c1w = this->saturation_terms[0][0];
+//   const double c2o = this->saturation_terms[1][1];
 //   const double c1p = this->pressure_terms[0];
 //   const double c2p = this->pressure_terms[1];
 
@@ -617,11 +626,11 @@ IMPESPressure<1, dim>::get_rhs_face_entry(const double,
 
 //   double entry = 0;
 
-//   const double c1w = this->saturation_terms[0,0];
-//   const double c2o = this->saturation_terms[1,1];
-//   const double c3w = this->saturation_terms[2,0];
-//   const double c3o = this->saturation_terms[2,1];
-//   const double c3g = this->saturation_terms[2,2];
+//   const double c1w = this->saturation_terms[0][0];
+//   const double c2o = this->saturation_terms[1][1];
+//   const double c3w = this->saturation_terms[2][0];
+//   const double c3o = this->saturation_terms[2][1];
+//   const double c3g = this->saturation_terms[2][2];
 //   const double c1p = this->pressure_terms[0];
 //   const double c2p = this->pressure_terms[1];
 //   const double c3p = this->pressure_terms[2];
@@ -633,7 +642,7 @@ IMPESPressure<1, dim>::get_rhs_face_entry(const double,
 // }  // eom
 
 
-// template <int n_phases, int dim = 3>
+// template <int n_phases>
 // double
 // IMPESPressure<dim,n_phases>::
 // get_rhs_cell_entry(const double time_step,
@@ -692,8 +701,8 @@ IMPESPressure<1, dim>::get_rhs_face_entry(const double,
 
 //   if (this->model.fluid_model == Model::FluidModelType::DeadOil)
 //   {
-//     const double c2o = this->saturation_terms[1,1];
-//     const double c1w = this->saturation_terms[0,0];
+//     const double c2o = this->saturation_terms[1][1];
+//     const double c1w = this->saturation_terms[0][0];
 //     const double c1p = this->pressure_terms[0];
 //     entry += +c2o/c1w * this->face_transmissibility[0] + this->face_transmissibility[1];
 //   }
@@ -727,8 +736,8 @@ IMPESPressure<1, dim>::get_rhs_face_entry(const double,
 
 //   if (this->model.fluid_model == Model::FluidModelType::DeadOil)
 //   {
-//     const double c2o = this->saturation_terms[1,1];
-//     const double c1w = this->saturation_terms[0,0];
+//     const double c2o = this->saturation_terms[1][1];
+//     const double c1w = this->saturation_terms[0][0];
 //     entry += +c2o/c1w * this->face_gravity_terms[0]
 //                         +
 //                         this->face_gravity_terms[1];

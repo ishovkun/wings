@@ -20,9 +20,12 @@ ADD_LIBRARY(wings SHARED
   ExtraFEData.hpp
   FEFunction/FEFunction.hpp
   FEFunction/FEFunctionPVT.hpp
+  FEFunction/FEFunctionPS.hpp
   Math.hpp
   Model.hpp
-  BitMap.hpp
+  BitMap/BitMapFile.hpp
+  BitMap/BitMapFunction.hpp
+  BitMap/BitMapTensorFunction.hpp
   Parsers.hpp
   Units.h
   Tensors.hpp

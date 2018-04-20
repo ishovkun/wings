@@ -21,8 +21,10 @@ class SolverBuilder
  public:
   SolverBuilder(const Model::Model<dim> &model);
 
+  void build_solvers();
+
   // FluidSolvers::FluidSolverBase<dim>
-  std::unique_ptr<FluidSolvers::FluidSolverBase<dim>>
+  std::unique_ptr<FluidSolvers::FluidSolverBase>
   get_fluid_solver(MPI_Comm                                  & mpi_communicator,
                    parallel::distributed::Triangulation<dim> & triangulation,
                    ConditionalOStream                        & pcout);
@@ -42,7 +44,7 @@ SolverBuilder::SolverBuilder(const Model::Model<dim> &model)
 
 
 // FluidSolvers::FluidSolverBase<dim>
-std::unique_ptr<FluidSolvers::FluidSolverBase<dim>>
+std::unique_ptr<FluidSolvers::FluidSolverBase>
 SolverBuilder::
 get_fluid_solver(MPI_Comm                                  & mpi_communicator,
                  parallel::distributed::Triangulation<dim> & triangulation,
@@ -52,8 +54,8 @@ get_fluid_solver(MPI_Comm                                  & mpi_communicator,
   {
     case 1:
       {
-        Equations::IMPESPressure<1,dim> implicit_pressure(model);
-        Equations::IMPESSaturation<1,dim> explicit_saturation(model);
+        Equations::IMPESPressure<1> implicit_pressure(model);
+        Equations::IMPESSaturation<1> explicit_saturation(model);
         // return std::make_unique<FluidSolvers::SolverIMPES<1,dim>>
         //     (new FluidSolvers::SolverIMPES<1,dim>(mpi_communicator,
         //                                           triangulation,
@@ -88,4 +90,5 @@ get_fluid_solver(MPI_Comm                                  & mpi_communicator,
 
   } // end switch
 }  // eom
+
 } // end of namespace

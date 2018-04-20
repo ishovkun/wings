@@ -13,6 +13,7 @@ namespace Equations
 
 using namespace dealii;
 
+static const int dim = 3;
 // these three structures should used to pass data to CellValues classes
 
 // reference to the dofhandler's cell object
@@ -40,7 +41,7 @@ struct FaceGeometry
 
 
 // Generic  class that defines the interaction with all fluid solvers in Wings
-template <int dim>
+// template <int dim>
 class FluidEquationsBase
 {
  public:
