@@ -13,12 +13,12 @@ static const int dim = 3;
 // template <int dim>
 class FluidSolverBase
 {
+ public:
   virtual void setup_dofs() = 0;
-  virtual void assemble_system(const double time_step) = 0;
-  virtual unsigned int solve_time_step() = 0;
-  virtual void revert_to_old_time_step() = 0;
+  virtual unsigned int solve_time_step(const double time_step) = 0;
+  // virtual void revert_to_old_time_step() = 0;
   // save old iter solution for comparison
-  virtual void save_solution() = 0;
+  // virtual void save_solution() = 0;
   // coupling with solid solver
   virtual void set_coupling(const DoFHandler<dim>               & solid_dof_handler,
                             const TrilinosWrappers::MPI::Vector & displacement,

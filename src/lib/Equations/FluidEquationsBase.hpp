@@ -27,7 +27,7 @@ struct SolutionValues
   Vector<double> saturation;
   // double div_u, div_old_u;
   double pressure;
-  Tensor<1, 3> grad_u, grad_old_u;
+  Tensor<2, 3> grad_u, grad_old_u;
 };
 
 

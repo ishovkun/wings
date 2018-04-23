@@ -21,7 +21,7 @@ class BitMapTensorFunction : public TensorFunction<rank, dim, double>
 
  private:
   BitMapFunction<dim>  func;
-  const Tensor<1, dim> anisotropy;
+  const Tensor<rank, dim> anisotropy;
 };
 
 

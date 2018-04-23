@@ -63,6 +63,7 @@ class IMPESPressure : public FluidEquationsBase
   const Model::Model<dim>     & model;        // reference to the model object
   Point<dim>                    location;     // cell center coordinates
   // Tensor<1,n_phases>            rel_perm;           // productivity indices for phases and segments
+  SymmetricTensor<2,dim>        perm;
   std::vector<double>           rel_perm;              // relative permeabilities
   // Tensor<1,n_phases>            saturations;           // phase saturations
   Vector<double>                saturations;           // phase saturations
@@ -158,7 +159,7 @@ update_cell_values(const CellIterator<dim> & cell,
   location = cell->center();
   cell_volume = cell->measure();
   porosity = model.get_porosity->value(location);
-  const Tensor<2,dim> perm = model.get_permeability->value(cell->center());
+  perm = model.get_permeability->value(cell->center());
 
   this->pressure = solution.pressure;
   saturations = solution.saturation;
@@ -235,24 +236,26 @@ update_face_values(const CellIterator<dim> & neighbor_cell,
   const double distance = dx.norm();
 
   // obtain face absolute transmissibility
-  Tensor<2,dim> perm_negihbor =
+  SymmetricTensor<2,dim> perm_neighbor =
       model.get_permeability->value(neighbor_cell->center());
   // Math::harmonic_mean(this->k, neighbor_data.k, k_face);
   // dirty hack to make harmonic mean work with irregular grid
   const double dx1 = cell_volume/face_geometry.area;
   const double dx2 = 2*(distance - dx1/2);
-  Vector<double> k_face(dim);
-  Math::harmonic_mean(perm, perm_neighbor, dx1, dx2, k_face);
+  const SymmetricTensor<2,dim> k_face =
+      Math::harmonic_mean(perm, perm_neighbor, dx1, dx2);
 
+  // face absolute transmissibility
   double T_abs_face = 0;
+  // const Tensor<1,dim> kn = scalar_production(k_face, face_geometry.normal);
+  const Tensor<1,dim> kn = k_face * face_geometry.normal;
   for (int d=0; d<dim; ++d)
     if (abs(dx[d]/distance) > DefaultValues::small_number)
-      T_abs_face += (k_face[d]*abs(face_geometry.normal[d]/dx[d]))*face_geometry.area;
+      T_abs_face += abs(kn[d] / dx[d]) * face_geometry.area;
 
   // face phase transmissibilities
   std::vector<double> rel_perm_neighbor(n_phases);
   model.get_relative_permeability(neighbor_solution.saturation, rel_perm_neighbor);
-  // model.get_relative_permeability(saturations, rel_perm);
 
   const double gravity = model.gravity();
   const double depth = location[2];
@@ -285,11 +288,13 @@ update_face_values(const CellIterator<dim> & neighbor_cell,
 
     // transmissibility
     face_transmissibility[phase] = T_abs_face * rel_perm_face / mu_face / B_face;
+
     // gravity term
+    const int z = 2;
     face_gravity_terms[phase] =
         rho_sc / (B_face*B_face) / mu_face *
-        gravity * k_face[2] * rel_perm_face *
-        face_geometry.normal[2] * face_geometry.area;
+        gravity * kn[z] * rel_perm_face *
+        face_geometry.area;
     // upwind relperms
   } // end phase loop
 

@@ -49,11 +49,9 @@ class SolverIMPES : public FluidSolverBase
    * and allocate memory for solution vectors */
   void setup_dofs() override;
   // save solution for old iteration to compute difference later
-  virtual void save_solution() override;
+  // virtual void save_solution() override;
   // Implicit pressure system: Fill matrix and rhs vector
   void assemble_pressure_system(const double time_step);
-  // same as assemble_pressure_system
-  void assemble_system(const double time_step) override;
   /*
    * solve saturation system explicitly.
    */
@@ -83,9 +81,9 @@ class SolverIMPES : public FluidSolverBase
   get_pressure_saturation_function();
 
   // accessing private members
-  const TrilinosWrappers::SparseMatrix & get_system_matrix() override;
-  const TrilinosWrappers::MPI::Vector  & get_rhs_vector() override;
-  const DoFHandler<dim>                & get_dof_handler() override;
+  const TrilinosWrappers::SparseMatrix & get_system_matrix();
+  const TrilinosWrappers::MPI::Vector  & get_rhs_vector();
+  const DoFHandler<dim>                & get_dof_handler();
   const FE_DGQ<dim>                    & get_fe() override;
 
  private:
@@ -485,7 +483,7 @@ SolverIMPES<n_phases>::solve_time_step(const double time_step)
   unsigned int n_steps = solve_pressure_system();
 
   if (n_phases > 1)
-    solve_saturation_system();
+    solve_saturation_system(time_step);
 
   return n_steps;
 }
@@ -549,15 +547,15 @@ template <int n_phases>
 void
 SolverIMPES<n_phases>::attach_data(DataOut<dim> & data_out) const
 {
-  data_out.attach_dof_handler(dof_handler);
-  // scale pressure by bar/psi/whatever
-  Output::ScaleOutputVector<dim> pressure_scaler(Keywords::pressure_vector,
-                                                 model.units.pressure());
-  // data_out.add_data_vector(pressure_relevant, Keywords::pressure_vector,
+  // data_out.attach_dof_handler(dof_handler);
+  // // scale pressure by bar/psi/whatever
+  // Output::ScaleOutputVector<dim> pressure_scaler(Keywords::pressure_vector,
+  //                                                model.units.pressure());
+  // // data_out.add_data_vector(pressure_relevant, Keywords::pressure_vector,
+  // //                          DataOut<dim>::type_dof_data);
+  // data_out.add_data_vector(pressure, pressure_scaler);
+  // data_out.add_data_vector(saturation, Keywords::saturation_water_vector,
   //                          DataOut<dim>::type_dof_data);
-  data_out.add_data_vector(pressure, pressure_scaler);
-  data_out.add_data_vector(saturation, Keywords::saturation_water_vector,
-                           DataOut<dim>::type_dof_data);
 }  // end attach_data
 
 

@@ -276,6 +276,7 @@ solve_time_step_fluid_mechanics(FluidSolvers::FluidSolverBase    & fluid_solver,
 }  // end solve_
 
 
+
 template <int dim>
 void Simulator<dim>::run()
 {
@@ -291,26 +292,17 @@ void Simulator<dim>::run()
 
   output_helper.prepare_output_directories();
 
-  SolverBuilder builder(model);
-  // auto & fluid_solver = builder.get_fluid_solver(mpi_communicator,
-  //                                                triangulation,
-  //                                                pcout);
+  // make solvers
+  SolverBuilder builder(model, mpi_communicator, triangulation, pcout);
+  builder.build_solvers();
 
-  // define fluid object
-  // FluidEquations::FluidEquationsPressure<dim> cell_values(model),
-  //                                     neighbor_values(model);
-  // FluidEquations::FluidEquationsSaturation<dim> cell_values_saturation(model);
-  // FluidSolvers::SolverIMPES<dim> fluid_solver(mpi_communicator,
-  //                                             triangulation,
-  //                                             model, pcout,
-  //                                             cell_values, neighbor_values,
-  //                                             cell_values_saturation);
+  std::shared_ptr<FluidSolvers::FluidSolverBase> fluid_solver =
+      builder.get_fluid_solver();
 
-  // // define solid object
   // SolidSolvers::ElasticSolver<dim>
   //     solid_solver(mpi_communicator, triangulation, model, pcout);
 
-  // // pcout << "solid definition sucess" << std::endl;
+  // pcout << "solid initialization sucess" << std::endl;
 
   // // couple solvers
   // if (model.solid_model != Model::SolidModelType::Compressibility)
@@ -324,7 +316,7 @@ void Simulator<dim>::run()
   //   solid_solver.setup_dofs();
   // }
 
-  // fluid_solver.setup_dofs();
+  fluid_solver->setup_dofs();
 
   // model.locate_wells(fluid_solver.get_dof_handler());
 
