@@ -24,6 +24,7 @@ ADD_LIBRARY(wings SHARED
   FEFunction/FEFunctionPS.hpp
   Math.hpp
   Model.hpp
+  Probe.hpp
   BitMap/BitMapFile.hpp
   BitMap/BitMapFunction.hpp
   BitMap/BitMapTensorFunction.hpp

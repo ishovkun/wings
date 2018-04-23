@@ -299,26 +299,15 @@ void Simulator<dim>::run()
   std::shared_ptr<FluidSolvers::FluidSolverBase> fluid_solver =
       builder.get_fluid_solver();
 
-  // SolidSolvers::ElasticSolver<dim>
-  //     solid_solver(mpi_communicator, triangulation, model, pcout);
+  std::shared_ptr<SolidSolvers::SolidSolverBase> solid_solver =
+      builder.get_solid_solver();
 
-  // pcout << "solid initialization sucess" << std::endl;
-
-  // // couple solvers
-  // if (model.solid_model != Model::SolidModelType::Compressibility)
-  // {
-  //   const FEValuesExtractors::Vector displacement(0);
-  //   solid_solver.set_coupling(fluid_solver.get_dof_handler());
-  //   fluid_solver.set_coupling(solid_solver.get_dof_handler(),
-  //                             solid_solver.relevant_solution,
-  //                             solid_solver.old_solution,
-  //                             displacement);
-  //   solid_solver.setup_dofs();
-  // }
-
+  // setup dofs
   fluid_solver->setup_dofs();
+  if (model.solid_model != Model::SolidModelType::Compressibility)
+    solid_solver->setup_dofs();
 
-  // model.locate_wells(fluid_solver.get_dof_handler());
+  model.locate_wells(fluid_solver.get_dof_handler());
 
   // FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
   //     pressure_function(fluid_solver.get_dof_handler(),

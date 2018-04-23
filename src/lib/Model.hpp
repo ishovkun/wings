@@ -68,8 +68,8 @@ class Model
   // template<int dim> Model<dim>
   // friend class Parsers::Reader;
  public:
-  Model(MPI_Comm           &mpi_communicator_,
-        ConditionalOStream &pcout_);
+  Model(MPI_Comm           & mpi_communicator_,
+        ConditionalOStream & pcout_);
   ~Model();
  private:
   MPI_Comm                               & mpi_communicator;
@@ -86,11 +86,11 @@ class Model
   TensorFunction<2,dim,double> * get_permeability;
 
   // adding data
-  void set_fluid_model(const FluidModelType &type);
-  void set_solid_model(const SolidModelType &type);
-  void set_pvt_water(Interpolation::LookupTable &table);
-  void set_pvt_oil(Interpolation::LookupTable &table);
-  void set_pvt_gas(Interpolation::LookupTable &table);
+  void set_fluid_model(const FluidModelType     & type);
+  void set_solid_model(const SolidModelType     & type);
+  void set_pvt_water(Interpolation::LookupTable & table);
+  void set_pvt_oil(Interpolation::LookupTable   & table);
+  void set_pvt_gas(Interpolation::LookupTable   & table);
   void set_rel_perm(const double Sw_crit,
                     const double So_rw,
                     const double k_rw0,
@@ -223,8 +223,8 @@ Model<dim>::Model(MPI_Comm           &mpi_communicator_,
     pcout(pcout_),
     get_young_modulus(NULL),
     get_poisson_ratio(NULL),
-    get_permeability(NULL),
-    get_porosity(NULL)
+    get_porosity(NULL),
+    get_permeability(NULL)
 {
   // declare_parameters();
   units.set_system(Units::si_units);

@@ -14,7 +14,9 @@ namespace Wings
 {
 using namespace dealii;
 
+
 static const int dim = 3;
+
 
 class SolverBuilder
 {
@@ -27,10 +29,14 @@ class SolverBuilder
   void build_solvers();
 
   // FluidSolvers::FluidSolverBase<dim>
-  std::shared_ptr<FluidSolvers::FluidSolverBase>    get_fluid_solver();
-  std::shared_ptr<FluidSolvers::FluidSolverBase>    get_solid_solver();
+  std::shared_ptr<FluidSolvers::FluidSolverBase>   get_fluid_solver();
+  std::shared_ptr<SolidSolvers::SolidSolverBase>   get_solid_solver();
 
  protected:
+  void build_fluid_solver();
+  void build_solid_solver();
+  void couple_solvers();
+
   const Model::Model<dim> & model;
   MPI_Comm                                  & mpi_communicator;
   parallel::distributed::Triangulation<dim> & triangulation;
@@ -57,7 +63,7 @@ SolverBuilder(const Model::Model<dim> &model,
 
 
 
-void SolverBuilder::build_solvers()
+void SolverBuilder::build_fluid_solver()
 {
   switch(model.n_phases())
   {
@@ -93,7 +99,28 @@ void SolverBuilder::build_solvers()
         throw(ExcMessage("fluid solver undefined"));
       }
   } // end switch
+} // eom
 
+
+
+void SolverBuilder::couple_solvers()
+{
+  if (model.solid_model != Model::SolidModelType::Compressibility)
+  {
+      const FEValuesExtractors::Vector displacement(0);
+      solid_solver->set_coupling(fluid_solver->get_dof_handler());
+      fluid_solver->set_coupling(solid_solver->get_dof_handler(),
+                                 solid_solver->relevant_solution,
+                                 solid_solver->old_solution,
+                                 displacement);
+
+  }
+} // eom
+
+
+
+void SolverBuilder::build_solid_solver()
+{
   // build solid solver
   switch(model.solid_model)
   {
@@ -117,8 +144,17 @@ void SolverBuilder::build_solvers()
         throw(ExcMessage("solid solver undefined"));
         break;
       }
-  }
+  } // end switch
+} // eom
 
+
+
+void SolverBuilder::build_solvers()
+{
+
+  build_fluid_solver();
+  build_solid_solver();
+  couple_solvers();
 }  // end build_solvers
 
 
@@ -131,10 +167,10 @@ SolverBuilder::get_fluid_solver()
 
 
 
-// std::shared_ptr<FluidSolvers::FluidSolverBase>
-// SolverBuilder::get_solid_solver()
-// {
-//   return solid_solver;
-// }  // eom
+std::shared_ptr<SolidSolvers::SolidSolverBase>
+SolverBuilder::get_solid_solver()
+{
+  return solid_solver;
+}  // eom
 
 } // end of namespace

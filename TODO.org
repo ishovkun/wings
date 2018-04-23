@@ -1,22 +1,9 @@
 
 * General
-** DONE Model should decide which phase is oil water or gas, not cellvalues
-   CLOSED: [2018-03-09 Fri 14:26]
-** DONE Merge SaturationSolver and PressureSolver into FLuidSolverIMPES
-   CLOSED: [2018-02-16 Fri 18:20]
-** Simulator should take model as an argument
-** DONE Harmonic Mean for transmissibility should take cell sizes into account
-   CLOSED: [2018-01-31 Wed 12:15]
 ** TODO Arithmetic mean for properties should take cell sizes into account
-** DONE Make impes solver have only one owned solution
-   CLOSED: [2018-02-16 Fri 18:20]
-   have solution instead of pressure_solution and saturation_solution
-** DONE Allow creating cubic mesh with n_elements and dimensions
-   CLOSED: [2018-02-16 Fri 18:20]
-   also allow mesh file keyword
 ** DONE Put FluidEquations into ConstitutiveModel namespace and rename it into .., make ExtraValues callse FluidEquations
    CLOSED: [2018-03-09 Fri 14:26]
-** TODO Do some sort of location Probe class that would be responsible for getting data instead of model.
+** TODO Do location Probe class that would be responsible for getting data instead of model.
 * Physics
 ** Multiphase
 *** DONE Input
@@ -33,14 +20,7 @@
     CLOSED: [2018-02-16 Fri 18:21]
 *** Plasticity
 * Units
-** DONE Implement unit systems
-   CLOSED: [2017-12-21 Thu 18:04]
-** DONE Upon reading mesh node coordinate needs to be multiplied by units
-   CLOSED: [2018-01-25 Thu 23:57]
-** TODO Output units
-** Field report geometry Units
-** DONE Units in bitmap
-   CLOSED: [2018-01-30 Tue 10:34]
+** TODO Field report geometry Units
 * Adaptive mesh refinement
 ** DONE PressureSolver and Wells work with refined mesh
    CLOSED: [2017-12-22 Fri 18:36]
@@ -48,12 +28,7 @@
 ** Refinement at saturation fronts
 ** Initial refinement at water-oil-contact
 * 3D bitmap input
-** DONE Implement
-** DONE Test 1D bitmap
-   CLOSED: [2018-02-16 Fri 18:21]
 ** Test 3D heterogeneous bitmap
-* DONE Parallelize
-  CLOSED: [2018-02-10 Sat 13:00]
 * Problems
 ** Well segment function is either inaccurate or slow
 ** I am calculating face transmissibilities twice!
