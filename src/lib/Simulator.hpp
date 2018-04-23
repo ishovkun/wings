@@ -307,7 +307,7 @@ void Simulator<dim>::run()
   if (model.solid_model != Model::SolidModelType::Compressibility)
     solid_solver->setup_dofs();
 
-  model.locate_wells(fluid_solver.get_dof_handler());
+  model.locate_wells(fluid_solver->get_dof_handler());
 
   // FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
   //     pressure_function(fluid_solver.get_dof_handler(),

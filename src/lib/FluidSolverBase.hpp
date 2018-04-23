@@ -2,7 +2,6 @@
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/fe/fe_values.h>
 
-
 namespace FluidSolvers
 {
 using namespace dealii;

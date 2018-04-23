@@ -115,7 +115,7 @@ class Model
   void set_fluid_linear_solver(const LinearSolverType & solver_type);
   void set_solid_linear_solver(const LinearSolverType & solver_type);
   // querying data
-  bool has_phase(const Phase &phase) const;
+  bool has_phase(const Phase & phase) const;
   unsigned int n_phases() const;
   double density_standard_conditions(const int phase) const;
   double density_sc_water() const;
@@ -140,8 +140,8 @@ class Model
                PVTValues    & pvt_values) const;
   double get_time_step(const double time) const;
   std::vector<int> get_well_ids() const;
-  void get_relative_permeability(const Vector<double> &saturation,
-                                 std::vector<double>  &dst) const;
+  void get_relative_permeability(const Vector<double> & saturation,
+                                 std::vector<double>  & dst) const;
   int get_well_id(const std::string& well_name) const;
   std::pair<double,double> get_saturation_limits(const unsigned int phase) const;
 
