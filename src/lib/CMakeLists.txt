@@ -12,6 +12,7 @@ ADD_LIBRARY(wings SHARED
   FluidSolverBase.hpp
   SolverIMPES.hpp
 	AssembleFlowSystem.hpp
+  SolidSolverBase.hpp
 	ElasticSolver.hpp
   Equations/FluidEquationsBase.hpp
   Equations/IMPESPressure.hpp

@@ -4,8 +4,11 @@
 #include <deal.II/numerics/vector_tools.h>  // interpolate_boundary_values
 
 // custom modules
+#include <SolidSolverBase.hpp>
 #include <Math.hpp>
 
+
+namespace Wings {
 
 namespace SolidSolvers
 {
@@ -13,13 +16,15 @@ using namespace dealii;
 
 
 template <int dim>
-class ElasticSolver
+class ElasticSolver : public SolidSolverBase
 {
  public:
-  ElasticSolver(MPI_Comm                                  &mpi_communicator,
-                parallel::distributed::Triangulation<dim> &triangulation,
-                const Model::Model<dim>                   &model,
-                ConditionalOStream                        &pcout);
+  // Constructor
+  ElasticSolver(MPI_Comm                                  & mpi_communicator,
+                parallel::distributed::Triangulation<dim> & triangulation,
+                const Model::Model<dim>                   & model,
+                ConditionalOStream                        & pcout);
+  // Destructor
   ~ElasticSolver();
   /* setup degrees of freedom for the current triangulation
    * and allocate memory for solution vectors */
@@ -28,14 +33,19 @@ class ElasticSolver
   void assemble_system(const TrilinosWrappers::MPI::Vector & pressure_vector);
   // solve linear system syste_matrix*solution= rhs_vector
   // returns the number of solver steps
-  unsigned int solve();
+  unsigned int solve_linear_system();
   // give solver access to fluid dofs
-  void set_coupling(const DoFHandler<dim> &fluid_dof_handler);
+  void set_coupling(const DoFHandler<dim> & fluid_dof_handler);
+  // assemble_system() and solve()
+  unsigned int solve_time_step(const double /*time_step*/) override;
+  // for field output
+  void attach_data(DataOut<dim> & data_out) const override;
+
   // accessing private members
   const TrilinosWrappers::SparseMatrix & get_system_matrix();
   const TrilinosWrappers::MPI::Vector  & get_rhs_vector();
-  const DoFHandler<dim>                & get_dof_handler();
-  const FESystem<dim>                  & get_fe();
+  const DoFHandler<dim>                & get_dof_handler() override;
+
 
  private:
   MPI_Comm                                  & mpi_communicator;
@@ -87,9 +97,9 @@ ElasticSolver<dim>::~ElasticSolver()
 
 template <int dim>
 void
-ElasticSolver<dim>::set_coupling(const DoFHandler<dim> &fluid_dof_handler)
+ElasticSolver<dim>::set_coupling(const DoFHandler<dim> & fluid_dof_handler)
 {
-  p_fluid_dof_handler = &fluid_dof_handler;
+  p_fluid_dof_handler = & fluid_dof_handler;
 } // eom
 
 
@@ -317,7 +327,7 @@ assemble_system(const TrilinosWrappers::MPI::Vector & pressure_vector)
 
 template<int dim>
 unsigned int
-ElasticSolver<dim>::solve()
+ElasticSolver<dim>::solve_linear_system()
 {
   // setup CG solver
   TrilinosWrappers::SolverCG::AdditionalData data_cg;
@@ -377,4 +387,24 @@ ElasticSolver<dim>::get_dof_handler()
   return dof_handler;
 }  // eom
 
+
+
+template <int dim>
+unsigned int ElasticSolver<dim>::solve_time_step(const double)
+{
+  throw(ExcNotImplemented());
+}  // eom
+
+
+
+template <int dim>
+void ElasticSolver<dim>::attach_data(DataOut<dim> & data_out) const
+{
+  throw(ExcNotImplemented());
+}  // eom
+
+
+
 } // end of namespace
+
+} // end wings

@@ -78,11 +78,13 @@ void SolverBuilder::build_solvers()
 
     case 2:
       {
+        throw(ExcNotImplemented());
         break;
       }
 
     case 3:
       {
+        throw(ExcNotImplemented());
         break;
       }
 
