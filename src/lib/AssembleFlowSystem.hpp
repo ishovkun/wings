@@ -70,7 +70,6 @@ void assemble_flow_system(const DoFHandler<dim>             & fluid_dof_handler,
   std::vector<double>                 div_old_u_values(n_q_points);
   std::vector< Tensor<2,dim> >        grad_u_values(n_q_points);
   std::vector< Tensor<2,dim> >        grad_old_u_values(n_q_points);
-
   std::vector< std::vector<double> >  s_values(n_phases);
   for (auto & c: s_values)
     c.resize(face_quadrature_formula.size());

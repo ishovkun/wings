@@ -22,17 +22,21 @@
 #include <FEFunction/FEFunction.hpp>
 // #include <FEFunction/FEFunctionPVT.hpp>
 #include <SolverBuilder.hpp>
+#include <Probe.hpp>
+
 
 namespace Wings
 {
 using namespace dealii;
 
 
-template <int dim>
+template <int dim, int n_phases>
 class Simulator
 {
  public:
-  Simulator(std::string);
+  Simulator(Model::Model<dim>  & model,
+            MPI_Comm           & mpi_communicator,
+            ConditionalOStream & pcout);
   // ~Simulator();
   void read_mesh(unsigned int verbosity = 0);
   void create_mesh();
@@ -53,25 +57,25 @@ class Simulator
                                        SolidSolvers::ElasticSolver<dim>  & solid_solver,
                                        const double                        time_step);
 
-  MPI_Comm                                  mpi_communicator;
+  MPI_Comm                                & mpi_communicator;
   parallel::distributed::Triangulation<dim> triangulation;
-  ConditionalOStream                        pcout;
-  Model::Model<dim>                         model;
-  std::string                               input_file;
+  ConditionalOStream                      & pcout;
+  Model::Model<dim>                       & model;
   Output::OutputHelper<dim>                 output_helper;
   // TimerOutput                               computing_timer;
 };
 
 
 
-template <int dim>
-Simulator<dim>::Simulator(std::string input_file_name_)
+template <int dim, int n_phases>
+Simulator<dim,n_phases>::Simulator(Model::Model<dim>  & model,
+                          MPI_Comm           & mpi_communicator,
+                          ConditionalOStream & pcout)
     :
-    mpi_communicator(MPI_COMM_WORLD),
+    mpi_communicator(mpi_communicator),
     triangulation(mpi_communicator),
-    pcout(std::cout, (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)),
-    model(mpi_communicator, pcout),
-    input_file(input_file_name_),
+    pcout(pcout),
+    model(model),
     output_helper(mpi_communicator, triangulation)
     // ,computing_timer(mpi_communicator, pcout,
     //                 TimerOutput::summary, TimerOutput::wall_times)
@@ -80,7 +84,7 @@ Simulator<dim>::Simulator(std::string input_file_name_)
 
 
 template <int dim>
-void Simulator<dim>::create_mesh()
+void Simulator<dim,n_phases>::create_mesh()
 {
   const auto & p1 = model.mesh_config.points.first;
   const auto & p2 = model.mesh_config.points.second;
@@ -149,8 +153,8 @@ void Simulator<dim>::create_mesh()
 
 
 
-template <int dim>
-void Simulator<dim>::read_mesh(unsigned int verbosity)
+template <int dim, int n_phases>
+void Simulator<dim,n_phases>::read_mesh(unsigned int verbosity)
 {
   GridIn<dim> gridin;
   gridin.attach_triangulation(triangulation);
@@ -170,9 +174,9 @@ void Simulator<dim>::read_mesh(unsigned int verbosity)
 
 
 
-template <int dim>
+template <int dim, int n_phases>
 void
-Simulator<dim>::
+Simulator<dim,n_phases>::
 field_report(const double                          time,
              const unsigned int                    time_step_number,
              const FluidSolvers::FluidSolverBase & fluid_solver)
@@ -188,9 +192,9 @@ field_report(const double                          time,
 
 
 
-template<int dim>
+template <int dim, int n_phases>
 void
-Simulator<dim>::
+Simulator<dim,n_phases>::
 solve_time_step_fluid(FluidSolvers::FluidSolverBase & fluid_solver,
                       const double                    time_step)
 {
@@ -212,9 +216,9 @@ solve_time_step_fluid(FluidSolvers::FluidSolverBase & fluid_solver,
 
 
 
-template<int dim>
+template <int dim, int n_phases>
 void
-Simulator<dim>::
+Simulator<dim,n_phases>::
 solve_time_step_fluid_mechanics(FluidSolvers::FluidSolverBase    & fluid_solver,
                                 SolidSolvers::ElasticSolver<dim> & solid_solver,
                                 const double                       time_step)
@@ -277,13 +281,10 @@ solve_time_step_fluid_mechanics(FluidSolvers::FluidSolverBase    & fluid_solver,
 
 
 
-template <int dim>
-void Simulator<dim>::run()
+template <int dim, int n_phases>
+void Simulator<dim,n_phases>::run()
 {
-  Parsers::Reader reader(pcout, model);
-  reader.read_input(input_file, /* verbosity= */0);
   output_helper.set_case_name("solution");
-
 
   if (model.mesh_config.type == Model::MeshType::Create)
     create_mesh();
@@ -292,8 +293,11 @@ void Simulator<dim>::run()
 
   output_helper.prepare_output_directories();
 
+
+  Probe::Probe<n_phases> probe(model);
+
   // make solvers
-  SolverBuilder builder(model, mpi_communicator, triangulation, pcout);
+  SolverBuilder builder(model, probe, mpi_communicator, triangulation, pcout);
   builder.build_solvers();
 
   std::shared_ptr<FluidSolvers::FluidSolverBase> fluid_solver =
@@ -308,6 +312,7 @@ void Simulator<dim>::run()
     solid_solver->setup_dofs();
 
   model.locate_wells(fluid_solver->get_dof_handler());
+
 
   // FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
   //     pressure_function(fluid_solver.get_dof_handler(),

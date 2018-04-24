@@ -2,6 +2,7 @@
 #include <deal.II/distributed/tria.h>
 
 #include <Model.hpp>
+#include <Probe.hpp>
 
 #include <SolverIMPES.hpp>
 #include <ElasticSolver.hpp>
@@ -21,7 +22,8 @@ static const int dim = 3;
 class SolverBuilder
 {
  public:
-  SolverBuilder(const Model::Model<dim> &model,
+  SolverBuilder(const Model::Model<dim>                   & model,
+                Probe::Probe                              & probe,
                 MPI_Comm                                  & mpi_communicator,
                 parallel::distributed::Triangulation<dim> & triangulation,
                 ConditionalOStream                        & pcout);
@@ -50,7 +52,8 @@ class SolverBuilder
 
 
 SolverBuilder::
-SolverBuilder(const Model::Model<dim> &model,
+SolverBuilder(const Model::Model<dim>                   & model,
+              Probe::Probe                              & probe,
               MPI_Comm                                  & mpi_communicator,
               parallel::distributed::Triangulation<dim> & triangulation,
               ConditionalOStream                        & pcout)

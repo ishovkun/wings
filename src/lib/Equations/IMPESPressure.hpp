@@ -137,15 +137,10 @@ template <int n_phases>
 IMPESPressure<n_phases>::
 IMPESPressure(const Model::Model<dim> &model)
     :
-    // FluidEquationsBase<dim>::FluidEquationsBase(),
     FluidEquationsBase::FluidEquationsBase(),
     model(model),
     rel_perm(n_phases),
     pvt_values(n_phases)
-    // face_transmissibility(n_phases),
-    // face_gravity_terms(n_phases),
-    // well_Js(n_phases),
-    // well_Qs(n_phases)
 {}
 
 

@@ -5,6 +5,7 @@
 namespace Wings {
 
 namespace Probe {
+using namespace dealii;
 
 
 static const int dim = 3;
@@ -12,91 +13,135 @@ static const int dim = 3;
 template <int dim>
 using CellIterator = typename dealii::DoFHandler<dim>::active_cell_iterator;
 
+
+template<int n_phases>
 struct SolutionValues
 {
-  SolutionValues(const int n_phases = 3) {saturation.reinit(n_phases);}
-  Vector<double> saturation;
-  // double div_u, div_old_u;
+  Tensor<1,n_phases> saturation;
   double pressure;
-  Tensor<2, 3> grad_u, grad_old_u;
+  Tensor<2, dim> grad_u, grad_old_u;
 };
 
 
+template <int n_phases>
 class Probe
 {
  public:
-  Probe(const Model<dim> & model);
-  ~Probe();
+  Probe(const Model::Model<dim> & model);
+  // ~Probe();
 
   // fetching data
   double get_biot_coefficient() const;
   double gravity() const;
-  double get_rock_compressibility(const Point<dim> &p) const;
-  void get_pvt(const double   pressure,
-               const int      phase,
-               PVTValues    & pvt_values) const;
+  double get_rock_compressibility() const;
+  // void get_pvt(const double   pressure,
+  //              const int      phase,
+  //              PVTValues    & pvt_values) const;
 
   double get_total_density() const;
   double get_porosity() const;
-  double get_absolute_permeability() const;
+  Tensor<2, dim> get_absolute_permeability() const;
   // double get_relative_permeability() const;
 
-  virtual void begin_cell() = 0;
-  virtual void next_cell() = 0;
-  virtual void set_cell(CellIterator & cell) = 0;
+  virtual void begin_cell();
+  virtual void next_cell();
+  virtual void set_cell(CellIterator<dim> & cell);
 
  protected:
-  virtual void extract_solution_values() = 0;
+  // virtual void extract_solution_values() = 0;
 
-  const Model<dim> & model;
-  CellIterator  fluid_cell, solid_cell;
+  const Model::Model<dim> & model;
+  DoFHandler<dim> * fluid_dof_handler;
+  DoFHandler<dim> * solid_dof_handler;
+  CellIterator<dim>  fluid_cell, solid_cell;
 };
 
 
 
-Probe(const Model & model)
+template <int n_phases>
+Probe<n_phases>::Probe(const Model::Model<dim> & model)
     :
     model(model)
 {}
 
 
 
-inline double
-Probe::get_biot_coefficient() const
+template <int n_phases>
+void Probe<n_phases>::begin_cell()
 {
-  AssertThrow(solid_model != SolidModelType::Compressibility,
+  fluid_cell = fluid_dof_handler->begin_active();
+  solid_cell = solid_dof_handler->begin_active();
+}  // eom
+
+
+
+template <int n_phases>
+void Probe<n_phases>::next_cell()
+{
+  fluid_cell++;
+  solid_cell++;
+}  // eom
+
+
+template <int n_phases>
+void Probe<n_phases>::set_cell(CellIterator<dim> & cell)
+{
+  fluid_cell =
+      DoFHandler<dim>::
+      active_cell_iterator(&(fluid_dof_handler->get_triangulation()),
+                           cell->level(),
+                           cell->index(),
+                           fluid_dof_handler);
+  solid_cell =
+      DoFHandler<dim>::
+      active_cell_iterator(&(solid_dof_handler->get_triangulation()),
+                           cell->level(),
+                           cell->index(),
+                           solid_dof_handler);
+}  // eom
+
+
+template <int n_phases>
+inline double
+Probe<n_phases>::get_biot_coefficient() const
+{
+  AssertThrow(model.solid_model != Model::SolidModelType::Compressibility,
               ExcMessage("Biot coefficient inapplicable for compressibility model"));
 
-  return model.biot_coefficient;
+  return model.get_biot_coefficient();
 } //eom
 
 
 
+template <int n_phases>
 inline double
-Probe::get_porosity() const
+Probe<n_phases>::get_porosity() const
 {
   return model.get_porosity->value(fluid_cell->center());
 } // eom
 
 
 
-inline TensorFunction<2,dim,double>
-Probe::get_permeability() const
+template <int n_phases>
+inline Tensor<2, dim>
+Probe<n_phases>::get_absolute_permeability() const
 {
   return model.get_permeability->value(fluid_cell->center());
 } // eom
 
 
 
-template<int dim>
+template <int n_phases>
 double
-Probe::get_rock_compressibility() const
+Probe<n_phases>::get_rock_compressibility() const
 {
-  if (solid_model == SolidModelType::Compressibility)
+  Point<dim> p = fluid_cell->center();
+
+  if (model.solid_model == Model::SolidModelType::Compressibility)
   {
-    return rock_compressibility_constant;
+    return model.rock_compressibility_constant;
   }
-  else if (solid_model == SolidModelType::Elasticity)
+  else if (model.solid_model == Model::SolidModelType::Elasticity)
   {
     const double E = model.get_young_modulus->value(p);
     const double nu = model.get_poisson_ratio->value(p);
@@ -117,10 +162,11 @@ Probe::get_rock_compressibility() const
 
 
 
+template <int n_phases>
 double
-Probe<dim>::get_total_density()
+Probe<n_phases>::get_total_density() const
 {
-
+  // const double phi_0 = model.get_porosity->value(fluid_cell);
 }  // end get_total_density
 
 
