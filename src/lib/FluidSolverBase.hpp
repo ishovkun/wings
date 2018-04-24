@@ -2,16 +2,17 @@
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/fe/fe_values.h>
 
+// #include <Probe.hpp>
+#include <SolutionValues.h>
+
 namespace Wings {
 
 namespace FluidSolvers
 {
 using namespace dealii;
 
-static const int dim = 3;
 
-// template <int dim, typename MatrixType, typename VectorType1, typename VectorType2>
-// template <int dim>
+template <int dim, int n_phases>
 class FluidSolverBase
 {
  public:
@@ -29,10 +30,12 @@ class FluidSolverBase
   virtual void attach_data(DataOut<dim> & data_out) const = 0;
 
   // accessing private members
-  // const MatrixType         & get_system_matrix() = 0;
-  // const VectorType1        & get_rhs_vector() = 0;
   virtual const DoFHandler<dim>    & get_dof_handler() = 0;
   virtual const FiniteElement<dim> & get_fe() = 0;
+  // needed for probe class
+  virtual void extract_solution_data
+  (const typename DoFHandler<dim>::active_cell_iterator & cell,
+   SolutionValues<dim,n_phases>                         & solution_values);
 };
 
 } // end of namespace

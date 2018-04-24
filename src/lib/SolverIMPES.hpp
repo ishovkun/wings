@@ -35,7 +35,7 @@ using namespace dealii;
 
 
 template <int dim, int n_phases>
-class SolverIMPES : public FluidSolverBase
+class SolverIMPES : public FluidSolverBase<dim,n_phases>
 {
  public:
   /* TODO: initialization description */
@@ -77,6 +77,10 @@ class SolverIMPES : public FluidSolverBase
    * This method is used for generating field reports
    */
   void attach_data(DataOut<dim> & data_out) const override;
+  /* */
+  void extract_solution_data
+  (const typename dealii::DoFHandler<dim>::active_cell_iterator & cell,
+   SolutionValues<dim,n_phases>                                 & solution_values);
 
   FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
   get_pressure_saturation_function();

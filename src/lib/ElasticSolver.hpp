@@ -15,8 +15,8 @@ namespace SolidSolvers
 using namespace dealii;
 
 
-template <int dim>
-class ElasticSolver : public SolidSolverBase
+template <int dim, int n_phases>
+class ElasticSolver : public SolidSolverBase<dim,n_phases>
 {
  public:
   // Constructor
@@ -40,6 +40,10 @@ class ElasticSolver : public SolidSolverBase
   unsigned int solve_time_step(const double /*time_step*/) override;
   // for field output
   void attach_data(DataOut<dim> & data_out) const override;
+  // for probe
+  void extract_solution_data
+  (const typename DoFHandler<dim>::active_cell_iterator & cell,
+   SolutionValues<dim,n_phases>                         & solution_values) override;
 
   // accessing private members
   const TrilinosWrappers::SparseMatrix & get_system_matrix();
@@ -70,8 +74,8 @@ class ElasticSolver : public SolidSolverBase
 
 
 
-template <int dim>
-ElasticSolver<dim>::
+template <int dim, int n_phases>
+ElasticSolver<dim,n_phases>::
 ElasticSolver(MPI_Comm                                  &mpi_communicator,
               parallel::distributed::Triangulation<dim> &triangulation,
               const Model::Model<dim>                   &model,
@@ -87,26 +91,26 @@ ElasticSolver(MPI_Comm                                  &mpi_communicator,
 
 
 
-template <int dim>
-ElasticSolver<dim>::~ElasticSolver()
+template <int dim, int n_phases>
+ElasticSolver<dim,n_phases>::~ElasticSolver()
 {
   dof_handler.clear();
 } // eom
 
 
 
-template <int dim>
+template <int dim, int n_phases>
 void
-ElasticSolver<dim>::set_coupling(const DoFHandler<dim> & fluid_dof_handler)
+ElasticSolver<dim,n_phases>::set_coupling(const DoFHandler<dim> & fluid_dof_handler)
 {
   p_fluid_dof_handler = & fluid_dof_handler;
 } // eom
 
 
 
-template <int dim>
+template <int dim, int n_phases>
 void
-ElasticSolver<dim>::setup_dofs()
+ElasticSolver<dim,n_phases>::setup_dofs()
 {
   dof_handler.distribute_dofs(fe);
 
@@ -166,9 +170,9 @@ ElasticSolver<dim>::setup_dofs()
 
 
 
-template <int dim>
+template <int dim, int n_phases>
 void
-ElasticSolver<dim>::
+ElasticSolver<dim,n_phases>::
 assemble_system(const TrilinosWrappers::MPI::Vector & pressure_vector)
 {
   const auto &  fluid_fe = p_fluid_dof_handler->get_fe();
@@ -325,9 +329,9 @@ assemble_system(const TrilinosWrappers::MPI::Vector & pressure_vector)
 
 
 
-template<int dim>
+template<int dim, int n_phases>
 unsigned int
-ElasticSolver<dim>::solve_linear_system()
+ElasticSolver<dim,n_phases>::solve_linear_system()
 {
   // setup CG solver
   TrilinosWrappers::SolverCG::AdditionalData data_cg;
@@ -371,39 +375,48 @@ ElasticSolver<dim>::solve_linear_system()
 
 
 
-template<int dim>
+template <int dim, int n_phases>
 const TrilinosWrappers::SparseMatrix &
-ElasticSolver<dim>::get_system_matrix()
+ElasticSolver<dim,n_phases>::get_system_matrix()
 {
   return system_matrix;
 }  // end get_syste_matrix
 
 
 
-template <int dim>
+template <int dim, int n_phases>
 const DoFHandler<dim> &
-ElasticSolver<dim>::get_dof_handler()
+ElasticSolver<dim,n_phases>::get_dof_handler()
 {
   return dof_handler;
 }  // eom
 
 
 
-template <int dim>
-unsigned int ElasticSolver<dim>::solve_time_step(const double)
+template <int dim, int n_phases>
+unsigned int ElasticSolver<dim,n_phases>::solve_time_step(const double)
 {
   throw(ExcNotImplemented());
 }  // eom
 
 
 
-template <int dim>
-void ElasticSolver<dim>::attach_data(DataOut<dim> & data_out) const
+template <int dim, int n_phases>
+void ElasticSolver<dim,n_phases>::attach_data(DataOut<dim> & data_out) const
 {
   throw(ExcNotImplemented());
 }  // eom
 
 
+
+template <int dim, int n_phases>
+void ElasticSolver<dim,n_phases>::
+extract_solution_data
+(const typename DoFHandler<dim>::active_cell_iterator & cell,
+ SolutionValues<dim,n_phases>                         & solution_values)
+{
+  throw(ExcNotImplemented());
+}  // eom
 
 } // end of namespace
 

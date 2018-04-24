@@ -28,8 +28,8 @@ class SolverBuilder
 
   void build_solvers();
 
-  std::shared_ptr<FluidSolvers::FluidSolverBase>   get_fluid_solver();
-  std::shared_ptr<SolidSolvers::SolidSolverBase>   get_solid_solver();
+  std::shared_ptr<FluidSolvers::FluidSolverBase<dim,n_phases>> get_fluid_solver();
+  std::shared_ptr<SolidSolvers::SolidSolverBase<dim,n_phases>> get_solid_solver();
 
  protected:
   void build_fluid_solver();
@@ -42,8 +42,8 @@ class SolverBuilder
   parallel::distributed::Triangulation<dim> & triangulation;
   ConditionalOStream                        & pcout;
 
-  std::shared_ptr<FluidSolvers::FluidSolverBase>    fluid_solver;
-  std::shared_ptr<SolidSolvers::ElasticSolver<dim>> solid_solver;
+  std::shared_ptr<FluidSolvers::FluidSolverBase<dim,n_phases>> fluid_solver;
+  std::shared_ptr<SolidSolvers::SolidSolverBase<dim,n_phases>> solid_solver;
 
 };
 
@@ -79,40 +79,6 @@ void SolverBuilder<dim,n_phases>::build_fluid_solver()
              pcout,
              implicit_pressure,
              explicit_saturation);
-  // switch(model.n_phases())
-  // {
-  //   case 1:
-  //     {
-  //       Equations::IMPESPressure<1> implicit_pressure(model, probe);
-  //       Equations::IMPESSaturation<1> explicit_saturation(model, probe);
-  //       fluid_solver =
-  //           std::make_shared<FluidSolvers::SolverIMPES<dim,1>>
-  //           (mpi_communicator,
-  //            triangulation,
-  //            model,
-  //            pcout,
-  //            implicit_pressure,
-  //            explicit_saturation);
-  //       break;
-  //     }
-
-  //   case 2:
-  //     {
-  //       throw(ExcNotImplemented());
-  //       break;
-  //     }
-
-  //   case 3:
-  //     {
-  //       throw(ExcNotImplemented());
-  //       break;
-  //     }
-
-  //   default:
-  //     {
-  //       throw(ExcMessage("fluid solver undefined"));
-  //     }
-  // } // end switch
 } // eom
 
 
@@ -123,11 +89,11 @@ void SolverBuilder<dim,n_phases>::couple_solvers()
   if (model.solid_model != Model::SolidModelType::Compressibility)
   {
       const FEValuesExtractors::Vector displacement(0);
-      solid_solver->set_coupling(fluid_solver->get_dof_handler());
-      fluid_solver->set_coupling(solid_solver->get_dof_handler(),
-                                 solid_solver->relevant_solution,
-                                 solid_solver->old_solution,
-                                 displacement);
+      // solid_solver->set_coupling(fluid_solver->get_dof_handler());
+      // fluid_solver->set_coupling(solid_solver->get_dof_handler(),
+      //                            solid_solver->relevant_solution,
+      //                            solid_solver->old_solution,
+      //                            displacement);
 
   }
 } // eom
@@ -150,7 +116,7 @@ void SolverBuilder<dim,n_phases>::build_solid_solver()
     case Model::SolidModelType::Elasticity:
       {
         solid_solver =
-            std::make_shared<SolidSolvers::ElasticSolver<dim>>
+            std::make_shared<SolidSolvers::ElasticSolver<dim,n_phases>>
             (mpi_communicator, triangulation, model, pcout);
         break;
       }
@@ -177,7 +143,7 @@ void SolverBuilder<dim,n_phases>::build_solvers()
 
 
 template<int dim, int n_phases>
-std::shared_ptr<FluidSolvers::FluidSolverBase>
+std::shared_ptr<FluidSolvers::FluidSolverBase<dim,n_phases>>
 SolverBuilder<dim,n_phases>::get_fluid_solver()
 {
   return fluid_solver;
@@ -186,7 +152,7 @@ SolverBuilder<dim,n_phases>::get_fluid_solver()
 
 
 template<int dim, int n_phases>
-std::shared_ptr<SolidSolvers::SolidSolverBase>
+std::shared_ptr<SolidSolvers::SolidSolverBase<dim,n_phases>>
 SolverBuilder<dim,n_phases>::get_solid_solver()
 {
   return solid_solver;

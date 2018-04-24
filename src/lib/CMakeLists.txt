@@ -9,6 +9,7 @@ ADD_LIBRARY(wings SHARED
   Reader.hpp
   Simulator.hpp
   SolverBuilder.hpp
+	SolutionValues.h
   FluidSolverBase.hpp
   SolverIMPES.hpp
 	AssembleFlowSystem.hpp

@@ -39,7 +39,7 @@ class Simulator
             ConditionalOStream & pcout);
   // ~Simulator();
   void read_mesh(unsigned int verbosity = 0);
-  void create_mesh();
+  void create_mesh();  //
   void run();
 
 
@@ -48,14 +48,15 @@ class Simulator
   // export vtu data (for paraview)
   void field_report(const double                          time_step,
                     const unsigned int                    time_step_number,
-                    const FluidSolvers::FluidSolverBase & fluid_solver);
+                    const FluidSolvers::FluidSolverBase<dim,n_phases> & fluid_solver);
   // Solve time step for a blackoil system without geomechanics
-  void solve_time_step_fluid(FluidSolvers::FluidSolverBase & fluid_solver,
+  void solve_time_step_fluid(FluidSolvers::FluidSolverBase<dim,n_phases> & fluid_solver,
                              const double                    time_step);
   // Solve time step for a blackoil system with geomechanics
-  void solve_time_step_fluid_mechanics(FluidSolvers::FluidSolverBase     & fluid_solver,
-                                       SolidSolvers::ElasticSolver<dim>  & solid_solver,
-                                       const double                        time_step);
+  void solve_time_step_fluid_mechanics
+  (FluidSolvers::FluidSolverBase<dim,n_phases> & fluid_solver,
+   SolidSolvers::ElasticSolver<dim,n_phases>   & solid_solver,
+   const double                                  time_step);
 
   MPI_Comm                                & mpi_communicator;
   parallel::distributed::Triangulation<dim> triangulation;
@@ -177,9 +178,9 @@ void Simulator<dim,n_phases>::read_mesh(unsigned int verbosity)
 template <int dim, int n_phases>
 void
 Simulator<dim,n_phases>::
-field_report(const double                          time,
-             const unsigned int                    time_step_number,
-             const FluidSolvers::FluidSolverBase & fluid_solver)
+field_report(const double                                        time,
+             const unsigned int                                  time_step_number,
+             const FluidSolvers::FluidSolverBase<dim,n_phases> & fluid_solver)
 {
   DataOut<dim> data_out;
 
@@ -195,7 +196,7 @@ field_report(const double                          time,
 template <int dim, int n_phases>
 void
 Simulator<dim,n_phases>::
-solve_time_step_fluid(FluidSolvers::FluidSolverBase & fluid_solver,
+solve_time_step_fluid(FluidSolvers::FluidSolverBase<dim,n_phases> & fluid_solver,
                       const double                    time_step)
 {
   // update wells
@@ -219,9 +220,9 @@ solve_time_step_fluid(FluidSolvers::FluidSolverBase & fluid_solver,
 template <int dim, int n_phases>
 void
 Simulator<dim,n_phases>::
-solve_time_step_fluid_mechanics(FluidSolvers::FluidSolverBase    & fluid_solver,
-                                SolidSolvers::ElasticSolver<dim> & solid_solver,
-                                const double                       time_step)
+solve_time_step_fluid_mechanics(FluidSolvers::FluidSolverBase<dim,n_phases> & fluid_solver,
+                                SolidSolvers::ElasticSolver<dim,n_phases>   & solid_solver,
+                                const double                                  time_step)
 {
   // FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
   //     pressure_function(fluid_solver.get_dof_handler(),
@@ -302,11 +303,11 @@ void Simulator<dim,n_phases>::run()
                                       triangulation, pcout);
   builder.build_solvers();
 
-  std::shared_ptr<FluidSolvers::FluidSolverBase> fluid_solver =
-      builder.get_fluid_solver();
+  std::shared_ptr<FluidSolvers::FluidSolverBase<dim,n_phases>>
+      fluid_solver = builder.get_fluid_solver();
 
-  std::shared_ptr<SolidSolvers::SolidSolverBase> solid_solver =
-      builder.get_solid_solver();
+  std::shared_ptr<SolidSolvers::SolidSolverBase<dim,n_phases>>
+      solid_solver = builder.get_solid_solver();
 
   // setup dofs
   fluid_solver->setup_dofs();
