@@ -10,6 +10,8 @@
 #include <Equations/FluidEquationsBase.hpp>
 
 
+namespace Wings {
+
 namespace FluidSolvers
 {
 using namespace dealii;
@@ -236,3 +238,5 @@ void assemble_flow_system(const DoFHandler<dim>             & fluid_dof_handler,
 } // end of method
 
 } // end of namespace
+
+} // end wings

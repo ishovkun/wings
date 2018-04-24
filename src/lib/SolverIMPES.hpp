@@ -27,13 +27,14 @@
 #include <ScaleOutputVector.hpp>
 #include <FEFunction/FEFunctionPS.hpp>
 
+namespace Wings {
 
 namespace FluidSolvers
 {
 using namespace dealii;
 
 
-template <int n_phases>
+template <int dim, int n_phases>
 class SolverIMPES : public FluidSolverBase
 {
  public:
@@ -120,8 +121,8 @@ class SolverIMPES : public FluidSolverBase
 };
 
 
-template <int n_phases>
-SolverIMPES<n_phases>::
+template <int dim, int n_phases>
+SolverIMPES<dim,n_phases>::
 SolverIMPES(MPI_Comm                                  & mpi_communicator_,
             parallel::distributed::Triangulation<dim> & triangulation_,
             const Model::Model<dim>                   & model_,
@@ -144,15 +145,15 @@ SolverIMPES(MPI_Comm                                  & mpi_communicator_,
 {}  // eom
 
 
-template <int n_phases>
-SolverIMPES<n_phases>::~SolverIMPES()
+template <int dim, int n_phases>
+SolverIMPES<dim,n_phases>::~SolverIMPES()
 {
   dof_handler.clear();
 }  // eom
 
 
-template <int n_phases>
-void SolverIMPES<n_phases>::setup_dofs()
+template <int dim, int n_phases>
+void SolverIMPES<dim,n_phases>::setup_dofs()
 {
   dof_handler.distribute_dofs(fe);
   locally_owned_dofs.clear();
@@ -187,9 +188,9 @@ void SolverIMPES<n_phases>::setup_dofs()
 
 
 
-template <int n_phases>
+template <int dim, int n_phases>
 void
-SolverIMPES<n_phases>::
+SolverIMPES<dim,n_phases>::
 assemble_pressure_system(const double time_step)
 {
   assemble_flow_system
@@ -404,9 +405,9 @@ assemble_pressure_system(const double time_step)
 
 
 
-template <int n_phases>
+template <int dim, int n_phases>
 void
-SolverIMPES<n_phases>::
+SolverIMPES<dim,n_phases>::
 solve_saturation_system(const double time_step)
 {
   assemble_flow_system
@@ -442,9 +443,9 @@ solve_saturation_system(const double time_step)
 } // eom
 
 
-template <int n_phases>
+template <int dim, int n_phases>
 unsigned int
-SolverIMPES<n_phases>::solve_pressure_system()
+SolverIMPES<dim,n_phases>::solve_pressure_system()
 {
   double tol = 1e-10*rhs_vector.l2_norm();
   if (tol == 0.0)
@@ -475,9 +476,9 @@ SolverIMPES<n_phases>::solve_pressure_system()
 
 
 
-template <int n_phases>
+template <int dim, int n_phases>
 unsigned int
-SolverIMPES<n_phases>::solve_time_step(const double time_step)
+SolverIMPES<dim,n_phases>::solve_time_step(const double time_step)
 {
   assemble_pressure_system(time_step);
   unsigned int n_steps = solve_pressure_system();
@@ -490,9 +491,9 @@ SolverIMPES<n_phases>::solve_time_step(const double time_step)
 
 
 
-template <int n_phases>
+template <int dim, int n_phases>
 void
-SolverIMPES<n_phases>::
+SolverIMPES<dim,n_phases>::
 set_coupling(const DoFHandler<dim>               & solid_dof_handler,
              const TrilinosWrappers::MPI::Vector & displacement_vector,
              const TrilinosWrappers::MPI::Vector & old_displacement_vector,
@@ -507,45 +508,45 @@ set_coupling(const DoFHandler<dim>               & solid_dof_handler,
 
 
 
-template <int n_phases>
+template <int dim, int n_phases>
 const TrilinosWrappers::SparseMatrix&
-SolverIMPES<n_phases>::get_system_matrix()
+SolverIMPES<dim,n_phases>::get_system_matrix()
 {
   return system_matrix;
 }  // eom
 
 
 
-template <int n_phases>
+template <int dim, int n_phases>
 const TrilinosWrappers::MPI::Vector&
-SolverIMPES<n_phases>::get_rhs_vector()
+SolverIMPES<dim,n_phases>::get_rhs_vector()
 {
   return rhs_vector;
 }  // eom
 
 
 
-template <int n_phases>
+template <int dim, int n_phases>
 const DoFHandler<dim> &
-SolverIMPES<n_phases>::get_dof_handler()
+SolverIMPES<dim,n_phases>::get_dof_handler()
 {
   return dof_handler;
 }  // eom
 
 
 
-template <int n_phases>
+template <int dim, int n_phases>
 const FE_DGQ<dim> &
-SolverIMPES<n_phases>::get_fe()
+SolverIMPES<dim,n_phases>::get_fe()
 {
   return fe;
 }  // eom
 
 
 
-template <int n_phases>
+template <int dim, int n_phases>
 void
-SolverIMPES<n_phases>::attach_data(DataOut<dim> & data_out) const
+SolverIMPES<dim,n_phases>::attach_data(DataOut<dim> & data_out) const
 {
   // data_out.attach_dof_handler(dof_handler);
   // // scale pressure by bar/psi/whatever
@@ -560,9 +561,9 @@ SolverIMPES<n_phases>::attach_data(DataOut<dim> & data_out) const
 
 
 
-template<int n_phases>
+template<int dim, int n_phases>
 FEFunction::FEFunction<dim, TrilinosWrappers::MPI::Vector>
-SolverIMPES<n_phases>::get_pressure_saturation_function()
+SolverIMPES<dim,n_phases>::get_pressure_saturation_function()
 {
   return FEFunction::FEFunctionPS<dim,TrilinosWrappers::MPI::Vector>(dof_handler,
                                                                      pressure,
@@ -571,3 +572,5 @@ SolverIMPES<n_phases>::get_pressure_saturation_function()
 
 
 }  // end of namespace
+
+} // end wings

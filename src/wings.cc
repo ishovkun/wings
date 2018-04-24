@@ -15,40 +15,38 @@ int main(int argc, char *argv[])
 
     std::string input_file_name = Parsers::parse_command_line(argc, argv);
 
-    ConditionalOStream
-    pcout(std::cout, (Utilities::MPI::this_mpi_process(mpi_communicator) == 0));
-
     MPI_Comm mpi_communicator(MPI_COMM_WORLD);
 
+    ConditionalOStream
+        pcout(std::cout, (Utilities::MPI::this_mpi_process(mpi_communicator) == 0));
+
+    const int dim = 3;
     Model::Model<dim> model(mpi_communicator, pcout);
 
     Parsers::Reader reader(pcout, model);
-    reader.read_input(input_file, /* verbosity= */0);
+    reader.read_input(input_file_name, /* verbosity= */0);
 
-    const int dim = 3;
 
     switch (model.n_phases())
     {
-
       case 1:
       {
-        Wings::Simulator<dim, 1> simulator(model, pcout);
+        Wings::Simulator<dim, 1> simulator(model, mpi_communicator, pcout);
         simulator.run();
         break;
       }
-      case 2:
-        {
-          Wings::Simulator<dim, 2> simulator(model, pcout);
-          simulator.run();
-          break;
-        }
-      case 3:
-        {
-          Wings::Simulator<dim, 3> simulator(model, pcout);
-          simulator.run();
-          break;
-        }
-      else
+      // case 2:
+      //   {
+      //     Wings::Simulator<dim, 2> simulator(model, mpi_communicator, pcout);
+      //     simulator.run();
+      //     break;
+      //   }
+      // case 3:
+      //   {
+      //     Wings::Simulator<dim, 3> simulator(model, mpi_communicator, pcout);
+      //     simulator.run();
+      //     break;
+      //   }
     }
 
     return 0;

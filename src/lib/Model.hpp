@@ -197,8 +197,8 @@ class Model
   double                     initial_saturation_water, initial_saturation_oil;
 
   double rock_compressibility_constant;
- protected:
   std::string                input_file_name;
+ protected:
   double                     density_sc_w_constant,
                              density_sc_o_constant,
                              density_sc_g_constant,

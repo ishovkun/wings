@@ -8,6 +8,8 @@
  * local entries and essentially contains all the physics of the problem.
  */
 
+namespace Wings {
+
 namespace Equations
 {
 
@@ -89,3 +91,5 @@ class FluidEquationsBase
 
 
 }  // end of namespace
+
+}   // end wings

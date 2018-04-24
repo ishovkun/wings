@@ -69,8 +69,8 @@ class Simulator
 
 template <int dim, int n_phases>
 Simulator<dim,n_phases>::Simulator(Model::Model<dim>  & model,
-                          MPI_Comm           & mpi_communicator,
-                          ConditionalOStream & pcout)
+                                   MPI_Comm           & mpi_communicator,
+                                   ConditionalOStream & pcout)
     :
     mpi_communicator(mpi_communicator),
     triangulation(mpi_communicator),
@@ -83,7 +83,7 @@ Simulator<dim,n_phases>::Simulator(Model::Model<dim>  & model,
 
 
 
-template <int dim>
+template<int dim, int n_phases>
 void Simulator<dim,n_phases>::create_mesh()
 {
   const auto & p1 = model.mesh_config.points.first;
@@ -145,7 +145,7 @@ void Simulator<dim,n_phases>::create_mesh()
   grid_out.set_flags(flags);
   // std::ofstream out ("bl-mesh.vtk ");
   // grid_out.write_vtk(triangulation, out);
-  std::ofstream out(input_file + ".msh");
+  std::ofstream out(model.input_file_name + ".msh");
   grid_out.write_msh(triangulation, out);
 
   GridTools::scale(model.units.length(), triangulation);
@@ -294,10 +294,12 @@ void Simulator<dim,n_phases>::run()
   output_helper.prepare_output_directories();
 
 
-  Probe::Probe<n_phases> probe(model);
+  Probe::Probe<dim,n_phases> probe(model);
 
   // make solvers
-  SolverBuilder builder(model, probe, mpi_communicator, triangulation, pcout);
+  SolverBuilder<dim,n_phases> builder(model, probe,
+                                      mpi_communicator,
+                                      triangulation, pcout);
   builder.build_solvers();
 
   std::shared_ptr<FluidSolvers::FluidSolverBase> fluid_solver =

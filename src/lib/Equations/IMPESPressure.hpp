@@ -1,9 +1,13 @@
 #pragma once
 
 #include <Model.hpp>
+#include <Probe.hpp>
 #include <Math.hpp>
 
 #include <Equations/FluidEquationsBase.hpp>
+
+
+namespace Wings {
 
 
 namespace Equations
@@ -12,12 +16,12 @@ using namespace dealii;
 
 // static const int dim = 3;
 
-// class IMPESPressure : public FluidEquationsBase<dim>
 template <int n_phases>
 class IMPESPressure : public FluidEquationsBase
 {
  public:
-  IMPESPressure(const Model::Model<dim> &model_);
+  IMPESPressure(const Model::Model<dim>     & model,
+                Probe::Probe<dim,n_phases>  & probe);
   /* Update storage vectors and values for the current cell */
   virtual void update_cell_values(const CellIterator<dim> & cell,
                                   const SolutionValues    & solution_values) override;
@@ -60,7 +64,8 @@ class IMPESPressure : public FluidEquationsBase
                                     const int /* phase */ = 0) const override;
 
  public:
-  const Model::Model<dim>     & model;        // reference to the model object
+  const Model::Model<dim>          & model;        // reference to the model object
+  const Probe::Probe<dim,n_phases> & probe;        // reference to the probe object
   Point<dim>                    location;     // cell center coordinates
   // Tensor<1,n_phases>            rel_perm;           // productivity indices for phases and segments
   SymmetricTensor<2,dim>        perm;
@@ -135,10 +140,12 @@ class IMPESPressure : public FluidEquationsBase
 
 template <int n_phases>
 IMPESPressure<n_phases>::
-IMPESPressure(const Model::Model<dim> &model)
+IMPESPressure(const Model::Model<dim>    & model,
+              Probe::Probe<dim,n_phases> & probe)
     :
     FluidEquationsBase::FluidEquationsBase(),
     model(model),
+    probe(probe),
     rel_perm(n_phases),
     pvt_values(n_phases)
 {}
@@ -763,3 +770,5 @@ IMPESPressure<1>::get_rhs_face_entry(const double,
 // } // eom
 
 } // end namespace
+
+} // end wings

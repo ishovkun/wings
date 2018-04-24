@@ -16,21 +16,18 @@ namespace Wings
 using namespace dealii;
 
 
-static const int dim = 3;
-
-
+template<int dim, int n_phases>
 class SolverBuilder
 {
  public:
   SolverBuilder(const Model::Model<dim>                   & model,
-                Probe::Probe                              & probe,
+                Probe::Probe<dim,n_phases>                & probe,
                 MPI_Comm                                  & mpi_communicator,
                 parallel::distributed::Triangulation<dim> & triangulation,
                 ConditionalOStream                        & pcout);
 
   void build_solvers();
 
-  // FluidSolvers::FluidSolverBase<dim>
   std::shared_ptr<FluidSolvers::FluidSolverBase>   get_fluid_solver();
   std::shared_ptr<SolidSolvers::SolidSolverBase>   get_solid_solver();
 
@@ -39,7 +36,8 @@ class SolverBuilder
   void build_solid_solver();
   void couple_solvers();
 
-  const Model::Model<dim> & model;
+  const Model::Model<dim>                   & model;
+  Probe::Probe<dim,n_phases>                & probe;
   MPI_Comm                                  & mpi_communicator;
   parallel::distributed::Triangulation<dim> & triangulation;
   ConditionalOStream                        & pcout;
@@ -51,14 +49,16 @@ class SolverBuilder
 
 
 
-SolverBuilder::
+template<int dim, int n_phases>
+SolverBuilder<dim,n_phases>::
 SolverBuilder(const Model::Model<dim>                   & model,
-              Probe::Probe                              & probe,
+              Probe::Probe<dim,n_phases>                & probe,
               MPI_Comm                                  & mpi_communicator,
               parallel::distributed::Triangulation<dim> & triangulation,
               ConditionalOStream                        & pcout)
     :
     model(model),
+    probe(probe),
     mpi_communicator(mpi_communicator),
     triangulation(triangulation),
     pcout(pcout)
@@ -66,47 +66,59 @@ SolverBuilder(const Model::Model<dim>                   & model,
 
 
 
-void SolverBuilder::build_fluid_solver()
+template<int dim, int n_phases>
+void SolverBuilder<dim,n_phases>::build_fluid_solver()
 {
-  switch(model.n_phases())
-  {
-    case 1:
-      {
-        Equations::IMPESPressure<1> implicit_pressure(model);
-        Equations::IMPESSaturation<1> explicit_saturation(model);
-        fluid_solver =
-            std::make_shared<FluidSolvers::SolverIMPES<1>>
+  Equations::IMPESPressure<n_phases> implicit_pressure(model, probe);
+  Equations::IMPESSaturation<n_phases> explicit_saturation(model, probe);
+  fluid_solver =
+      std::make_shared<FluidSolvers::SolverIMPES<dim,n_phases>>
             (mpi_communicator,
              triangulation,
              model,
              pcout,
              implicit_pressure,
              explicit_saturation);
-        break;
-      }
+  // switch(model.n_phases())
+  // {
+  //   case 1:
+  //     {
+  //       Equations::IMPESPressure<1> implicit_pressure(model, probe);
+  //       Equations::IMPESSaturation<1> explicit_saturation(model, probe);
+  //       fluid_solver =
+  //           std::make_shared<FluidSolvers::SolverIMPES<dim,1>>
+  //           (mpi_communicator,
+  //            triangulation,
+  //            model,
+  //            pcout,
+  //            implicit_pressure,
+  //            explicit_saturation);
+  //       break;
+  //     }
 
-    case 2:
-      {
-        throw(ExcNotImplemented());
-        break;
-      }
+  //   case 2:
+  //     {
+  //       throw(ExcNotImplemented());
+  //       break;
+  //     }
 
-    case 3:
-      {
-        throw(ExcNotImplemented());
-        break;
-      }
+  //   case 3:
+  //     {
+  //       throw(ExcNotImplemented());
+  //       break;
+  //     }
 
-    default:
-      {
-        throw(ExcMessage("fluid solver undefined"));
-      }
-  } // end switch
+  //   default:
+  //     {
+  //       throw(ExcMessage("fluid solver undefined"));
+  //     }
+  // } // end switch
 } // eom
 
 
 
-void SolverBuilder::couple_solvers()
+template<int dim, int n_phases>
+void SolverBuilder<dim,n_phases>::couple_solvers()
 {
   if (model.solid_model != Model::SolidModelType::Compressibility)
   {
@@ -122,7 +134,8 @@ void SolverBuilder::couple_solvers()
 
 
 
-void SolverBuilder::build_solid_solver()
+template<int dim, int n_phases>
+void SolverBuilder<dim,n_phases>::build_solid_solver()
 {
   // build solid solver
   switch(model.solid_model)
@@ -152,7 +165,8 @@ void SolverBuilder::build_solid_solver()
 
 
 
-void SolverBuilder::build_solvers()
+template<int dim, int n_phases>
+void SolverBuilder<dim,n_phases>::build_solvers()
 {
 
   build_fluid_solver();
@@ -162,16 +176,18 @@ void SolverBuilder::build_solvers()
 
 
 
+template<int dim, int n_phases>
 std::shared_ptr<FluidSolvers::FluidSolverBase>
-SolverBuilder::get_fluid_solver()
+SolverBuilder<dim,n_phases>::get_fluid_solver()
 {
   return fluid_solver;
 }  // eom
 
 
 
+template<int dim, int n_phases>
 std::shared_ptr<SolidSolvers::SolidSolverBase>
-SolverBuilder::get_solid_solver()
+SolverBuilder<dim,n_phases>::get_solid_solver()
 {
   return solid_solver;
 }  // eom

@@ -2,6 +2,7 @@
 
 #include <Equations/IMPESPressure.hpp>
 
+namespace Wings {
 
 namespace Equations
 {
@@ -16,7 +17,8 @@ template <int n_phases>
 class IMPESSaturation : public IMPESPressure<n_phases>
 {
  public:
-  IMPESSaturation(const Model::Model<dim> &model);
+  IMPESSaturation(const Model::Model<dim>     & model,
+                  Probe::Probe<dim,n_phases>  & probe);
   /* Update storage vectors and values for the current face */
   virtual void update_face_values(const CellIterator<dim> & neighbor_cell,
                                   const SolutionValues    & solution_values,
@@ -41,9 +43,11 @@ class IMPESSaturation : public IMPESPressure<n_phases>
 
 
 template <int n_phases>
-IMPESSaturation<n_phases>::IMPESSaturation(const Model::Model<dim> &model_)
+IMPESSaturation<n_phases>::
+IMPESSaturation(const Model::Model<dim>    & model,
+                Probe::Probe<dim,n_phases> & probe)
     :
-    IMPESPressure<n_phases>::IMPESPressure(model_)
+    IMPESPressure<n_phases>::IMPESPressure(model, probe)
 {}
 
 
@@ -104,3 +108,5 @@ get_rhs_cell_entry(const double time_step,
 }  // eom
 
 }  // end of namespace
+
+} // end wings

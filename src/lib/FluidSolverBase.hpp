@@ -2,6 +2,8 @@
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/fe/fe_values.h>
 
+namespace Wings {
+
 namespace FluidSolvers
 {
 using namespace dealii;
@@ -34,3 +36,5 @@ class FluidSolverBase
 };
 
 } // end of namespace
+
+} // end wings
