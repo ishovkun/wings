@@ -9,7 +9,7 @@ namespace Wings
       struct SolutionValues
       {
         dealii::Tensor<1,n_phases> saturation;
-        double pressure;
+        double pressure, old_pressure;
         dealii::Tensor<2, dim> grad_u, grad_old_u;
       };
 

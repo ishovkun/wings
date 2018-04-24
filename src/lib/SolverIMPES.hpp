@@ -96,6 +96,8 @@ class SolverIMPES : public FluidSolverBase<dim,n_phases>
   parallel::distributed::Triangulation<dim> & triangulation;
   DoFHandler<dim>                             dof_handler;
   FE_DGQ<dim>                                 fe;
+  FEValues<dim>                               fe_values;
+  std::vector<double>                         vector_values;
   const Model::Model<dim>                   & model;
   ConditionalOStream                        & pcout;
 
@@ -138,6 +140,8 @@ SolverIMPES(MPI_Comm                                  & mpi_communicator_,
     triangulation(triangulation_),
     dof_handler(triangulation_),
     fe(0), // since we want finite volumes
+    fe_values(fe, QGauss<dim>(1), update_values),
+    vector_values(1),
     model(model_),
     pcout(pcout_),
     // saturation_solution(model.n_phases()),
@@ -582,7 +586,22 @@ SolverIMPES<dim,n_phases>::extract_solution_data
 (const typename DoFHandler<dim>::active_cell_iterator & cell,
  SolutionValues<dim,n_phases>                         & solution_values)
 {
-  throw(ExcNotImplemented());
+  // throw(ExcNotImplemented());
+  fe_values.reinit(cell);
+
+  const unsigned int q_point = 0;
+
+  fe_values.get_function_values(pressure, vector_values);
+  solution_values.pressure = vector_values[q_point];
+
+  fe_values.get_function_values(pressure_old, vector_values);
+  solution_values.old_pressure = vector_values[q_point];
+
+  for (int phase < n_phases)
+  {
+    fe_values.get_function_values(saturation[phase], vector_values);
+    solution_values.saturation[phase] = vector_values[q_point];
+  }
 } // eom
 
 }  // end of namespace
