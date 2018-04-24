@@ -35,7 +35,7 @@ class FluidSolverBase
   // needed for probe class
   virtual void extract_solution_data
   (const typename DoFHandler<dim>::active_cell_iterator & cell,
-   SolutionValues<dim,n_phases>                         & solution_values);
+   SolutionValues<dim,n_phases>                         & solution_values) = 0;
 };
 
 } // end of namespace

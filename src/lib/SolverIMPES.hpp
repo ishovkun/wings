@@ -80,7 +80,7 @@ class SolverIMPES : public FluidSolverBase<dim,n_phases>
   /* */
   void extract_solution_data
   (const typename dealii::DoFHandler<dim>::active_cell_iterator & cell,
-   SolutionValues<dim,n_phases>                                 & solution_values);
+   SolutionValues<dim,n_phases>                                 & solution_values) override;
 
   FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>
   get_pressure_saturation_function();
@@ -574,6 +574,16 @@ SolverIMPES<dim,n_phases>::get_pressure_saturation_function()
                                                                      saturation);
 }  // end get_pressure_saturation_function
 
+
+
+template<int dim, int n_phases>
+void
+SolverIMPES<dim,n_phases>::extract_solution_data
+(const typename DoFHandler<dim>::active_cell_iterator & cell,
+ SolutionValues<dim,n_phases>                         & solution_values)
+{
+  throw(ExcNotImplemented());
+} // eom
 
 }  // end of namespace
 
