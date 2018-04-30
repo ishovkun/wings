@@ -16,7 +16,11 @@
 #include <RelativePermeability.hpp>
 
 
-namespace Model
+namespace Wings
+{
+
+
+namespace Wellbore
 {
 using namespace dealii;
 
@@ -25,22 +29,47 @@ template <int dim>
 using CellIterator = typename DoFHandler<dim>::active_cell_iterator;
 
 
-template <int dim>
+template<int dim>
+struct WellInfo
+{
+  WellInfo();
+  WellInfo(const double                      radius,
+           const std::vector< Point<dim> > & locations,
+           const std::string                 name = "") :
+      name(name),
+      radius(radius),
+      locations(locations) {}
+
+  void set_info(const double                      radius,
+                const std::vector< Point<dim> > & locations,
+                const std::string                 name = "")
+  {
+    this->name = name;
+    this->radius = radius;
+    this->locations = locations;
+  }
+
+  std::string             name;
+  double                  radius;
+  std::vector<Point<dim>> locations;
+};
+
+
+template <int dim, int n_phases>
 class Wellbore : public Function<dim>
 {
  public:
-  Wellbore(const std::vector< Point<dim> >&                      locations_,
-           const double                                          radius_,
-           MPI_Comm                                             &mpi_communicator_,
-           const Function<dim>                                  &get_permeability,
-           const RelativePermeability                           &relative_permeability,
-           const std::vector<const Interpolation::LookupTable*> &pvt_tables);
+  Wellbore(const std::vector< Point<dim> >                      & locations_,
+           const double                                           radius_,
+           MPI_Comm                                             & mpi_communicator);
 
   // set data methods
   // set control method (pressure, flow), control value, etc.
   void set_control(const Schedule::WellControl& control_);
   // get well know where to get p and s from to compute productivity
   void set_pressure_saturation_function(const Function<dim> &f);
+  // give the access to solution variable
+  void set_probe();
   // access methods
   double                                  get_radius() const;
   // get current controlling parameters
@@ -128,21 +157,21 @@ class Wellbore : public Function<dim>
    * Tells whether the well should be placed in the current cell or the wellbore.
    * Useful for wells located exactly on between two cells.
    */
-  bool neighbor_is_farther(const Tensor<1,dim> &cell_to_wellbore,
-                           const Tensor<1,dim> &neighbor_to_wellbore,
-                           const unsigned int  cell_index,
-                           const unsigned int  neighbor_index,
-                           const double        tolerance) const;
+  bool neighbor_is_farther(const Tensor<1,dim> & cell_to_wellbore,
+                           const Tensor<1,dim> & neighbor_to_wellbore,
+                           const unsigned int    cell_index,
+                           const unsigned int    neighbor_index,
+                           const double          tolerance) const;
   // Checks if a vector is aligned with a face
-  bool aligned_with_face(const Tensor<1,dim> &cell_to_wellbore,
-                         const Tensor<1,dim> &face_normal) const;
+  bool aligned_with_face(const Tensor<1,dim> & cell_to_wellbore,
+                         const Tensor<1,dim> & face_normal) const;
 
   // variables
-  std::vector< Point<dim> >                             locations;
-  double                                                radius;
-  MPI_Comm                                             &mpi_communicator;
-  const Function<dim>                                  &get_permeability;
-  const RelativePermeability                           &relative_permeability;
+  std::vector< Point<dim> >  locations;
+  double                     radius;
+  MPI_Comm                 & mpi_communicator;
+  // const Function<dim>                                  &get_permeability;
+  // const RelativePermeability                           &relative_permeability;
   // I'm making this this not-a-ref because the original object is destroyed
   // should't be too heavy
   const std::vector<const Interpolation::LookupTable*>  pvt_tables;
@@ -158,8 +187,8 @@ class Wellbore : public Function<dim>
 };  // eom
 
 
-template <int dim>
-Wellbore<dim>::Wellbore(const std::vector< Point<dim> >&                      locations,
+template <int dim, int n_phases>
+Wellbore<dim,n_phases>::Wellbore(const std::vector< Point<dim> >&                      locations,
                         const double                                          radius,
                         MPI_Comm                                             &mpi_communicator,
                         const Function<dim>                                  &get_permeability,
@@ -191,47 +220,47 @@ Wellbore<dim>::Wellbore(const std::vector< Point<dim> >&                      lo
 
 
 
-template <int dim>
+template <int dim, int n_phases>
 inline
-void Wellbore<dim>::set_control(const Schedule::WellControl& control_)
+void Wellbore<dim,n_phases>::set_control(const Schedule::WellControl& control_)
 {
   control = control_;
 }  // eom
 
 
 
-template <int dim>
+template <int dim, int n_phases>
 inline
 const Schedule::WellControl &
-Wellbore<dim>::get_control()
+Wellbore<dim,n_phases>::get_control()
 {
   return this->control;
 }  // eom
 
 
 
-template <int dim>
+template <int dim, int n_phases>
 inline
 double
-Wellbore<dim>::get_radius() const
+Wellbore<dim,n_phases>::get_radius() const
 {
   return radius;
 }  // eom
 
 
 
-template <int dim>
+template <int dim, int n_phases>
 inline
 const std::vector<CellIterator<dim>> &
-Wellbore<dim>::get_cells()
+Wellbore<dim,n_phases>::get_cells()
 {
   return cells;
 }  // eom
 
 
 
-template <int dim>
-inline bool Wellbore<dim>::
+template <int dim, int n_phases>
+inline bool Wellbore<dim,n_phases>::
 neighbor_is_farther(const Tensor<1,dim> &cell_to_wellbore,
                     const Tensor<1,dim> &neighbor_to_wellbore,
                     const unsigned int  cell_index,
@@ -257,8 +286,8 @@ neighbor_is_farther(const Tensor<1,dim> &cell_to_wellbore,
 
 
 
-template <int dim>
-inline bool Wellbore<dim>::
+template <int dim, int n_phases>
+inline bool Wellbore<dim,n_phases>::
 aligned_with_face(const Tensor<1,dim> &cell_to_wellbore,
                   const Tensor<1,dim> &face_normal) const
 {
@@ -272,8 +301,8 @@ aligned_with_face(const Tensor<1,dim> &cell_to_wellbore,
 
 
 
-template <int dim>
-void Wellbore<dim>::locate(const DoFHandler<dim>& dof_handler)
+template <int dim, int n_phases>
+void Wellbore<dim,n_phases>::locate(const DoFHandler<dim,n_phases>& dof_handler)
 {
   /* Algorithm:
      I. if just one well location, add cell that contains the point.
@@ -503,8 +532,8 @@ void Wellbore<dim>::locate(const DoFHandler<dim>& dof_handler)
 
 
 
-template <int dim>
-bool Wellbore<dim>::
+template <int dim, int n_phases>
+bool Wellbore<dim,n_phases>::
 point_inside_cell(const CellIterator<dim> &cell,
                   const Point<dim>        &p)
 {
@@ -525,8 +554,8 @@ point_inside_cell(const CellIterator<dim> &cell,
 
 
 
-template <int dim>
-double Wellbore<dim>::
+template <int dim, int n_phases>
+double Wellbore<dim,n_phases>::
 get_segment_length(const Point<dim>                       &start,
                    const CellIterator<dim>                &cell,
                    const Tensor<1,dim>                    &tangent,
@@ -574,17 +603,17 @@ get_segment_length(const Point<dim>                       &start,
 
 
 
-template <int dim>
+template <int dim, int n_phases>
 const std::vector< Point<dim> > &
-Wellbore<dim>::get_locations()
+Wellbore<dim,n_phases>::get_locations()
 {
   return locations;
 } // eom
 
 
 
-template <int dim>
-int Wellbore<dim>::find_cell(const CellIterator<dim> & cell) const
+template <int dim, int n_phases>
+int Wellbore<dim,n_phases>::find_cell(const CellIterator<dim> & cell) const
 {
   /*
     Returns index in this->wells, segment_length, segment_direction
@@ -603,9 +632,9 @@ int Wellbore<dim>::find_cell(const CellIterator<dim> & cell) const
 
 
 
-template <int dim>
+template <int dim, int n_phases>
 void
-Wellbore<dim>::get_cell_size(FEFaceValues<dim> &fe_face_values,
+Wellbore<dim,n_phases>::get_cell_size(FEFaceValues<dim> &fe_face_values,
                              const CellIterator<dim> &cell,
                              Tensor<1,dim> &h) const
 { // compute size of one cell into h
@@ -636,9 +665,9 @@ Wellbore<dim>::get_cell_size(FEFaceValues<dim> &fe_face_values,
 
 
 
-template <int dim>
+template <int dim, int n_phases>
 std::vector< Tensor<1,dim> >
-Wellbore<dim>::
+Wellbore<dim,n_phases>::
 get_cell_sizes(const std::vector<CellIterator<dim>> &cells_) const
 { // compute cell sizes for the cells in the cells_ vector
   /*
@@ -666,17 +695,17 @@ get_cell_sizes(const std::vector<CellIterator<dim>> &cells_) const
 
 
 
-template <int dim>
+template <int dim, int n_phases>
 std::vector< std::vector<double> > &
-Wellbore<dim>:: get_productivities()
+Wellbore<dim,n_phases>:: get_productivities()
 {
   return productivities;
 } // eom
 
 
 
-template <int dim>
-void Wellbore<dim>::
+template <int dim, int n_phases>
+void Wellbore<dim,n_phases>::
 update_productivity()
 {
   /*
@@ -751,9 +780,9 @@ update_productivity()
 
 
 
-template <int dim>
+template <int dim, int n_phases>
 inline
-double Wellbore<dim>::compute_productivity(const double k1,
+double Wellbore<dim,n_phases>::compute_productivity(const double k1,
                                            const double k2,
                                            const double dx1,
                                            const double dx2,
@@ -775,9 +804,9 @@ double Wellbore<dim>::compute_productivity(const double k1,
 
 
 
-template <int dim>
+template <int dim, int n_phases>
 std::pair<double,double>
-Wellbore<dim>::get_J_and_Q(const CellIterator<dim> & cell,
+Wellbore<dim,n_phases>::get_J_and_Q(const CellIterator<dim> & cell,
                            const unsigned int phase) const
 {
   /*
@@ -849,9 +878,9 @@ Wellbore<dim>::get_J_and_Q(const CellIterator<dim> & cell,
 
 
 
-template<int dim>
+template <int dim, int n_phases>
 double
-Wellbore<dim>::get_flow_rate(const CellIterator<dim> & cell,
+Wellbore<dim,n_phases>::get_flow_rate(const CellIterator<dim> & cell,
                              const double              cell_pressure,
                              const unsigned int        phase) const
 {
@@ -867,12 +896,14 @@ Wellbore<dim>::get_flow_rate(const CellIterator<dim> & cell,
 
 
 
-template<int dim>
+template <int dim, int n_phases>
 void
-Wellbore<dim>::set_pressure_saturation_function(const Function<dim> &f)
+Wellbore<dim,n_phases>::set_pressure_saturation_function(const Function<dim> &f)
 {
   p_pres_sat_func = & f;
 }  // end set_pressure_saturation_function
 
 
 }  // end of namespace
+
+}  // end wings

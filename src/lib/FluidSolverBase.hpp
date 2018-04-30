@@ -17,6 +17,7 @@ class FluidSolverBase
 {
  public:
   virtual void setup_dofs() = 0;
+  virtual void solve_initialization_step() = 0;
   virtual unsigned int solve_time_step(const double time_step) = 0;
   // virtual void revert_to_old_time_step() = 0;
   // save old iter solution for comparison

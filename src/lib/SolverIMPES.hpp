@@ -61,6 +61,7 @@ class SolverIMPES : public FluidSolverBase<dim,n_phases>
    * solve linear system syste_matrix*pressure_solution = rhs_vector
    * returns the number of solver steps
    */
+  void solve_initialization_step() override;
   unsigned int solve_pressure_system();
   /*
    * Solve pressure system, and then explicitly solve
@@ -499,6 +500,21 @@ SolverIMPES<dim,n_phases>::solve_time_step(const double time_step)
 
 
 
+template<int dim, int n_phases>
+void
+SolverIMPES<dim,n_phases>::solve_initialization_step()
+{
+  pressure = model.reference_pressure;
+
+  if (n_phases > 1)
+    saturation[0] = model.initial_saturation_water;
+  // if (n_phases > 2)
+  //   saturation[0] = model.initial_saturation_water;
+
+}  // end solve_initialization_step
+
+
+
 template <int dim, int n_phases>
 void
 SolverIMPES<dim,n_phases>::
@@ -597,7 +613,7 @@ SolverIMPES<dim,n_phases>::extract_solution_data
   fe_values.get_function_values(pressure_old, vector_values);
   solution_values.old_pressure = vector_values[q_point];
 
-  for (int phase < n_phases)
+  for (int phase = 0; phase < n_phases; ++phase)
   {
     fe_values.get_function_values(saturation[phase], vector_values);
     solution_values.saturation[phase] = vector_values[q_point];

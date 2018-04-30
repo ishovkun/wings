@@ -8,7 +8,6 @@
 #include <deal.II/base/conditional_ostream.h>
 
 // Custom modules
-#include <Wellbore.hpp>
 #include <Parsers.hpp>
 #include <BitMap/BitMapFunction.hpp>
 #include <BitMap/BitMapTensorFunction.hpp>

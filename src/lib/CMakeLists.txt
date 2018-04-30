@@ -36,7 +36,8 @@ ADD_LIBRARY(wings SHARED
   Schedule.hpp
   DefaultValues.h
   LookupTable.hpp
-  Wellbore.hpp
+  Wellbore/Wellbore.hpp
+  Wellbore/Wells.hpp
   OutputHelper.hpp
   ScaleOutputVector.hpp
 )

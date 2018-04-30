@@ -8,7 +8,8 @@
 #include <boost/algorithm/string.hpp>
 
 // Custom modules
-#include <Wellbore.hpp>
+// #include <Wellbore.hpp>
+#include <Wellbore/Wellbore.hpp>
 #include <Parsers.hpp>
 // #include <BitMap.hpp>
 #include <Units.h>
@@ -103,9 +104,9 @@ class Model
   void set_rock_compressibility(const double x) {rock_compressibility_constant = x;}
   void set_density_sc_w(const double x) {density_sc_w_constant = x;}
   void set_density_sc_o(const double x) {density_sc_o_constant = x;}
-  void add_well(const std::string name,
-                const double radius,
-                const std::vector< Point<dim> > &locations);
+  void add_well(const std::string                 name,
+                const double                      radius,
+                const std::vector< Point<dim> > & locations);
   void set_solid_dirichlet_boundary_conditions(const std::vector<int>    & labels,
                                                const std::vector<int>    & components,
                                                const std::vector<double> & values);
@@ -142,7 +143,7 @@ class Model
   std::vector<int> get_well_ids() const;
   void get_relative_permeability(const Vector<double> & saturation,
                                  std::vector<double>  & dst) const;
-  int get_well_id(const std::string& well_name) const;
+  int get_well_id(const std::string & well_name) const;
   std::pair<double,double> get_saturation_limits(const unsigned int phase) const;
 
   const Interpolation::LookupTable &
@@ -154,10 +155,10 @@ class Model
   FluidCouplingStrategy coupling_strategy() const;
 
   // update methods
-  void update_well_controls(const double time);
-  void locate_wells(const DoFHandler<dim>& dof_handler);
-  void update_well_productivities(const Function<dim> &get_pressure,
-                                  const Function<dim> &get_saturation);
+  // void update_well_controls(const double time);
+  // void locate_wells(const DoFHandler<dim>& dof_handler);
+  // void update_well_productivities(const Function<dim> &get_pressure,
+  //                                 const Function<dim> &get_saturation);
 
   void compute_runtime_parameters();
   const std::vector<const Interpolation::LookupTable*> get_pvt_tables() const;
@@ -178,7 +179,8 @@ class Model
   std::vector< std::pair< Point<dim>,Point<dim> > >
   local_prerefinement_region;
   Units::Units               units;
-  std::vector<Wellbore<dim>> wells;
+  // std::vector<Wellbore<dim>> wells;
+  std::vector<Wellbore::WellInfo<dim>> wells;
   Schedule::Schedule         schedule;
   double                     coupling_tolerance,
                              min_time_step,
@@ -210,6 +212,7 @@ class Model
                              pvt_table_gas;
   RelativePermeability       rel_perm;
   std::vector<Phase>         phases;
+
  private:
   std::map<double, double>   timestep_table;
   std::map<std::string, int> well_ids;
@@ -324,7 +327,7 @@ double Model<dim>::gravity() const
 
 
 template <int dim>
-int Model<dim>::get_well_id(const std::string& well_name) const
+int Model<dim>::get_well_id(const std::string & well_name) const
 {
   return well_ids.find(well_name)->second;
 } // eom
@@ -358,13 +361,12 @@ const std::vector<const Interpolation::LookupTable*> Model<dim>::get_pvt_tables(
 
 
 template <int dim>
-void Model<dim>::add_well(const std::string name,
-                          const double radius,
-                          const std::vector< Point<dim> > &locations)
+void Model<dim>::add_well(const std::string                 name,
+                          const double                      radius,
+                          const std::vector< Point<dim> > & locations)
 {
-  // Wellbore<dim> w(locations, radius, mpi_communicator,
-  //                 *get_permeability, rel_perm, get_pvt_tables());
-  // this->wells.push_back(w);
+  // Wellbore::WellInfo<dim> well(radius, locations, name);
+  this->wells.push_back(Wellbore::WellInfo<dim>(radius, locations, name));
 
   // check if well_id is in unique_well_ids and add if not
   if (well_ids.empty())
@@ -399,7 +401,6 @@ void Model<dim>::locate_wells(const DoFHandler<dim>& dof_handler)
 {
   for (unsigned int i=0; i<wells.size(); i++)
   {
-    // std::cout << "well " << i << std::endl;
     wells[i].locate(dof_handler);
   }
 } // eom
