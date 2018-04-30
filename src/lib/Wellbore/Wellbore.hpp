@@ -9,11 +9,13 @@
 #include <deal.II/base/quadrature_lib.h>
 #include <math.h>
 
+#include <WellInfo.hpp>
 #include <DefaultValues.h>
-#include <Schedule.hpp>
+#include <Wellbore/Schedule.hpp>
 #include <Math.hpp>
-#include <LookupTable.hpp>
-#include <RelativePermeability.hpp>
+// #include <LookupTable.hpp>
+// #include <RelativePermeability.hpp>
+#include <Probe.hpp>
 
 
 namespace Wings
@@ -29,45 +31,20 @@ template <int dim>
 using CellIterator = typename DoFHandler<dim>::active_cell_iterator;
 
 
-template<int dim>
-struct WellInfo
-{
-  WellInfo();
-  WellInfo(const double                      radius,
-           const std::vector< Point<dim> > & locations,
-           const std::string                 name = "") :
-      name(name),
-      radius(radius),
-      locations(locations) {}
-
-  void set_info(const double                      radius,
-                const std::vector< Point<dim> > & locations,
-                const std::string                 name = "")
-  {
-    this->name = name;
-    this->radius = radius;
-    this->locations = locations;
-  }
-
-  std::string             name;
-  double                  radius;
-  std::vector<Point<dim>> locations;
-};
-
-
 template <int dim, int n_phases>
 class Wellbore : public Function<dim>
 {
  public:
-  Wellbore(const std::vector< Point<dim> >                      & locations_,
-           const double                                           radius_,
-           MPI_Comm                                             & mpi_communicator);
+  Wellbore(const std::vector< Point<dim> > & locations,
+           const double                      radius,
+           Probe::Probe<dim,n_phases>      & probe,
+           MPI_Comm                        & mpi_communicator);
 
   // set data methods
   // set control method (pressure, flow), control value, etc.
-  void set_control(const Schedule::WellControl& control_);
+  void set_control(const Schedule::WellControl & control_);
   // get well know where to get p and s from to compute productivity
-  void set_pressure_saturation_function(const Function<dim> &f);
+  void set_pressure_saturation_function(const Function<dim> & f);
   // give the access to solution variable
   void set_probe();
   // access methods
@@ -90,7 +67,7 @@ class Wellbore : public Function<dim>
    * If a wellbore is initialized with more than one point,
    * it is considered to consists of segments.
    */
-  void locate(const DoFHandler<dim>& dof_handler);
+  void locate(const DoFHandler<dim> & dof_handler);
   /*
    * get matrix and rhs entries for pressure solver.
    * rhs (Q) entry:
@@ -120,8 +97,8 @@ class Wellbore : public Function<dim>
    * tolerance on the face because sometimes the deal.ii method
    * sometimes lies (when the point is on the cell edge).
    */
-  static bool point_inside_cell(const CellIterator<dim> &cell,
-                                const Point<dim>        &p);
+  static bool point_inside_cell(const CellIterator<dim> & cell,
+                                const Point<dim>        & p);
 
 
  private:
@@ -133,22 +110,22 @@ class Wellbore : public Function<dim>
    * assuming the point is in the cell, compute
    * the length of the wellbore in this cell
    */
-  double get_segment_length(const Point<dim>                       &start,
-                            const CellIterator<dim>                &cell,
-                            const Tensor<1,dim>                    &tangent,
-                            const std::pair<Point<dim>,Point<dim>> &end_points);
+  double get_segment_length(const Point<dim>                       & start,
+                            const CellIterator<dim>                & cell,
+                            const Tensor<1,dim>                    & tangent,
+                            const std::pair<Point<dim>,Point<dim>> & end_points);
   /*
    * compute a triplet dx, dy, dz for the cell.
    * Haven't checked how it works for non-orthogonal cells.
    */
-  void get_cell_size(FEFaceValues<dim> &fe_face_values,
-                     const CellIterator<dim> &cell,
-                     Tensor<1,dim> &h) const;
+  void get_cell_size(FEFaceValues<dim>       & fe_face_values,
+                     const CellIterator<dim> & cell,
+                     Tensor<1,dim>           & h) const;
   /*
    * Same as the previous method but for a vector of cells
    */
   std::vector< Tensor<1,dim> >
-  get_cell_sizes(const std::vector<CellIterator<dim>> &cells_) const;
+  get_cell_sizes(const std::vector<CellIterator<dim>> & cells_) const;
 
   // Check if the list of wellbore cells contains the cell
   int find_cell(const CellIterator<dim> & cell) const;
@@ -175,33 +152,30 @@ class Wellbore : public Function<dim>
   // I'm making this this not-a-ref because the original object is destroyed
   // should't be too heavy
   const std::vector<const Interpolation::LookupTable*>  pvt_tables;
-  int                                n_phases;
   Schedule::WellControl              control;
-  const DoFHandler<dim>              *p_dof_handler;
+  const DoFHandler<dim>            * p_dof_handler;
   std::vector<CellIterator<dim>>     cells;
   std::vector<double>                segment_length;
   std::vector< Tensor<1,dim> >       segment_direction;
   std::vector< std::vector<double> > productivities;
   Vector<double>                     total_productivity;
-  const Function<dim> * p_pres_sat_func;
+  const Function<dim>              * p_pres_sat_func;
 };  // eom
 
 
 template <int dim, int n_phases>
-Wellbore<dim,n_phases>::Wellbore(const std::vector< Point<dim> >&                      locations,
-                        const double                                          radius,
-                        MPI_Comm                                             &mpi_communicator,
-                        const Function<dim>                                  &get_permeability,
-                        const RelativePermeability                           &relative_permeability,
-                        const std::vector<const Interpolation::LookupTable*> &pvt_tables)
+Wellbore<dim,n_phases>::Wellbore(const std::vector< Point<dim> > & locations,
+                                 const double                      radius,
+                                 Probe::Probe<dim,n_phases>      & probe,
+                                 MPI_Comm                        &  mpi_communicator)
     :
     locations(locations),
     radius(radius),
     mpi_communicator(mpi_communicator),
-    get_permeability(get_permeability),
-    relative_permeability(relative_permeability),
-    pvt_tables(pvt_tables),
-    n_phases(pvt_tables.size()),
+    // get_permeability(get_permeability),
+    // relative_permeability(relative_permeability),
+    // pvt_tables(pvt_tables),
+    // n_phases(pvt_tables.size()),
     total_productivity(n_phases)
 {
   // AssertThrow(pvt_tables.size() == 2, ExcMessage("how many phases do you have man?"));

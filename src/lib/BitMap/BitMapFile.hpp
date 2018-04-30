@@ -7,6 +7,9 @@
 
 #include <Parsers.hpp>
 
+namespace Wings
+{
+
 
 namespace BitMap {
 using namespace dealii;
@@ -250,3 +253,6 @@ void BitMapFile::scale_coordinates(const double scale)
 
 
 }  // end of namespace
+
+
+}  // end Wings

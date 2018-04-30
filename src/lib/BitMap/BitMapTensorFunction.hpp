@@ -4,6 +4,10 @@
 
 #include <BitMap/BitMapFunction.hpp>
 
+namespace Wings
+{
+
+
 namespace BitMap {
 
 using namespace dealii;
@@ -54,3 +58,6 @@ BitMapTensorFunction<rank,dim>::scale_coordinates(const double scale)
 }  // end value
 
 } // end of namespace
+
+
+}  // end Wings

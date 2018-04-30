@@ -2,6 +2,10 @@
 
 #include <deal.II/lac/vector.h>
 
+namespace Wings
+{
+
+
 namespace Model
 {
 // using namespace dealii;
@@ -68,4 +72,7 @@ void RelativePermeability::get_values(const dealii::Vector<double> &saturation,
   dst[1] = k_ro;
 }  // eom
 
+
 }  // end namespace
+
+} // end wings

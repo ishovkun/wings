@@ -4,6 +4,8 @@
 
 #include <BitMap/BitMapFile.hpp>
 
+namespace Wings
+{
 
 namespace BitMap {
 
@@ -72,3 +74,6 @@ BitMapFunction<dim>::scale_coordinates(const double scale)
 
 
 }
+
+
+}  // end Wings

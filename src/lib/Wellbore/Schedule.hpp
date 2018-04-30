@@ -6,7 +6,10 @@
 #include <algorithm>
 #include <deal.II/base/exceptions.h>
 
-namespace Schedule
+namespace Wings
+{
+
+namespace Wellbore
 {
   enum WellControlType {pressure_control, flow_control_total, flow_control_phase_1,
                         flow_control_phase_2, flow_control_phase_3};
@@ -105,3 +108,5 @@ namespace Schedule
   }  // eom
 
 }  // end of namespace
+
+} // end wings

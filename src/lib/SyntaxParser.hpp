@@ -3,51 +3,57 @@
 
 #include <Parsers.hpp>
 
+namespace Wings
+{
+
 namespace Parsers
 {
-  class SyntaxParser
-  {
-  public:
-    SyntaxParser(std::string &text_);
-    void enter_subsection(const std::string& kwd,
-                          const bool required = true);
-    double get_double(const std::string & kwd,
-                      const double default_value) const;
-    double get_double(const std::string & kwd) const;
-    int get_int(const std::string & kwd,
-                const int default_value) const;
-    int get_int(const std::string & kwd) const;
-    std::string get(const std::string &kwd,
-                    const std::string default_value) const;
-    std::string get(const std::string &kwd) const;
-    std::vector<std::string> get_str_list(const std::string &kwd,
-                                          const std::string &delimiter) const;
-    std::vector<std::string> get_str_list(const std::string              &kwd,
-                                          const std::string              &delimiter,
-                                          const std::vector<std::string> &default_value) const;
-    template<typename Number>
-    std::vector<Number> get_number_list(const std::string         & kwd,
-                                        const std::string         & delimiter,
-                                        const unsigned int        size = 0) const;
-    template<typename Number>
-    std::vector<Number> get_number_list(const std::string         & kwd,
-                                        const std::string         & delimiter,
-                                        const std::vector<Number> & default_value) const;
-    FullMatrix<double>
-    get_matrix(const std::string  &kwd,
-               const std::string  &delimiter_col,
-               const std::string  &delimiter_row) const;
+
+class SyntaxParser
+{
+ public:
+  SyntaxParser(std::string &text_);
+  void enter_subsection(const std::string& kwd,
+                        const bool required = true);
+  double get_double(const std::string & kwd,
+                    const double default_value) const;
+  double get_double(const std::string & kwd) const;
+  int get_int(const std::string & kwd,
+              const int default_value) const;
+  int get_int(const std::string & kwd) const;
+  std::string get(const std::string &kwd,
+                  const std::string default_value) const;
+  std::string get(const std::string &kwd) const;
+  std::vector<std::string> get_str_list(const std::string &kwd,
+                                        const std::string &delimiter) const;
+  std::vector<std::string> get_str_list(const std::string              &kwd,
+                                        const std::string              &delimiter,
+                                        const std::vector<std::string> &default_value) const;
+  template<typename Number>
+  std::vector<Number> get_number_list(const std::string         & kwd,
+                                      const std::string         & delimiter,
+                                      const unsigned int        size = 0) const;
+  template<typename Number>
+  std::vector<Number> get_number_list(const std::string         & kwd,
+                                      const std::string         & delimiter,
+                                      const std::vector<Number> & default_value) const;
+  dealii::FullMatrix<double>
+  get_matrix(const std::string  &kwd,
+             const std::string  &delimiter_col,
+             const std::string  &delimiter_row) const;
 
 
-  private:
-    std::string text, active_text;
-    // format
-    std::string subsection_prefix, subsection_close,
-      comment_begin, comment_close, kwd_close;
+ private:
+  std::string text, active_text;
+  // format
+  std::string subsection_prefix, subsection_close,
+    comment_begin, comment_close, kwd_close;
 
-  };
+};
 
-  SyntaxParser::SyntaxParser(std::string &text_)
+
+
+SyntaxParser::SyntaxParser(std::string &text_)
     :
     text(text_),
     subsection_prefix("subsection "),
@@ -55,7 +61,7 @@ namespace Parsers
     comment_begin("#"),
     comment_close("\n"),
     kwd_close("/")
-  {}
+{}
 
 
 void SyntaxParser::enter_subsection(const std::string &kwd,
@@ -102,74 +108,74 @@ void SyntaxParser::enter_subsection(const std::string &kwd,
 } // eom
 
 
-  int SyntaxParser::get_int(const std::string &kwd) const
-  {
-    std::string txt = get(kwd);
-    return Parsers::convert<int>(txt);
-  } // eom
+int SyntaxParser::get_int(const std::string &kwd) const
+{
+  std::string txt = get(kwd);
+  return Parsers::convert<int>(txt);
+} // eom
 
 
-  int SyntaxParser::get_int(const std::string &kwd,
-                             const int default_value) const
+int SyntaxParser::get_int(const std::string &kwd,
+                          const int default_value) const
+{
+  try
   {
-    try
-    {
-      get_int(kwd);
-    }
-    catch (std::exception &exc)
-    {
-      return default_value;
-    }
+    get_int(kwd);
+  }
+  catch (std::exception &exc)
+  {
     return default_value;
-  } // eom
+  }
+  return default_value;
+} // eom
 
 
-  double SyntaxParser::get_double(const std::string &kwd) const
+double SyntaxParser::get_double(const std::string &kwd) const
+{
+  std::string txt = get(kwd);
+  return Parsers::convert<double>(txt);
+} // eom
+
+
+double SyntaxParser::get_double(const std::string &kwd,
+                                const double default_value) const
+{
+  try
   {
-    std::string txt = get(kwd);
-    return Parsers::convert<double>(txt);
-  } // eom
-
-
-  double SyntaxParser::get_double(const std::string &kwd,
-                                  const double default_value) const
+    return get_double(kwd);
+  }
+  catch (std::exception &exc)
   {
-    try
-    {
-      return get_double(kwd);
-    }
-    catch (std::exception &exc)
-    {
-      // std::cout << "Caught something!!11" << std::endl;
-      return default_value;
-    }
+    // std::cout << "Caught something!!11" << std::endl;
     return default_value;
-  } // eom
+  }
+  return default_value;
+} // eom
 
 
-  std::string SyntaxParser::get(const std::string &kwd) const
-  {
-    std::string raw_result =
+std::string SyntaxParser::get(const std::string &kwd) const
+{
+  std::string raw_result =
       Parsers::find_substring(active_text, kwd, kwd_close);
-    boost::trim(raw_result);
-    boost::algorithm::trim_left(raw_result);
-    return raw_result;
-  }  // eom
+  boost::trim(raw_result);
+  boost::algorithm::trim_left(raw_result);
+  return raw_result;
+}  // eom
 
 
-  std::string SyntaxParser::get(const std::string &kwd,
-                                const std::string default_value) const
+std::string SyntaxParser::get(const std::string &kwd,
+                              const std::string default_value) const
+{
+  try
   {
-    try
-    {
-      return get(kwd);
-    }
-    catch (std::exception &exc)
-    {
-      return default_value;
-    }
+    return get(kwd);
+  }
+  catch (std::exception &exc)
+  {
     return default_value;
-  } // eom
+  }
+  return default_value;
+} // eom
 
 
 std::vector<std::string>
@@ -252,7 +258,7 @@ SyntaxParser::get_number_list(const std::string  &kwd,
 
 
 
-FullMatrix<double>
+dealii::FullMatrix<double>
 SyntaxParser::get_matrix(const std::string  &kwd,
                          const std::string  &delimiter_row,
                          const std::string  &delimiter_col) const
@@ -264,7 +270,7 @@ SyntaxParser::get_matrix(const std::string  &kwd,
                           boost::is_any_of(delimiter_col),
                           boost::token_compress_on);
   const unsigned int n_cols = tmp.size();
-  FullMatrix<double> result(n_rows, n_cols);
+  dealii::FullMatrix<double> result(n_rows, n_cols);
   for (unsigned int i=0; i<n_rows; ++i)
   {
     boost::algorithm::split(tmp, rows[i],
@@ -281,4 +287,6 @@ SyntaxParser::get_matrix(const std::string  &kwd,
   return result;
 } // eom
 
-}
+}  // end parsers
+
+} // end wings

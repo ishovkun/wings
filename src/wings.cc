@@ -1,4 +1,4 @@
-#include <Simulator.hpp>
+// #include <Simulator.hpp>
 #include <Parsers.hpp>
 #include <Reader.hpp>
 #include <Model.hpp>
@@ -27,27 +27,27 @@ int main(int argc, char *argv[])
     reader.read_input(input_file_name, /* verbosity= */0);
 
 
-    switch (model.n_phases())
-    {
-      case 1:
-      {
-        Wings::Simulator<dim, 1> simulator(model, mpi_communicator, pcout);
-        simulator.run();
-        break;
-      }
-      // case 2:
-      //   {
-      //     Wings::Simulator<dim, 2> simulator(model, mpi_communicator, pcout);
-      //     simulator.run();
-      //     break;
-      //   }
-      // case 3:
-      //   {
-      //     Wings::Simulator<dim, 3> simulator(model, mpi_communicator, pcout);
-      //     simulator.run();
-      //     break;
-      //   }
-    }
+    // switch (model.n_phases())
+    // {
+    //   case 1:
+    //   {
+    //     Wings::Simulator<dim, 1> simulator(model, mpi_communicator, pcout);
+    //     simulator.run();
+    //     break;
+    //   }
+    //   // case 2:
+    //   //   {
+    //   //     Wings::Simulator<dim, 2> simulator(model, mpi_communicator, pcout);
+    //   //     simulator.run();
+    //   //     break;
+    //   //   }
+    //   // case 3:
+    //   //   {
+    //   //     Wings::Simulator<dim, 3> simulator(model, mpi_communicator, pcout);
+    //   //     simulator.run();
+    //   //     break;
+    //   //   }
+    // } // end case n_phases
 
     return 0;
   } // end try

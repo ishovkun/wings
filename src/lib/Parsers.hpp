@@ -6,6 +6,9 @@
 #include <boost/spirit/include/qi.hpp>
 #include <regex>
 
+namespace Wings
+{
+
 namespace Parsers {
 	using namespace dealii;
 
@@ -300,3 +303,5 @@ namespace Parsers {
   } // eom
 
 } // end of namespace
+
+}  // end Wings

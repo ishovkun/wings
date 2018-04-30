@@ -33,9 +33,10 @@ ADD_LIBRARY(wings SHARED
   Units.h
   Tensors.hpp
   Keywords.h
-  Schedule.hpp
   DefaultValues.h
   LookupTable.hpp
+  Wellbore/Schedule.hpp
+  Wellbore/WellInfo.hpp
   Wellbore/Wellbore.hpp
   Wellbore/Wells.hpp
   OutputHelper.hpp

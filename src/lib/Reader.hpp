@@ -19,6 +19,10 @@
 #include <LookupTable.hpp>
 #include <Math.hpp>
 
+namespace Wings
+{
+
+
 namespace Parsers {
 
 constexpr int dim = 3;
@@ -26,8 +30,8 @@ constexpr int dim = 3;
   class Reader
   {
   public:
-    Reader(ConditionalOStream & pcout_,
-           Model::Model<dim>  & model_);
+    Reader(dealii::ConditionalOStream & pcout_,
+           Model::Model<dim>          & model_);
     void read_input(const std::string&,
                     const int verbosity_=0);
     void print_input();
@@ -47,7 +51,7 @@ constexpr int dim = 3;
                         const Tensor<1,dim> & anisotropy,
                         const SyntaxParser  & parser) const;
 
-    ConditionalOStream & pcout;
+    dealii::ConditionalOStream & pcout;
     Model::Model<dim>  & model;
     int                 verbosity;
     std::string         input_text;
@@ -583,4 +587,7 @@ Reader::get_function(const std::string  & kwd,
       model.schedule.add_entry(schedule_entry);
     } // end lines loop
   } // eom
+
 } // end of namespace
+
+} // end wings

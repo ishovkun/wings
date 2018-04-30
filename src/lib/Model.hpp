@@ -9,7 +9,8 @@
 
 // Custom modules
 // #include <Wellbore.hpp>
-#include <Wellbore/Wellbore.hpp>
+#include <Wellbore/WellInfo.hpp>
+#include <Wellbore/Schedule.hpp>
 #include <Parsers.hpp>
 // #include <BitMap.hpp>
 #include <Units.h>
@@ -18,8 +19,13 @@
 #include <RelativePermeability.hpp>
 
 
+namespace Wings
+{
+
+
 namespace Model
 {
+
 using namespace dealii;
 
 enum FluidModelType {Liquid, Gas, DeadOil, WaterGas, BlackOil};
@@ -181,7 +187,7 @@ class Model
   Units::Units               units;
   // std::vector<Wellbore<dim>> wells;
   std::vector<Wellbore::WellInfo<dim>> wells;
-  Schedule::Schedule         schedule;
+  Wellbore::Schedule         schedule;
   double                     coupling_tolerance,
                              min_time_step,
                              t_max;
@@ -387,33 +393,34 @@ void Model<dim>::add_well(const std::string                 name,
 
 
 
-template <int dim>
-void Model<dim>::update_well_controls(const double time)
-{
-  for (unsigned int i=0; i<wells.size(); i++)
-    wells[i].set_control(schedule.get_control(time, i));
-} // eom
+// template <int dim>
+// void Model<dim>::update_well_controls(const double time)
+// {
+//   for (unsigned int i=0; i<wells.size(); i++)
+//     wells[i].set_control(schedule.get_control(time, i));
+// } // eom
 
 
 
-template <int dim>
-void Model<dim>::locate_wells(const DoFHandler<dim>& dof_handler)
-{
-  for (unsigned int i=0; i<wells.size(); i++)
-  {
-    wells[i].locate(dof_handler);
-  }
-} // eom
+// template <int dim>
+// void Model<dim>::locate_wells(const DoFHandler<dim>& dof_handler)
+// {
+//   throw(ExcNotImplemented());
+//   // for (unsigned int i=0; i<wells.size(); i++)
+//   // {
+//   //   wells[i].locate(dof_handler);
+//   // }
+// } // eom
 
 
 
-template <int dim>
-void Model<dim>::update_well_productivities(const Function<dim> &get_pressure,
-                                            const Function<dim> &get_saturation)
-{
-  for (auto & well : wells)
-    well.update_productivity(get_pressure, get_saturation);
-}  // eom
+// template <int dim>
+// void Model<dim>::update_well_productivities(const Function<dim> &get_pressure,
+//                                             const Function<dim> &get_saturation)
+// {
+//   for (auto & well : wells)
+//     well.update_productivity(get_pressure, get_saturation);
+// }  // eom
 
 
 
@@ -693,4 +700,7 @@ set_solid_linear_solver(const LinearSolverType & solver_type)
   linear_solver_solid = solver_type;
 }  // end set_fluid_linear_solver( const Model::LinearSolverType solver_type )
 
+
 }  // end of namespace
+
+} // end wings

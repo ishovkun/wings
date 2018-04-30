@@ -5,6 +5,7 @@
 
 // custom modules
 #include <SolidSolverBase.hpp>
+#include <Model.hpp>
 #include <Math.hpp>
 
 

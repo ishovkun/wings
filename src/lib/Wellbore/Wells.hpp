@@ -14,6 +14,8 @@ namespace Wings
 namespace Wellbore
 {
 
+using namespace dealii;
+
 template<int dim, int n_phases>
 class Wells
 {

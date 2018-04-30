@@ -297,24 +297,24 @@ void Simulator<dim,n_phases>::run()
 
   Probe::Probe<dim,n_phases> probe(model);
 
-  // make solvers
-  SolverBuilder<dim,n_phases> builder(model, probe,
-                                      mpi_communicator,
-                                      triangulation, pcout);
-  builder.build_solvers();
+  // // make solvers
+  // SolverBuilder<dim,n_phases> builder(model, probe,
+  //                                     mpi_communicator,
+  //                                     triangulation, pcout);
+  // builder.build_solvers();
 
-  std::shared_ptr<FluidSolvers::FluidSolverBase<dim,n_phases>>
-      fluid_solver = builder.get_fluid_solver();
+  // std::shared_ptr<FluidSolvers::FluidSolverBase<dim,n_phases>>
+  //     fluid_solver = builder.get_fluid_solver();
 
-  std::shared_ptr<SolidSolvers::SolidSolverBase<dim,n_phases>>
-      solid_solver = builder.get_solid_solver();
+  // std::shared_ptr<SolidSolvers::SolidSolverBase<dim,n_phases>>
+  //     solid_solver = builder.get_solid_solver();
 
   // setup dofs
-  fluid_solver->setup_dofs();
-  if (model.solid_model != Model::SolidModelType::Compressibility)
-    solid_solver->setup_dofs();
+  // fluid_solver->setup_dofs();
+  // if (model.solid_model != Model::SolidModelType::Compressibility)
+  //   solid_solver->setup_dofs();
 
-  model.locate_wells(fluid_solver->get_dof_handler());
+  // model.locate_wells(fluid_solver->get_dof_handler());
 
 
   // FEFunction::FEFunction<dim,TrilinosWrappers::MPI::Vector>

@@ -1,8 +1,8 @@
 #pragma once
 
 #include <Model.hpp>
-#include <ElasticSolver.hpp>
-#include <SolverIMPES.hpp>
+#include <SolidSolverBase.hpp>
+#include <FluidSolverBase.hpp>
 
 namespace Wings {
 
@@ -12,7 +12,6 @@ using namespace dealii;
 
 template <int dim>
 using CellIterator = typename dealii::DoFHandler<dim>::active_cell_iterator;
-
 
 
 template<int dim, int n_phases>
@@ -85,12 +84,6 @@ CellIterator<dim> Probe<dim,n_phases>::endc()
   return fluid_solver->get_dof_handler().end();
 }  // eom
 
-// template<int dim, int n_phases>
-// void Probe<dim,n_phases>::next_cell()
-// {
-//   fluid_cell++;
-//   solid_cell++;
-// }  // eom
 
 
 template<int dim, int n_phases>
@@ -185,6 +178,6 @@ Probe<dim,n_phases>::get_total_density() const
 
 
 
-} // end probe namespace
+} // end probe
 
 } // end wings
