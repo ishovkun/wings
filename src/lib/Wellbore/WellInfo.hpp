@@ -1,6 +1,11 @@
 #pragma once
 
+#include <vector>
 #include <deal.II/base/point.h>
+
+/*
+ * This structure stores info that is necessary to initiate wells
+ */
 
 namespace Wings
 {
@@ -9,18 +14,13 @@ namespace Wellbore
 {
 // using namespace dealii;
 
+
 template<int dim>
 struct WellInfo
 {
-  WellInfo();
-  // WellInfo(const double                           radius,
-  //          // const std::vector<dealii:Point<dim>> & locations,
-  //          const std::vector<dealii:Point<dim>> & locations,
-  //          const std::string                      name = "");
-
-  // void set_info(const double                           radius,
-  //               const std::vector<dealii:Point<dim>> & locations,
-  //               const std::string                      name = "");
+  WellInfo(const double                            radius,
+           const std::vector<dealii::Point<dim>> & locations,
+           const std::string                       name = "");
 
   std::string             name;
   double                  radius;
@@ -30,21 +30,14 @@ struct WellInfo
 
 
 template <int dim>
-WellInfo<dim>::WellInfo()
+WellInfo<dim>::WellInfo(const double                            radius,
+                        const std::vector<dealii::Point<dim>> & locations,
+                        const std::string                       name)
+    :
+    radius(radius),
+    locations(locations),
+    name(name)
 {}
-
-
-
-// template <int dim>
-// WellInfo<dim>::WellInfo(const double                           radius,
-//                         // const std::vector<dealii:Point<dim>> & locations,
-//                         const std::vector<dealii:Point<dim>> & locations,
-//                         const std::string                      name = "")
-//     :
-//     radius(radius),
-//     locations(locations),
-//     name(name)
-// {}
 
 
 
@@ -58,6 +51,6 @@ WellInfo<dim>::WellInfo()
 // }  // end set_info
 
 
-} // end welbore
+} // end wellbore
 
 } // end wings

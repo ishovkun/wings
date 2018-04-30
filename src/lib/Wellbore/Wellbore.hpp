@@ -794,60 +794,61 @@ Wellbore<dim,n_phases>::get_J_and_Q(const CellIterator<dim> & cell,
   // AssertThrow(cells.size() > 0,
   //             ExcMessage("Need to locate wells first"));
 
+  AssertThrow(false, ExcNotImplemented());
 
-  const int segment = find_cell(cell);
-  if (segment == -1)
-    return std::make_pair(0.0, 0.0);
+  // const int segment = find_cell(cell);
+  // if (segment == -1)
+  //   return std::make_pair(0.0, 0.0);
 
-  if (control.type == Schedule::WellControlType::pressure_control)
-  {
-    // std::cout << "cell " << cell->center() << std::endl;
-    // std::cout << "BHP " << control.value << "\n";
-    // std::cout << "J " << productivities[segment][phase] << "\t"
-    //           << "phase " << phase << std::endl;
-    return std::make_pair(productivities[segment][phase],
-                          control.value*productivities[segment][phase]);
-  }
-  else if (control.type == Schedule::WellControlType::flow_control_total)
-  {
-    // compute sum of productivities per phase to normalize flow in a segment
-    // l1_norm cause they all should be positive
-    const double sum_phase_productivities = total_productivity.l1_norm();
-    // std::cout << "productivity sum" << sum_phase_productivities << "\n";
+  // if (control.type == Schedule::WellControlType::pressure_control)
+  // {
+  //   // std::cout << "cell " << cell->center() << std::endl;
+  //   // std::cout << "BHP " << control.value << "\n";
+  //   // std::cout << "J " << productivities[segment][phase] << "\t"
+  //   //           << "phase " << phase << std::endl;
+  //   return std::make_pair(productivities[segment][phase],
+  //                         control.value*productivities[segment][phase]);
+  // }
+  // else if (control.type == Schedule::WellControlType::flow_control_total)
+  // {
+  //   // compute sum of productivities per phase to normalize flow in a segment
+  //   // l1_norm cause they all should be positive
+  //   const double sum_phase_productivities = total_productivity.l1_norm();
+  //   // std::cout << "productivity sum" << sum_phase_productivities << "\n";
 
-    const double normalized_flux =
-        control.value*productivities[segment][phase]/sum_phase_productivities;
+  //   const double normalized_flux =
+  //       control.value*productivities[segment][phase]/sum_phase_productivities;
 
-    if (sum_phase_productivities > 0)
-      return std::make_pair(0.0, -normalized_flux);
-    else
-      return std::make_pair(0.0, 0.0);
-  }
-  else if (control.type == Schedule::flow_control_phase_1)
-  {
-    if (phase == 0)
-    {
-      // std::cout << "injecting " << control.value << std::endl;
-      return std::make_pair(0.0, control.value);
-    }
-    else
-    {
-      return std::make_pair(0.0, 0.0);
-    }
-  }
-  else if (control.type == Schedule::flow_control_phase_2)
-  {
-    if (phase == 1)
-      return std::make_pair(0.0, control.value);
-    else
-      return std::make_pair(0.0, 0.0);
-  }
-  else
-  {
-    AssertThrow(false, ExcNotImplemented());
-  }
+  //   if (sum_phase_productivities > 0)
+  //     return std::make_pair(0.0, -normalized_flux);
+  //   else
+  //     return std::make_pair(0.0, 0.0);
+  // }
+  // else if (control.type == Schedule::flow_control_phase_1)
+  // {
+  //   if (phase == 0)
+  //   {
+  //     // std::cout << "injecting " << control.value << std::endl;
+  //     return std::make_pair(0.0, control.value);
+  //   }
+  //   else
+  //   {
+  //     return std::make_pair(0.0, 0.0);
+  //   }
+  // }
+  // else if (control.type == Schedule::flow_control_phase_2)
+  // {
+  //   if (phase == 1)
+  //     return std::make_pair(0.0, control.value);
+  //   else
+  //     return std::make_pair(0.0, 0.0);
+  // }
+  // else
+  // {
+  //   AssertThrow(false, ExcNotImplemented());
+  // }
 
-  return std::make_pair(0.0, 0.0) ;
+  // return std::make_pair(0.0, 0.0) ;
 }  // eom
 
 

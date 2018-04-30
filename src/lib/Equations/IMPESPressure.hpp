@@ -200,13 +200,14 @@ update_wells(const CellIterator<dim> &cell)
   well_Js = 0;
   well_Qs = 0;
 
-  for (int phase = 0; phase < n_phases; ++phase)
-    for (const auto & well : model.wells)
-    {
-      std::pair<double,double> J_and_Q = well.get_J_and_Q(cell, phase);
-      well_Js[phase] += J_and_Q.first;
-      well_Qs[phase] += J_and_Q.second;
-    }
+  AssertThrow(false, ExcNotImplemented());
+  // for (int phase = 0; phase < n_phases; ++phase)
+  //   for (const auto & well : model.wells)
+  //   {
+  //     std::pair<double,double> J_and_Q = well.get_J_and_Q(cell, phase);
+  //     well_Js[phase] += J_and_Q.first;
+  //     well_Qs[phase] += J_and_Q.second;
+  //   }
 
 }  // eom
 
@@ -220,9 +221,10 @@ update_wells(const CellIterator<dim> &cell,
 {
   well_Qs = 0;
 
-  for (int phase = 0; phase < n_phases; ++phase)
-    for (const auto & well : model.wells)
-      well_Qs[phase] += well.get_flow_rate(cell, pressure, phase);
+  AssertThrow(false, ExcNotImplemented());
+  // for (int phase = 0; phase < n_phases; ++phase)
+  //   for (const auto & well : model.wells)
+  //     well_Qs[phase] += well.get_flow_rate(cell, pressure, phase);
 }  // eom
 
 

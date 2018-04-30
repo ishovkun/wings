@@ -324,10 +324,10 @@ void Simulator<dim,n_phases>::run()
   //     saturation_function(fluid_solver.get_dof_handler(),
   //                         fluid_solver.saturation_relevant);
 
-  { // initialization step
-    fluid_solver->solve_initialization_step();
-    // solid_solver->solve_time_step(double);
-  }
+  // { // initialization step
+  //   fluid_solver->solve_initialization_step();
+  //   // solid_solver->solve_time_step(double);
+  // }
   // { // fluid initialization step
   //   fluid_solver.pressure_relevant = model.reference_pressure;
   //   if (model.n_phases() == 2)

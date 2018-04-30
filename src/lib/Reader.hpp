@@ -543,7 +543,7 @@ Reader::get_function(const std::string  & kwd,
       AssertThrow(entries.size() >= 4,
                   ExcMessage("Wrong entry in schedule "+line));
 
-      Schedule::ScheduleEntry schedule_entry;
+      Wellbore::ScheduleEntry schedule_entry;
       // get time
       schedule_entry.time = Parsers::convert<double>(entries[0]);
       // get well name and identifier
@@ -554,12 +554,12 @@ Reader::get_function(const std::string  & kwd,
       // get control type
       const int control_type_id = Parsers::convert<int>(entries[2]);
       schedule_entry.control.type =
-        Schedule::well_control_type_indexing.find(control_type_id)->second;
+        Wellbore::well_control_type_indexing.find(control_type_id)->second;
       // get control value
       schedule_entry.control.value = Parsers::convert<double>(entries[3]);
 
       // convert value units
-      if (schedule_entry.control.type == Schedule::pressure_control)
+      if (schedule_entry.control.type == Wellbore::pressure_control)
       {
         schedule_entry.control.value *= model.units.pressure();
       }
@@ -567,16 +567,16 @@ Reader::get_function(const std::string  & kwd,
       if (   model.fluid_model == Model::DeadOil
              || model.fluid_model == Model::Liquid)
       {
-        if (schedule_entry.control.type != Schedule::pressure_control)
+        if (schedule_entry.control.type != Wellbore::pressure_control)
           schedule_entry.control.value *= model.units.fluid_rate();  //
       }
       else if (model.fluid_model == Model::BlackOil)
       {
-        if (schedule_entry.control.type == Schedule::flow_control_total
-            || schedule_entry.control.type == Schedule::flow_control_phase_1
-            || schedule_entry.control.type == Schedule::flow_control_phase_2)
+        if (schedule_entry.control.type == Wellbore::flow_control_total
+            || schedule_entry.control.type == Wellbore::flow_control_phase_1
+            || schedule_entry.control.type == Wellbore::flow_control_phase_2)
           schedule_entry.control.value *= model.units.fluid_rate();
-        if (schedule_entry.control.type == Schedule::flow_control_phase_3)
+        if (schedule_entry.control.type == Wellbore::flow_control_phase_3)
           schedule_entry.control.value *= model.units.gas_rate();
       }
       else

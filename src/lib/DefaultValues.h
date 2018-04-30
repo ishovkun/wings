@@ -1,5 +1,8 @@
 // #pragma once
 
+namespace Wings
+{
+
 namespace DefaultValues
 {
   // in degrees
@@ -11,3 +14,6 @@ namespace DefaultValues
   const int n_time_step_digits = 3;
   const int n_processor_digits = 3;
 }
+
+
+}  // end wings

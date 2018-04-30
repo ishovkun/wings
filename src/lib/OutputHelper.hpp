@@ -4,8 +4,14 @@
 
 // Custom modules
 #include <Keywords.h>
+#include <DefaultValues.h>
+
+namespace Wings
+{
+
 
 namespace Output
+
 {
 using namespace dealii;
 
@@ -164,3 +170,6 @@ OutputHelper<dim>::write_output(const double        time,
 }  // end write_output
 
 }  // end of namespace
+
+
+}  // end Wings
