@@ -3,6 +3,7 @@
 #include <Model.hpp>
 #include <Probe.hpp>
 #include <Math.hpp>
+#include <DefaultValues.h>
 
 #include <Equations/FluidEquationsBase.hpp>
 

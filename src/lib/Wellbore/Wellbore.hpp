@@ -9,8 +9,8 @@
 #include <deal.II/base/quadrature_lib.h>
 #include <math.h>
 
-#include <WellInfo.hpp>
 #include <DefaultValues.h>
+#include <BaseTypes.hpp>
 #include <Wellbore/Schedule.hpp>
 #include <Math.hpp>
 // #include <LookupTable.hpp>
@@ -27,30 +27,24 @@ namespace Wellbore
 using namespace dealii;
 
 
-template <int dim>
-using CellIterator = typename DoFHandler<dim>::active_cell_iterator;
-
-
 template <int dim, int n_phases>
 class Wellbore : public Function<dim>
 {
  public:
-  Wellbore(const std::vector< Point<dim> > & locations,
-           const double                      radius,
-           Probe::Probe<dim,n_phases>      & probe,
-           MPI_Comm                        & mpi_communicator);
+  Wellbore(const std::vector< Point<dim> >  & locations,
+           const double                       radius,
+           const Probe::Probe<dim,n_phases> & probe,
+           MPI_Comm                         & mpi_communicator);
 
   // set data methods
   // set control method (pressure, flow), control value, etc.
-  void set_control(const Schedule::WellControl & control_);
-  // get well know where to get p and s from to compute productivity
-  void set_pressure_saturation_function(const Function<dim> & f);
-  // give the access to solution variable
+  void set_control(const WellControl & control_);
+  // give the access to reservoir properties
   void set_probe();
   // access methods
   double                                  get_radius() const;
   // get current controlling parameters
-  const Schedule::WellControl           & get_control();
+  const WellControl           & get_control();
   // get cells where the wellbore is placed
   const  std::vector<CellIterator<dim>> & get_cells();
   // get true coordinates of the welbore
@@ -144,39 +138,31 @@ class Wellbore : public Function<dim>
                          const Tensor<1,dim> & face_normal) const;
 
   // variables
-  std::vector< Point<dim> >  locations;
-  double                     radius;
-  MPI_Comm                 & mpi_communicator;
-  // const Function<dim>                                  &get_permeability;
-  // const RelativePermeability                           &relative_permeability;
-  // I'm making this this not-a-ref because the original object is destroyed
-  // should't be too heavy
-  const std::vector<const Interpolation::LookupTable*>  pvt_tables;
-  Schedule::WellControl              control;
+  std::vector< Point<dim> >          locations;
+  double                             radius;
+  const Probe::Probe<dim,n_phases> & probe;
+  MPI_Comm                         & mpi_communicator;
+  WellControl                        control;
   const DoFHandler<dim>            * p_dof_handler;
   std::vector<CellIterator<dim>>     cells;
   std::vector<double>                segment_length;
   std::vector< Tensor<1,dim> >       segment_direction;
   std::vector< std::vector<double> > productivities;
-  Vector<double>                     total_productivity;
-  const Function<dim>              * p_pres_sat_func;
+  Tensor<1,n_phases>                 total_productivity;
 };  // eom
 
 
+
 template <int dim, int n_phases>
-Wellbore<dim,n_phases>::Wellbore(const std::vector< Point<dim> > & locations,
-                                 const double                      radius,
-                                 Probe::Probe<dim,n_phases>      & probe,
-                                 MPI_Comm                        &  mpi_communicator)
+Wellbore<dim,n_phases>::Wellbore(const std::vector< Point<dim> >  & locations,
+                                 const double                       radius,
+                                 const Probe::Probe<dim,n_phases> & probe,
+                                 MPI_Comm                         & mpi_communicator)
     :
     locations(locations),
     radius(radius),
-    mpi_communicator(mpi_communicator),
-    // get_permeability(get_permeability),
-    // relative_permeability(relative_permeability),
-    // pvt_tables(pvt_tables),
-    // n_phases(pvt_tables.size()),
-    total_productivity(n_phases)
+    probe(probe),
+    mpi_communicator(mpi_communicator)
 {
   // AssertThrow(pvt_tables.size() == 2, ExcMessage("how many phases do you have man?"));
   AssertThrow(locations.size() > 0,
@@ -187,8 +173,9 @@ Wellbore<dim,n_phases>::Wellbore(const std::vector< Point<dim> > & locations,
   for (unsigned int i=1; i<locations.size(); i++)
     AssertThrow((locations[i] - locations[i-1]).norm() > 0,
                 ExcMessage("Duplicates in wellbore locations"));
+
   // Init zero rate control just in case
-  control.type = Schedule::WellControlType::flow_control_total;
+  control.type = WellControlType::flow_control_total;
   control.value = 0.0;
 } //  eom
 
@@ -196,7 +183,7 @@ Wellbore<dim,n_phases>::Wellbore(const std::vector< Point<dim> > & locations,
 
 template <int dim, int n_phases>
 inline
-void Wellbore<dim,n_phases>::set_control(const Schedule::WellControl& control_)
+void Wellbore<dim,n_phases>::set_control(const WellControl & control_)
 {
   control = control_;
 }  // eom
@@ -205,7 +192,7 @@ void Wellbore<dim,n_phases>::set_control(const Schedule::WellControl& control_)
 
 template <int dim, int n_phases>
 inline
-const Schedule::WellControl &
+const WellControl &
 Wellbore<dim,n_phases>::get_control()
 {
   return this->control;
@@ -276,7 +263,7 @@ aligned_with_face(const Tensor<1,dim> &cell_to_wellbore,
 
 
 template <int dim, int n_phases>
-void Wellbore<dim,n_phases>::locate(const DoFHandler<dim,n_phases>& dof_handler)
+void Wellbore<dim,n_phases>::locate(const DoFHandler<dim> & dof_handler)
 {
   /* Algorithm:
      I. if just one well location, add cell that contains the point.
@@ -687,69 +674,71 @@ update_productivity()
     First compute the sum of permeabilities for the flux normalization
     Then compute productivities.
   */
-  Vector<double>      perm(dim);
-  Vector<double>      saturation(n_phases);
-  Tensor<1,dim>       abs_productivity;
-  std::vector<double> productivity(n_phases);
-  std::vector<double> rel_perm(n_phases);
-  std::vector<double> pvt_values(pvt_tables[0]->n_cols()); // size first pvt table
 
-  productivities.clear();
+  AssertThrow(false, ExcNotImplemented());
+  // Vector<double>      perm(dim);
+  // Vector<double>      saturation(n_phases);
+  // Tensor<1,dim>       abs_productivity;
+  // std::vector<double> productivity(n_phases);
+  // std::vector<double> rel_perm(n_phases);
+  // // std::vector<double> pvt_values(pvt_tables[0]->n_cols()); // size first pvt table
 
-  const std::vector< Tensor<1,dim> > h = get_cell_sizes(cells);
-  for (unsigned int i=0; i<cells.size(); i++)
-  {
-    get_permeability.vector_value(cells[i]->center(), perm);
-    abs_productivity[0] = compute_productivity
-        (perm[1], perm[2], h[i][1], h[i][2],
-         segment_length[i]*abs(segment_direction[i][0]));
-    abs_productivity[1] = compute_productivity
-        (perm[0], perm[2], h[i][0], h[i][2],
-         segment_length[i]*abs(segment_direction[i][1]));
-    abs_productivity[2] = compute_productivity
-        (perm[0], perm[1], h[i][0], h[i][1],
-         segment_length[i]*abs(segment_direction[i][2]));
+  // productivities.clear();
 
-    const double j_ind = abs_productivity.norm();
+  // const std::vector< Tensor<1,dim> > h = get_cell_sizes(cells);
+  // for (unsigned int i=0; i<cells.size(); i++)
+  // {
+  //   get_permeability.vector_value(cells[i]->center(), perm);
+  //   abs_productivity[0] = compute_productivity
+  //       (perm[1], perm[2], h[i][1], h[i][2],
+  //        segment_length[i]*abs(segment_direction[i][0]));
+  //   abs_productivity[1] = compute_productivity
+  //       (perm[0], perm[2], h[i][0], h[i][2],
+  //        segment_length[i]*abs(segment_direction[i][1]));
+  //   abs_productivity[2] = compute_productivity
+  //       (perm[0], perm[1], h[i][0], h[i][1],
+  //        segment_length[i]*abs(segment_direction[i][2]));
 
-    // retrieve pressure and saturations
-    std::vector<double> v_pressure_saturation(n_phases+1);
-    p_pres_sat_func.vector_value(cells[i]->center(), v_pressure_saturation);
-    // first component is pressure others - saturation
-    const double pressure = v_pressure_saturation[0];
+  //   const double j_ind = abs_productivity.norm();
 
-    if (n_phases == 1)
-      rel_perm[0] = 1;
-    else
-    {
-      // phase productivities
-      for (int p=0; p<n_phases; ++p)
-        saturation[p]=v_pressure_saturation[p+1];
-      // get_saturation.vector_value(cells[i]->center(), saturation);
-      relative_permeability.get_values(saturation, rel_perm);
-    }
+  //   // retrieve pressure and saturations
+  //   std::vector<double> v_pressure_saturation(n_phases+1);
+  //   p_pres_sat_func.vector_value(cells[i]->center(), v_pressure_saturation);
+  //   // first component is pressure others - saturation
+  //   const double pressure = v_pressure_saturation[0];
 
-    // const double pressure = get_pressure.value(cells[i]->center());
-    for (int p=0; p<n_phases; ++p)
-    {
-      pvt_tables[p]->get_values(pressure, pvt_values);
-      //                            volume factor viscosity
-      productivity[p] = rel_perm[p]/pvt_values[0]/pvt_values[2]*j_ind;
-    }
+  //   if (n_phases == 1)
+  //     rel_perm[0] = 1;
+  //   else
+  //   {
+  //     // phase productivities
+  //     for (int p=0; p<n_phases; ++p)
+  //       saturation[p]=v_pressure_saturation[p+1];
+  //     // get_saturation.vector_value(cells[i]->center(), saturation);
+  //     relative_permeability.get_values(saturation, rel_perm);
+  //   }
 
-    productivities.push_back(productivity);
+  //   // const double pressure = get_pressure.value(cells[i]->center());
+  //   for (int p=0; p<n_phases; ++p)
+  //   {
+  //     pvt_tables[p]->get_values(pressure, pvt_values);
+  //     //                            volume factor viscosity
+  //     productivity[p] = rel_perm[p]/pvt_values[0]/pvt_values[2]*j_ind;
+  //   }
 
-  }  // end cell loop
+  //   productivities.push_back(productivity);
 
-  // get sum of productivities for normalization later on
-  for (auto & p : total_productivity) p = 0;    // first set to zero
-  // sum
-  for (unsigned int i=0; i<cells.size(); i++)
-    for (unsigned int p=0; p<total_productivity.size(); p++)
-      total_productivity[p] += productivities[i][p];
-  // sum over mpi
-  for (unsigned int p=0; p<total_productivity.size(); p++)
-    total_productivity[p] = Utilities::MPI::sum(total_productivity[p], mpi_communicator);
+  // }  // end cell loop
+
+  // // get sum of productivities for normalization later on
+  // for (auto & p : total_productivity) p = 0;    // first set to zero
+  // // sum
+  // for (unsigned int i=0; i<cells.size(); i++)
+  //   for (unsigned int p=0; p<total_productivity.size(); p++)
+  //     total_productivity[p] += productivities[i][p];
+  // // sum over mpi
+  // for (unsigned int p=0; p<total_productivity.size(); p++)
+  //   total_productivity[p] = Utilities::MPI::sum(total_productivity[p], mpi_communicator);
 }  // eom
 
 
@@ -800,7 +789,7 @@ Wellbore<dim,n_phases>::get_J_and_Q(const CellIterator<dim> & cell,
   // if (segment == -1)
   //   return std::make_pair(0.0, 0.0);
 
-  // if (control.type == Schedule::WellControlType::pressure_control)
+  // if (control.type == WellControlType::pressure_control)
   // {
   //   // std::cout << "cell " << cell->center() << std::endl;
   //   // std::cout << "BHP " << control.value << "\n";
@@ -809,7 +798,7 @@ Wellbore<dim,n_phases>::get_J_and_Q(const CellIterator<dim> & cell,
   //   return std::make_pair(productivities[segment][phase],
   //                         control.value*productivities[segment][phase]);
   // }
-  // else if (control.type == Schedule::WellControlType::flow_control_total)
+  // else if (control.type == WellControlType::flow_control_total)
   // {
   //   // compute sum of productivities per phase to normalize flow in a segment
   //   // l1_norm cause they all should be positive
@@ -824,7 +813,7 @@ Wellbore<dim,n_phases>::get_J_and_Q(const CellIterator<dim> & cell,
   //   else
   //     return std::make_pair(0.0, 0.0);
   // }
-  // else if (control.type == Schedule::flow_control_phase_1)
+  // else if (control.type == flow_control_phase_1)
   // {
   //   if (phase == 0)
   //   {
@@ -836,7 +825,7 @@ Wellbore<dim,n_phases>::get_J_and_Q(const CellIterator<dim> & cell,
   //     return std::make_pair(0.0, 0.0);
   //   }
   // }
-  // else if (control.type == Schedule::flow_control_phase_2)
+  // else if (control.type == flow_control_phase_2)
   // {
   //   if (phase == 1)
   //     return std::make_pair(0.0, control.value);
@@ -863,20 +852,12 @@ Wellbore<dim,n_phases>::get_flow_rate(const CellIterator<dim> & cell,
   if (segment == -1)
     return 0.0;
 
-  if (control.type == Schedule::WellControlType::pressure_control)
+  if (control.type == WellControlType::pressure_control)
     return productivities[segment][phase] * (control.value - cell_pressure);
   else
     return get_J_and_Q(cell, phase).second;
 }  // end get_flow_rate
 
-
-
-template <int dim, int n_phases>
-void
-Wellbore<dim,n_phases>::set_pressure_saturation_function(const Function<dim> &f)
-{
-  p_pres_sat_func = & f;
-}  // end set_pressure_saturation_function
 
 
 }  // end of namespace

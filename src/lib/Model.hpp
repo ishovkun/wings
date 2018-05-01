@@ -185,7 +185,6 @@ class Model
   std::vector< std::pair< Point<dim>,Point<dim> > >
   local_prerefinement_region;
   Units::Units               units;
-  // std::vector<Wellbore<dim>> wells;
   std::vector<Wellbore::WellInfo<dim>> wells;
   Wellbore::Schedule         schedule;
   double                     coupling_tolerance,

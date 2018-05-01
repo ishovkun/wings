@@ -11,18 +11,12 @@
 
 // Custom modules
 #include <Model.hpp>
-#include <Reader.hpp>
-#include <OutputHelper.hpp>
-
-// #include <Wellbore.hpp>
-#include <SolverIMPES.hpp>
-// #include <PressureSolver.hpp>
-// #include <SaturationSolver.hpp>
-#include <ElasticSolver.hpp>
-#include <FEFunction/FEFunction.hpp>
-// #include <FEFunction/FEFunctionPVT.hpp>
-#include <SolverBuilder.hpp>
 #include <Probe.hpp>
+#include <FluidSolverBase.hpp>
+#include <SolidSolverBase.hpp>
+#include <SolverBuilder.hpp>
+#include <Wellbore/Wells.hpp>
+#include <OutputHelper.hpp>
 
 
 namespace Wings
@@ -297,7 +291,11 @@ void Simulator<dim,n_phases>::run()
 
   Probe::Probe<dim,n_phases> probe(model);
 
-  // // make solvers
+  Wellbore::Wells<dim,n_phases> wells(probe, mpi_communicator);
+  for (const auto & well : model.wells)
+    wells.add_well(well);
+
+  // make solvers
   // SolverBuilder<dim,n_phases> builder(model, probe,
   //                                     mpi_communicator,
   //                                     triangulation, pcout);

@@ -22,9 +22,9 @@ struct WellInfo
            const std::vector<dealii::Point<dim>> & locations,
            const std::string                       name = "");
 
-  std::string             name;
-  double                  radius;
+  double                          radius;
   std::vector<dealii::Point<dim>> locations;
+  std::string                     name;
 };
 
 
