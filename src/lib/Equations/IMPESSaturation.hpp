@@ -17,8 +17,10 @@ template <int n_phases>
 class IMPESSaturation : public IMPESPressure<n_phases>
 {
  public:
-  IMPESSaturation(const Model::Model<dim>     & model,
-                  Probe::Probe<dim,n_phases>  & probe);
+  // Constructor
+  IMPESSaturation(const Model::Model<dim>       & model,
+                  Probe::Probe<dim,n_phases>    & probe,
+                  Wellbore::Wells<dim,n_phases> & wells);
   /* Update storage vectors and values for the current face */
   virtual void update_face_values(const CellIterator<dim> & neighbor_cell,
                                   const SolutionValues    & solution_values,
@@ -44,10 +46,11 @@ class IMPESSaturation : public IMPESPressure<n_phases>
 
 template <int n_phases>
 IMPESSaturation<n_phases>::
-IMPESSaturation(const Model::Model<dim>    & model,
-                Probe::Probe<dim,n_phases> & probe)
+IMPESSaturation(const Model::Model<dim>       & model,
+                Probe::Probe<dim,n_phases>    & probe,
+                Wellbore::Wells<dim,n_phases> & wells)
     :
-    IMPESPressure<n_phases>::IMPESPressure(model, probe)
+    IMPESPressure<n_phases>::IMPESPressure(model, probe, wells)
 {}
 
 

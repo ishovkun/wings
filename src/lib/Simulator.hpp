@@ -296,16 +296,16 @@ void Simulator<dim,n_phases>::run()
     wells.add_well(well);
 
   // make solvers
-  // SolverBuilder<dim,n_phases> builder(model, probe,
-  //                                     mpi_communicator,
-  //                                     triangulation, pcout);
-  // builder.build_solvers();
+  SolverBuilder<dim,n_phases> builder(model, probe, wells,
+                                      mpi_communicator,
+                                      triangulation, pcout);
+  builder.build_solvers();
 
-  // std::shared_ptr<FluidSolvers::FluidSolverBase<dim,n_phases>>
-  //     fluid_solver = builder.get_fluid_solver();
+  std::shared_ptr<FluidSolvers::FluidSolverBase<dim,n_phases>>
+      fluid_solver = builder.get_fluid_solver();
 
-  // std::shared_ptr<SolidSolvers::SolidSolverBase<dim,n_phases>>
-  //     solid_solver = builder.get_solid_solver();
+  std::shared_ptr<SolidSolvers::SolidSolverBase<dim,n_phases>>
+      solid_solver = builder.get_solid_solver();
 
   // setup dofs
   // fluid_solver->setup_dofs();

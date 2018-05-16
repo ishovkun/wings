@@ -21,8 +21,9 @@ template <int n_phases>
 class IMPESPressure : public FluidEquationsBase
 {
  public:
-  IMPESPressure(const Model::Model<dim>     & model,
-                Probe::Probe<dim,n_phases>  & probe);
+  IMPESPressure(const Model::Model<dim>       & model,
+                Probe::Probe<dim,n_phases>    & probe,
+                Wellbore::Wells<dim,n_phases> & wells);
   /* Update storage vectors and values for the current cell */
   virtual void update_cell_values(const CellIterator<dim> & cell,
                                   const SolutionValues    & solution_values) override;
@@ -65,8 +66,10 @@ class IMPESPressure : public FluidEquationsBase
                                     const int /* phase */ = 0) const override;
 
  public:
-  const Model::Model<dim>          & model;        // reference to the model object
-  const Probe::Probe<dim,n_phases> & probe;        // reference to the probe object
+  const Model::Model<dim>       & model;        // reference to the model object
+  Probe::Probe<dim,n_phases>    & probe;        // reference to the probe object
+  Wellbore::Wells<dim,n_phases> & wells;        // reference to the wells object
+
   Point<dim>                    location;     // cell center coordinates
   // Tensor<1,n_phases>            rel_perm;           // productivity indices for phases and segments
   SymmetricTensor<2,dim>        perm;
@@ -141,12 +144,14 @@ class IMPESPressure : public FluidEquationsBase
 
 template <int n_phases>
 IMPESPressure<n_phases>::
-IMPESPressure(const Model::Model<dim>    & model,
-              Probe::Probe<dim,n_phases> & probe)
+IMPESPressure(const Model::Model<dim>       & model,
+              Probe::Probe<dim,n_phases>    & probe,
+              Wellbore::Wells<dim,n_phases> & wells)
     :
     FluidEquationsBase::FluidEquationsBase(),
     model(model),
     probe(probe),
+    wells(wells),
     rel_perm(n_phases),
     pvt_values(n_phases)
 {}

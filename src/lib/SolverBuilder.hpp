@@ -3,6 +3,7 @@
 
 #include <Model.hpp>
 #include <Probe.hpp>
+#include <Wellbore/Wells.hpp>
 
 #include <SolverIMPES.hpp>
 #include <ElasticSolver.hpp>
@@ -22,6 +23,7 @@ class SolverBuilder
  public:
   SolverBuilder(const Model::Model<dim>                   & model,
                 Probe::Probe<dim,n_phases>                & probe,
+                Wellbore::Wells<dim,n_phases>             & wells,
                 MPI_Comm                                  & mpi_communicator,
                 parallel::distributed::Triangulation<dim> & triangulation,
                 ConditionalOStream                        & pcout);
@@ -38,6 +40,7 @@ class SolverBuilder
 
   const Model::Model<dim>                   & model;
   Probe::Probe<dim,n_phases>                & probe;
+  Wellbore::Wells<dim,n_phases>             & wells;
   MPI_Comm                                  & mpi_communicator;
   parallel::distributed::Triangulation<dim> & triangulation;
   ConditionalOStream                        & pcout;
@@ -53,12 +56,14 @@ template<int dim, int n_phases>
 SolverBuilder<dim,n_phases>::
 SolverBuilder(const Model::Model<dim>                   & model,
               Probe::Probe<dim,n_phases>                & probe,
+              Wellbore::Wells<dim,n_phases>             & wells,
               MPI_Comm                                  & mpi_communicator,
               parallel::distributed::Triangulation<dim> & triangulation,
               ConditionalOStream                        & pcout)
     :
     model(model),
     probe(probe),
+    wells(wells),
     mpi_communicator(mpi_communicator),
     triangulation(triangulation),
     pcout(pcout)
@@ -69,8 +74,8 @@ SolverBuilder(const Model::Model<dim>                   & model,
 template<int dim, int n_phases>
 void SolverBuilder<dim,n_phases>::build_fluid_solver()
 {
-  Equations::IMPESPressure<n_phases> implicit_pressure(model, probe);
-  Equations::IMPESSaturation<n_phases> explicit_saturation(model, probe);
+  Equations::IMPESPressure<n_phases> implicit_pressure(model, probe, wells);
+  Equations::IMPESSaturation<n_phases> explicit_saturation(model, probe, wells);
   fluid_solver =
       std::make_shared<FluidSolvers::SolverIMPES<dim,n_phases>>
             (mpi_communicator,
